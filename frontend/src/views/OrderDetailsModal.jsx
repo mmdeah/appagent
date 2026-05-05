@@ -59,8 +59,8 @@ export default function OrderDetailsModal({ order, onClose }) {
       <h1>${order.placa} — ${order.marca} ${order.modelo} ${order.anio}</h1>
       <p style="color:#555;margin-bottom:16px">${order.cliente} &bull; ${order.telefono}</p>
       <h2>Datos del Vehículo y Cliente</h2><div class="grid">${rows}</div>
-      ${order.servicios ? `<h2>Servicios a Realizar</h2><p>${order.servicios}</p>` : ''}
-      ${order.notas ? `<h2>Notas</h2><p>${order.notas}</p>` : ''}
+      ${order.servicios ? `<h2>Servicios a Realizar</h2><p style="line-height:1.6">${order.servicios}</p>` : ''}
+      ${order.notas ? `<h2>Notas de Recepción</h2><p style="line-height:1.6;background:#fffbea;padding:8px 12px;border-left:3px solid #d97706;border-radius:4px">${order.notas}</p>` : ''}
     `);
   };
 
@@ -69,18 +69,24 @@ export default function OrderDetailsModal({ order, onClose }) {
     const stateClass = { Bueno: 'badge-good', Regular: 'badge-warn', Malo: 'badge-bad' };
     const rows = reportData.items.map(it => `
       <tr>
-        <td>${it.category}</td><td>${it.item}</td>
+        <td>${it.category}</td>
+        <td>${it.item}</td>
         <td class="${stateClass[it.state] || ''}">${it.state}</td>
-        <td>${it.manoObra ? '$' + fmt(it.manoObra) : '—'}</td>
-        <td>${it.requiereRepuesto ? (it.cantidadRepuesto||1)+'x $'+(it.valorRepuesto ? fmt(it.valorRepuesto) : '?') : '—'}</td>
-        <td>${it.recibeReparacion ? (it.valorReparacion ? '$'+fmt(it.valorReparacion) : 'Pendiente') : '—'}</td>
+        <td>${it.requiereRepuesto ? '✓ Requiere repuesto' : '—'}</td>
+        <td>${it.recibeReparacion ? '✓ Recibe reparación' : '—'}</td>
       </tr>
     `).join('');
     printWindow(`Reporte Técnico ${order.placa}`, `
       <h1>Reporte Técnico — ${order.placa}</h1>
-      <p style="color:#555;margin-bottom:16px">${order.marca} ${order.modelo} ${order.anio} &bull; ${order.cliente}</p>
+      <p style="color:#555;margin-bottom:4px">${order.marca} ${order.modelo} ${order.anio} &bull; ${order.cliente}</p>
+      <p style="color:#555;margin-bottom:16px">
+        ${order.kilometraje ? `Kilometraje: <strong>${fmt(order.kilometraje)} km</strong>` : ''}
+      </p>
+      ${order.notas ? `<div style="background:#fffbea;padding:8px 12px;border-left:3px solid #d97706;border-radius:4px;margin-bottom:16px;font-size:12px"><strong>Notas de Recepción:</strong> ${order.notas}</div>` : ''}
       <h2>Revisión de Componentes</h2>
-      <table><thead><tr><th>Categoría</th><th>Ítem</th><th>Estado</th><th>Mano de Obra</th><th>Repuesto</th><th>Reparación</th></tr></thead><tbody>${rows}</tbody></table>
+      <table><thead><tr>
+        <th>Categoría</th><th>Ítem</th><th>Estado</th><th>Repuesto</th><th>Reparación</th>
+      </tr></thead><tbody>${rows}</tbody></table>
     `);
   };
 
@@ -96,7 +102,11 @@ export default function OrderDetailsModal({ order, onClose }) {
     `).join('');
     printWindow(`Cotización ${order.placa}`, `
       <h1>Cotización — ${order.placa}</h1>
-      <p style="color:#555;margin-bottom:16px">${order.marca} ${order.modelo} ${order.anio} &bull; ${order.cliente} &bull; ${order.telefono}</p>
+      <p style="color:#555;margin-bottom:4px">${order.marca} ${order.modelo} ${order.anio} &bull; ${order.cliente} &bull; ${order.telefono}</p>
+      <p style="color:#555;margin-bottom:16px">
+        ${order.kilometraje ? `Kilometraje: <strong>${fmt(order.kilometraje)} km</strong>` : ''}
+      </p>
+      ${order.notas ? `<div style="background:#fffbea;padding:8px 12px;border-left:3px solid #d97706;border-radius:4px;margin-bottom:16px;font-size:12px"><strong>Notas de Recepción:</strong> ${order.notas}</div>` : ''}
       <h2>Detalle de Servicios</h2>
       <table><thead><tr><th style="width:40%">Descripción</th><th>Cant.</th><th>Vr. Unitario</th><th>+IVA</th><th>Total</th></tr></thead><tbody>${rows}</tbody></table>
       <div class="total-box">
