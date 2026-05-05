@@ -509,7 +509,6 @@ export default function AdminView() {
             )}
           </div>
 
-      </div>
 
       {/* New Order Modal */}
       {showNewOrder && (
