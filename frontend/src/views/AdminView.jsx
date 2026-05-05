@@ -67,6 +67,18 @@ export default function AdminView() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ estado })
     });
+
+    const order = orders.find(o => o.id === id);
+    if (order && order.correo) {
+      try {
+        await fetch(`${API_URL}/api/send-email`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ to: order.correo, type: 'update', placa: order.placa })
+        });
+      } catch (e) { console.error('Error enviando notificación:', e); }
+    }
+
     fetchOrders();
   };
 
@@ -96,6 +108,17 @@ export default function AdminView() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)
       });
+      
+      if (payload.correo) {
+        try {
+          await fetch(`${API_URL}/api/send-email`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ to: payload.correo, type: 'reception', placa: payload.placa })
+          });
+        } catch (e) { console.error('Error enviando correo de recepción:', e); }
+      }
+
       setCreatedOrderData(payload);
       setForm(emptyForm);
       setPhotos([]);

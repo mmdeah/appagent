@@ -13,6 +13,7 @@
   "type": "commonjs",
   "dependencies": {
     "cors": "^2.8.6",
-    "json-server": "^0.17.4"
+    "json-server": "^0.17.4",
+    "resend": "^6.12.2"
   }
 }

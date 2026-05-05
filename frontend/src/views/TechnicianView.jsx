@@ -93,6 +93,17 @@ export default function TechnicianView() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)
       });
+      
+      if (selectedOrder.correo) {
+        try {
+          await fetch(`${API_URL}/api/send-email`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ to: selectedOrder.correo, type: 'update', placa: selectedOrder.placa })
+          });
+        } catch (e) { console.error('Error enviando notificación:', e); }
+      }
+
       setStatusMsg({ text: '✓ Reporte subido exitosamente', type: 'success' });
       setTimeout(() => { setSelectedOrder(null); setReportData({}); setScannerCodes([{ prefix: 'P', code: '', description: '' }]); setPrecioDiagnostico(''); setStatusMsg({ text: '', type: '' }); }, 2000);
     } catch (e) {
