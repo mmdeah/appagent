@@ -32,7 +32,7 @@ server.use(jsonServer.bodyParser);
 const transporter = nodemailer.createTransport({
   service: 'gmail',
   auth: {
-    user: 'davidperlaza16@gmail.com',
+    user: 'autoonlinesdclientes@gmail.com',
     pass: 'vebd cese ezft nppf'
   }
 });
@@ -104,7 +104,7 @@ server.post('/api/send-email', async (req, res) => {
 
   try {
     await transporter.sendMail({
-      from: '"Taller Automotriz" <davidperlaza16@gmail.com>',
+      from: '"Taller Automotriz" <autoonlinesdclientes@gmail.com>',
       to,
       subject,
       html
