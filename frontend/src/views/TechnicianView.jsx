@@ -323,7 +323,6 @@ export default function TechnicianView() {
         <button className="btn-success" style={{ width: '100%', padding: '1rem', fontSize: '1.05rem', justifyContent: 'center' }} onClick={submitReport}>
           <SendHorizonal size={18} /> Subir Revisión
         </button>
-        </div>
       </div>
     </div>
 
