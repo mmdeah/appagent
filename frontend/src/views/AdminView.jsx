@@ -3,7 +3,7 @@ import { API_URL } from '../api';
 import OrderDetailsModal from './OrderDetailsModal';
 import PhotoUploadModal from './PhotoUploadModal';
 import { ThemeContext } from '../App';
-import { PlusCircle, BarChart3, Camera, X, Car } from 'lucide-react';
+import { PlusCircle, BarChart3, Camera, X, Car, Trash2, Zap, LayoutDashboard, History, Receipt } from 'lucide-react';
 
 const fmt = (n) => (parseFloat(n) || 0).toLocaleString('es-CO', { minimumFractionDigits: 0 });
 
@@ -21,7 +21,19 @@ export default function AdminView() {
   const [showPhotoUpload, setShowPhotoUpload] = useState(false);
   const [form, setForm] = useState(emptyForm);
   const [photos, setPhotos] = useState([]);
+  const [activeTab, setActiveTab] = useState('Kanban');
+  const [expenses, setExpenses] = useState([]);
+  const [expenseForm, setExpenseForm] = useState({ fecha: new Date().toISOString().split('T')[0], concepto: '', monto: '' });
+  const [quickOrderForm, setQuickOrderForm] = useState({ placa: '', cliente: '', marca: '', modelo: '', anio: '', servicios: '' });
   const [formStatus, setFormStatus] = useState({ text: '', type: '' });
+
+  const fetchExpenses = async () => {
+    try {
+      const res = await fetch(`${API_URL}/expenses`);
+      const data = await res.json();
+      setExpenses(data);
+    } catch (e) { console.error(e); }
+  };
 
   const fetchOrders = async () => {
     try {
@@ -29,16 +41,25 @@ export default function AdminView() {
       const data = await res.json();
       setOrders(data);
       let total = 0;
-      data.forEach(o => o.quotes?.forEach(q => q.items?.forEach(it => {
+      const entregadas = data.filter(o => o.estado === 'Entregado');
+      entregadas.forEach(o => o.quotes?.forEach(q => q.items?.forEach(it => {
         const sub = it.precio * it.cantidad;
         total += it.aplicaIva ? sub * 1.19 : sub;
       })));
       const active = data.filter(o => o.estado !== 'Entregado').length;
-      setStats({ total, avg: active > 0 ? total / active : 0, active });
+      setStats({ total, avg: entregadas.length > 0 ? total / entregadas.length : 0, active });
     } catch (e) { console.error(e); }
   };
 
-  useEffect(() => { fetchOrders(); }, []);
+  useEffect(() => { fetchOrders(); fetchExpenses(); }, []);
+
+  const deleteOrder = async (id) => {
+    if(!window.confirm('¿Estás seguro de eliminar esta orden permanentemente? Esta acción no se puede deshacer.')) return;
+    try {
+      await fetch(`${API_URL}/orders/${id}`, { method: 'DELETE' });
+      fetchOrders();
+    } catch (e) { console.error(e); }
+  };
 
   const moveOrder = async (id, estado) => {
     await fetch(`${API_URL}/orders/${id}`, {
@@ -84,6 +105,43 @@ export default function AdminView() {
     }
   };
 
+  const handleExpenseSubmit = async (e) => {
+    e.preventDefault();
+    if(!expenseForm.monto || !expenseForm.concepto) return;
+    try {
+      await fetch(`${API_URL}/expenses`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ...expenseForm, monto: parseInt(expenseForm.monto) })
+      });
+      setExpenseForm({ fecha: new Date().toISOString().split('T')[0], concepto: '', monto: '' });
+      fetchExpenses();
+    } catch (e) { console.error(e); }
+  };
+
+  const handleQuickOrder = async (e) => {
+    e.preventDefault();
+    if(!quickOrderForm.placa) return;
+    try {
+      const payload = {
+        ...quickOrderForm,
+        placa: quickOrderForm.placa.toUpperCase(),
+        estado: 'Entregado',
+        fecha: new Date().toISOString(),
+        fotos: []
+      };
+      const res = await fetch(`${API_URL}/orders`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      const newOrder = await res.json();
+      setQuickOrderForm({ placa: '', cliente: '', marca: '', modelo: '', anio: '', servicios: '' });
+      setSelectedOrder({ ...newOrder, reports: [], quotes: [] });
+      fetchOrders();
+    } catch (e) { console.error(e); }
+  };
+
   const colColor = { 'Recepción': '#6366f1', 'Proceso': '#f59e0b', 'Calidad': '#10b981' };
   const colBg   = { 'Recepción': 'rgba(99,102,241,0.08)', 'Proceso': 'rgba(245,158,11,0.08)', 'Calidad': 'rgba(16,185,129,0.08)' };
 
@@ -122,61 +180,220 @@ export default function AdminView() {
           <div className="stat-card">
             <div className="label">Total Facturado</div>
             <div className="value">${fmt(stats.total)}</div>
-            <div className="sub">Suma de todas las cotizaciones</div>
+            <div className="sub">De órdenes entregadas</div>
           </div>
           <div className="stat-card">
-            <div className="label">Promedio por O.S.</div>
+            <div className="label">Gastos Registrados</div>
+            <div className="value" style={{ color: 'var(--error)' }}>${fmt(expenses.reduce((acc, g) => acc + (parseFloat(g.monto) || 0), 0))}</div>
+            <div className="sub">Salidas de dinero</div>
+          </div>
+          <div className="stat-card">
+            <div className="label">Promedio O.S.</div>
             <div className="value">${fmt(stats.avg)}</div>
-            <div className="sub">Valor promedio por orden</div>
+            <div className="sub">Valor por orden entregada</div>
           </div>
         </div>
 
-        {/* Kanban */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '1.25rem' }}>
-          {COLUMNS.map(col => (
-            <div key={col} className="kanban-column">
-              <div className="kanban-header">
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                  <span style={{ width: 10, height: 10, borderRadius: '50%', background: colColor[col], display: 'inline-block' }}></span>
-                  <span style={{ fontWeight: 600, fontSize: '0.9rem' }}>{col}</span>
-                </div>
-                <span style={{ background: colBg[col], color: colColor[col], borderRadius: 999, padding: '0.15rem 0.6rem', fontSize: '0.75rem', fontWeight: 700 }}>
-                  {orders.filter(o => o.estado === col).length}
-                </span>
-              </div>
-
-              {orders.filter(o => o.estado === col).map(o => (
-                <div key={o.id} className="kanban-card" onClick={() => setSelectedOrder(o)}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '0.5rem' }}>
-                    <div>
-                      <div style={{ fontWeight: 700, fontSize: '1rem' }}>{o.placa}</div>
-                      <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>{o.marca} {o.modelo}</div>
-                    </div>
-                    <span style={{ fontSize: '0.72rem', background: o.reports?.length > 0 ? 'rgba(16,185,129,0.15)' : 'rgba(245,158,11,0.15)', color: o.reports?.length > 0 ? '#34d399' : '#fbbf24', padding: '0.2rem 0.5rem', borderRadius: 999, fontWeight: 600, whiteSpace: 'nowrap' }}>
-                      {o.reports?.length > 0 ? '✓ Revisado' : '⏳ Pdte'}
-                    </span>
-                  </div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '0.5rem' }}>
-                    <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>{o.cliente}</span>
-                    <select
-                      value={o.estado}
-                      onClick={e => e.stopPropagation()}
-                      onChange={e => { e.stopPropagation(); moveOrder(o.id, e.target.value); }}
-                      style={{ fontSize: '0.75rem', padding: '0.2rem 0.4rem', width: 'auto', borderRadius: 6 }}>
-                      {COLUMNS.map(c => <option key={c} value={c}>{c}</option>)}
-                    </select>
-                  </div>
-                </div>
-              ))}
-
-              {orders.filter(o => o.estado === col).length === 0 && (
-                <div style={{ textAlign: 'center', padding: '2rem 0', color: 'var(--text-muted)', fontSize: '0.82rem' }}>
-                  Sin órdenes
-                </div>
-              )}
-            </div>
+        {/* Navigation Tabs */}
+        <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1.5rem', borderBottom: '1px solid var(--border)', paddingBottom: '0.5rem', overflowX: 'auto' }}>
+          {[
+            { id: 'Kanban', icon: <LayoutDashboard size={16} />, label: 'Kanban' },
+            { id: 'Historial', icon: <History size={16} />, label: 'Historial' },
+            { id: 'Gastos', icon: <Receipt size={16} />, label: 'Gastos' },
+            { id: 'Docs Rápidos', icon: <Zap size={16} />, label: 'Docs Rápidos' }
+          ].map(t => (
+            <button key={t.id} onClick={() => setActiveTab(t.id)}
+              style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', padding: '0.5rem 1rem', background: activeTab === t.id ? 'var(--primary)' : 'transparent', color: activeTab === t.id ? 'white' : 'var(--text-muted)', border: 'none', borderRadius: 'var(--radius-sm)', cursor: 'pointer', fontWeight: 600, fontSize: '0.9rem', transition: 'all 0.2s', whiteSpace: 'nowrap' }}>
+              {t.icon} {t.label}
+            </button>
           ))}
         </div>
+
+        {/* Content based on activeTab */}
+        {activeTab === 'Kanban' && (
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '1.25rem' }}>
+            {COLUMNS.map(col => (
+              <div key={col} className="kanban-column">
+                <div className="kanban-header">
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                    <span style={{ width: 10, height: 10, borderRadius: '50%', background: colColor[col], display: 'inline-block' }}></span>
+                    <span style={{ fontWeight: 600, fontSize: '0.9rem' }}>{col}</span>
+                  </div>
+                  <span style={{ background: colBg[col], color: colColor[col], borderRadius: 999, padding: '0.15rem 0.6rem', fontSize: '0.75rem', fontWeight: 700 }}>
+                    {orders.filter(o => o.estado === col).length}
+                  </span>
+                </div>
+
+                {orders.filter(o => o.estado === col).map(o => (
+                  <div key={o.id} className="kanban-card" onClick={() => setSelectedOrder(o)}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '0.5rem' }}>
+                      <div>
+                        <div style={{ fontWeight: 700, fontSize: '1rem' }}>{o.placa}</div>
+                        <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>{o.marca} {o.modelo}</div>
+                      </div>
+                      <span style={{ fontSize: '0.72rem', background: o.reports?.length > 0 ? 'rgba(16,185,129,0.15)' : 'rgba(245,158,11,0.15)', color: o.reports?.length > 0 ? '#34d399' : '#fbbf24', padding: '0.2rem 0.5rem', borderRadius: 999, fontWeight: 600, whiteSpace: 'nowrap' }}>
+                        {o.reports?.length > 0 ? '✓ Revisado' : '⏳ Pdte'}
+                      </span>
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '0.5rem' }}>
+                      <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>{o.cliente}</span>
+                      <div style={{ display: 'flex', gap: '0.4rem', alignItems: 'center' }}>
+                        <select
+                          value={o.estado}
+                          onClick={e => e.stopPropagation()}
+                          onChange={e => { e.stopPropagation(); moveOrder(o.id, e.target.value); }}
+                          style={{ fontSize: '0.75rem', padding: '0.2rem 0.4rem', width: 'auto', borderRadius: 6 }}>
+                          {COLUMNS.map(c => <option key={c} value={c}>{c}</option>)}
+                        </select>
+                        <button onClick={e => { e.stopPropagation(); deleteOrder(o.id); }} style={{ background: 'none', border: 'none', color: 'var(--error)', cursor: 'pointer', display: 'flex', padding: '0.2rem' }} title="Eliminar orden">
+                          <Trash2 size={14} />
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+
+                {orders.filter(o => o.estado === col).length === 0 && (
+                  <div style={{ textAlign: 'center', padding: '2rem 0', color: 'var(--text-muted)', fontSize: '0.82rem' }}>
+                    Sin órdenes
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
+
+        {activeTab === 'Historial' && (
+          <div className="card" style={{ padding: '1.5rem' }}>
+            <h2 style={{ fontSize: '1.2rem', marginBottom: '1rem', fontWeight: 700 }}>Órdenes Entregadas</h2>
+            <table className="data-table">
+              <thead>
+                <tr>
+                  <th>Placa</th>
+                  <th>Cliente</th>
+                  <th>Vehículo</th>
+                  <th>Fecha Ingreso</th>
+                  <th>Acciones</th>
+                </tr>
+              </thead>
+              <tbody>
+                {orders.filter(o => o.estado === 'Entregado').length === 0 && (
+                  <tr><td colSpan="5" style={{ textAlign: 'center', color: 'var(--text-muted)' }}>No hay órdenes entregadas.</td></tr>
+                )}
+                {orders.filter(o => o.estado === 'Entregado').map(o => (
+                  <tr key={o.id}>
+                    <td style={{ fontWeight: 700 }}>{o.placa}</td>
+                    <td>{o.cliente}</td>
+                    <td>{o.marca} {o.modelo}</td>
+                    <td>{new Date(o.fecha).toLocaleDateString('es-CO')}</td>
+                    <td>
+                      <div style={{ display: 'flex', gap: '0.5rem' }}>
+                        <button className="btn-secondary" style={{ padding: '0.4rem 0.6rem', fontSize: '0.8rem' }} onClick={() => setSelectedOrder(o)}>Ver Detalle</button>
+                        <button className="btn-secondary" style={{ padding: '0.4rem 0.6rem', fontSize: '0.8rem', color: 'var(--error)' }} onClick={() => deleteOrder(o.id)}><Trash2 size={14} /></button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+
+        {activeTab === 'Gastos' && (
+          <div style={{ display: 'grid', gridTemplateColumns: '300px 1fr', gap: '1.5rem' }}>
+            <div className="card" style={{ padding: '1.5rem' }}>
+              <h2 style={{ fontSize: '1.1rem', marginBottom: '1rem', fontWeight: 700 }}>Registrar Gasto</h2>
+              <form onSubmit={handleExpenseSubmit}>
+                <div style={{ marginBottom: '1rem' }}>
+                  <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-muted)', marginBottom: '0.4rem' }}>Fecha</label>
+                  <input type="date" required value={expenseForm.fecha} onChange={e => setExpenseForm({...expenseForm, fecha: e.target.value})} style={{ width: '100%' }} />
+                </div>
+                <div style={{ marginBottom: '1rem' }}>
+                  <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-muted)', marginBottom: '0.4rem' }}>Concepto</label>
+                  <input type="text" required placeholder="Ej. Compra de repuestos" value={expenseForm.concepto} onChange={e => setExpenseForm({...expenseForm, concepto: e.target.value})} style={{ width: '100%' }} />
+                </div>
+                <div style={{ marginBottom: '1.5rem' }}>
+                  <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-muted)', marginBottom: '0.4rem' }}>Monto ($)</label>
+                  <input type="number" required placeholder="0" value={expenseForm.monto} onChange={e => setExpenseForm({...expenseForm, monto: e.target.value})} style={{ width: '100%' }} />
+                </div>
+                <button type="submit" className="btn-primary" style={{ width: '100%', justifyContent: 'center' }}>Guardar Gasto</button>
+              </form>
+            </div>
+            <div className="card" style={{ padding: '1.5rem' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+                <h2 style={{ fontSize: '1.1rem', fontWeight: 700 }}>Historial de Gastos</h2>
+                <div style={{ fontWeight: 700, color: 'var(--error)' }}>
+                  Total: ${fmt(expenses.reduce((acc, g) => acc + (parseFloat(g.monto) || 0), 0))}
+                </div>
+              </div>
+              <table className="data-table">
+                <thead>
+                  <tr>
+                    <th>Fecha</th>
+                    <th>Concepto</th>
+                    <th style={{ textAlign: 'right' }}>Monto</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {expenses.length === 0 && (
+                    <tr><td colSpan="3" style={{ textAlign: 'center', color: 'var(--text-muted)' }}>No se han registrado gastos.</td></tr>
+                  )}
+                  {expenses.map(g => (
+                    <tr key={g.id}>
+                      <td>{new Date(g.fecha).toLocaleDateString('es-CO')}</td>
+                      <td>{g.concepto}</td>
+                      <td style={{ textAlign: 'right', fontWeight: 700, color: 'var(--error)' }}>${fmt(g.monto)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+
+        {activeTab === 'Docs Rápidos' && (
+          <div className="card" style={{ padding: '1.5rem', maxWidth: 600, margin: '0 auto' }}>
+            <div style={{ textAlign: 'center', marginBottom: '1.5rem' }}>
+              <div style={{ background: 'rgba(99,102,241,0.1)', color: 'var(--primary)', width: 48, height: 48, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 0.5rem' }}>
+                <Zap size={24} />
+              </div>
+              <h2 style={{ fontSize: '1.2rem', fontWeight: 700 }}>Generador de Orden Exprés</h2>
+              <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem', marginTop: '0.5rem' }}>
+                Crea una orden rápida para cotizar o facturar inmediatamente. La orden quedará marcada como "Entregada" de forma automática.
+              </p>
+            </div>
+            <form onSubmit={handleQuickOrder}>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1rem' }}>
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-muted)', marginBottom: '0.4rem' }}>Placa</label>
+                  <input required placeholder="AAA123" value={quickOrderForm.placa} onChange={e => setQuickOrderForm({...quickOrderForm, placa: e.target.value.toUpperCase()})} style={{ width: '100%' }} />
+                </div>
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-muted)', marginBottom: '0.4rem' }}>Cliente</label>
+                  <input required placeholder="Nombre" value={quickOrderForm.cliente} onChange={e => setQuickOrderForm({...quickOrderForm, cliente: e.target.value})} style={{ width: '100%' }} />
+                </div>
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-muted)', marginBottom: '0.4rem' }}>Marca</label>
+                  <input required placeholder="Ej. Toyota" value={quickOrderForm.marca} onChange={e => setQuickOrderForm({...quickOrderForm, marca: e.target.value})} style={{ width: '100%' }} />
+                </div>
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-muted)', marginBottom: '0.4rem' }}>Modelo / Año</label>
+                  <div style={{ display: 'flex', gap: '0.5rem' }}>
+                    <input required placeholder="Corolla" value={quickOrderForm.modelo} onChange={e => setQuickOrderForm({...quickOrderForm, modelo: e.target.value})} style={{ flex: 2 }} />
+                    <input placeholder="Año" type="number" value={quickOrderForm.anio} onChange={e => setQuickOrderForm({...quickOrderForm, anio: e.target.value})} style={{ flex: 1 }} />
+                  </div>
+                </div>
+              </div>
+              <div style={{ marginBottom: '1.5rem' }}>
+                <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-muted)', marginBottom: '0.4rem' }}>Servicios / Observaciones (opcional)</label>
+                <textarea placeholder="Detalle rápido de la revisión o servicio..." value={quickOrderForm.servicios} onChange={e => setQuickOrderForm({...quickOrderForm, servicios: e.target.value})} style={{ width: '100%', minHeight: 60 }}></textarea>
+              </div>
+              <button type="submit" className="btn-primary" style={{ width: '100%', justifyContent: 'center', padding: '1rem', fontSize: '1rem' }}>
+                Crear y Facturar / Cotizar
+              </button>
+            </form>
+          </div>
+        )}
       </div>
 
       {/* New Order Modal */}
