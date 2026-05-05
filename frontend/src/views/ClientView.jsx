@@ -1,8 +1,7 @@
-import React, { useState, useContext } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Search, ArrowLeft, ChevronRight, Camera } from 'lucide-react';
 import { API_URL } from '../api';
-import { ThemeContext } from '../App';
 
 const fmt = (n) => (parseFloat(n) || 0).toLocaleString('es-CO', { minimumFractionDigits: 0 });
 
@@ -14,7 +13,6 @@ const ESTADO_CONFIG = {
 };
 
 export default function ClientView() {
-  const { theme, toggleTheme } = useContext(ThemeContext);
   const [placa, setPlaca] = useState('');
   const [orders, setOrders] = useState([]);
   const [selectedOrder, setSelectedOrder] = useState(null);
@@ -22,6 +20,10 @@ export default function ClientView() {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
+
+  useEffect(() => {
+    document.body.setAttribute('data-theme', 'light');
+  }, []);
 
   const searchOrders = async (e) => {
     e.preventDefault();
@@ -50,9 +52,6 @@ export default function ClientView() {
     return (
       <div className="login-page">
         <div style={{ width: '100%', maxWidth: 500, background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 'var(--radius)', padding: '2.5rem', boxShadow: 'var(--shadow-lg)' }}>
-          <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '0.75rem' }}>
-            <button onClick={toggleTheme} className="theme-toggle" title="Cambiar tema" />
-          </div>
           <div style={{ textAlign: 'center', marginBottom: '2rem' }}>
             <div style={{ fontSize: '2.5rem', marginBottom: '0.5rem' }}>🔍</div>
             <h1 style={{ fontWeight: 800, fontSize: '1.5rem', marginBottom: '0.25rem' }}>Consulta tu Vehículo</h1>
@@ -79,12 +78,6 @@ export default function ClientView() {
               {loading ? 'Buscando...' : 'Consultar Estado'}
             </button>
           </form>
-
-          <p style={{ textAlign: 'center', marginTop: '1.25rem' }}>
-            <button onClick={() => navigate('/')} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', fontSize: '0.82rem', display: 'inline-flex', alignItems: 'center', gap: '0.3rem' }}>
-              <ArrowLeft size={14} /> Volver al inicio
-            </button>
-          </p>
         </div>
       </div>
     );
@@ -99,7 +92,6 @@ export default function ClientView() {
             <button onClick={() => setOrders([])} className="btn-secondary">
               <ArrowLeft size={16} /> Buscar otra placa
             </button>
-            <button onClick={toggleTheme} className="theme-toggle" title="Cambiar tema" />
           </div>
 
           <div style={{ textAlign: 'center', marginBottom: '1.75rem' }}>
@@ -163,7 +155,6 @@ export default function ClientView() {
           <button onClick={() => setSelectedOrder(null)} className="btn-secondary">
             <ArrowLeft size={16} /> Ver todas las órdenes
           </button>
-          <button onClick={toggleTheme} className="theme-toggle" title="Cambiar tema" />
         </div>
 
         {/* Header ticket */}

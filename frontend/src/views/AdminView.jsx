@@ -17,6 +17,7 @@ export default function AdminView() {
   const [stats, setStats] = useState({ avg: 0, total: 0, active: 0 });
   const [selectedOrder, setSelectedOrder] = useState(null);
   const [showNewOrder, setShowNewOrder] = useState(false);
+  const [createdOrderData, setCreatedOrderData] = useState(null);
   const [showPhotoUpload, setShowPhotoUpload] = useState(false);
   const [form, setForm] = useState(emptyForm);
   const [photos, setPhotos] = useState([]);
@@ -62,18 +63,19 @@ export default function AdminView() {
     e.preventDefault();
     if (!form.placa) return;
     try {
+      const payload = {
+        ...form,
+        placa: form.placa.toUpperCase(),
+        estado: 'Recepción',
+        fecha: new Date().toISOString(),
+        fotos: photos
+      };
       await fetch(`${API_URL}/orders`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          ...form,
-          placa: form.placa.toUpperCase(),
-          estado: 'Recepción',
-          fecha: new Date().toISOString(),
-          fotos: photos
-        })
+        body: JSON.stringify(payload)
       });
-      setShowNewOrder(false);
+      setCreatedOrderData(payload);
       setForm(emptyForm);
       setPhotos([]);
       fetchOrders();
@@ -181,15 +183,33 @@ export default function AdminView() {
       {showNewOrder && (
         <div className="modal-overlay">
           <div className="modal-box" style={{ maxWidth: 640 }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
-              <h2 style={{ fontWeight: 700, fontSize: '1.2rem' }}>📋 Ingresar Vehículo</h2>
-              <button onClick={() => { setShowNewOrder(false); setPhotos([]); }} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)' }}><X size={20} /></button>
-            </div>
+            {createdOrderData ? (
+              <div style={{ textAlign: 'center', padding: '1rem' }}>
+                <div style={{ fontSize: '3.5rem', marginBottom: '1rem' }}>✅</div>
+                <h2 style={{ fontWeight: 800, fontSize: '1.6rem', marginBottom: '0.5rem' }}>¡Orden Creada!</h2>
+                <p style={{ color: 'var(--text-muted)', marginBottom: '2rem', fontSize: '1.05rem' }}>El vehículo <strong>{createdOrderData.placa}</strong> ha sido ingresado al sistema.</p>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
+                  <a href={`https://wa.me/57${createdOrderData.telefono}?text=${encodeURIComponent(`Buenos dias! Confirmamos recepcion del vehiculo de placas ${createdOrderData.placa}, puedes ver mas detalles del servicio aqui https://appagent.up.railway.app/cliente`)}`}
+                     target="_blank" rel="noreferrer"
+                     className="btn-success" style={{ padding: '0.85rem', width: '100%', justifyContent: 'center', fontSize: '1.05rem', textDecoration: 'none' }}>
+                    📱 Notificar al Cliente (WhatsApp)
+                  </a>
+                  <button className="btn-secondary" style={{ width: '100%', justifyContent: 'center', padding: '0.85rem', fontSize: '1rem' }} onClick={() => { setShowNewOrder(false); setCreatedOrderData(null); }}>
+                    Cerrar
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
+                  <h2 style={{ fontWeight: 700, fontSize: '1.2rem' }}>📋 Ingresar Vehículo</h2>
+                  <button onClick={() => { setShowNewOrder(false); setPhotos([]); }} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)' }}><X size={20} /></button>
+                </div>
 
-            {formStatus.text && <div className={`toast toast-${formStatus.type}`}>{formStatus.text}</div>}
+                {formStatus.text && <div className={`toast toast-${formStatus.type}`}>{formStatus.text}</div>}
 
-            <form onSubmit={handleCreateOrder}>
-              <p className="section-title">Vehículo</p>
+                <form onSubmit={handleCreateOrder}>
+                  <p className="section-title">Vehículo</p>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem', marginBottom: '1.25rem' }}>
                 <input required placeholder="Placa (Ej. AAA123)" value={form.placa} onChange={e => setForm({...form, placa: e.target.value.toUpperCase()})} />
                 <input required placeholder="Kilometraje" type="number" value={form.kilometraje} onChange={e => setForm({...form, kilometraje: e.target.value})} />
@@ -234,6 +254,8 @@ export default function AdminView() {
                 <button type="submit" className="btn-primary" style={{ flex: 2, justifyContent: 'center' }}>Guardar Orden</button>
               </div>
             </form>
+            </>
+            )}
           </div>
         </div>
       )}
