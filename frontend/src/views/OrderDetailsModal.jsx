@@ -12,10 +12,99 @@ export default function OrderDetailsModal({ order, onClose }) {
   );
   const [statusMsg, setStatusMsg] = useState({ text: '', type: '' });
   const [showConfirm, setShowConfirm] = useState(false);
+  const [lightboxSrc, setLightboxSrc] = useState(null);
 
   const showStatus = (text, type = 'success') => {
     setStatusMsg({ text, type });
     setTimeout(() => setStatusMsg({ text: '', type: '' }), 3000);
+  };
+
+  const printWindow = (title, bodyHtml) => {
+    const win = window.open('', '_blank', 'width=900,height=700');
+    win.document.write(`
+      <!DOCTYPE html><html><head>
+        <meta charset="utf-8" />
+        <title>${title}</title>
+        <style>
+          * { box-sizing: border-box; margin: 0; padding: 0; }
+          body { font-family: Arial, sans-serif; font-size: 13px; color: #111; padding: 24px; }
+          h1 { font-size: 20px; font-weight: 800; margin-bottom: 4px; }
+          h2 { font-size: 13px; font-weight: 600; text-transform: uppercase; letter-spacing: .06em; color: #555; border-bottom: 1px solid #ddd; padding-bottom: 4px; margin: 16px 0 8px; }
+          table { width: 100%; border-collapse: collapse; margin-bottom: 16px; }
+          th { text-align: left; padding: 6px 10px; background: #f4f4f4; font-size: 11px; text-transform: uppercase; border-bottom: 2px solid #ddd; }
+          td { padding: 6px 10px; border-bottom: 1px solid #eee; vertical-align: top; }
+          .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 4px 24px; margin-bottom: 16px; }
+          .lbl { font-size: 10px; text-transform: uppercase; color: #888; font-weight: 600; }
+          .val { font-size: 13px; font-weight: 500; }
+          .total-box { width: 260px; margin-left: auto; border: 1px solid #ddd; border-radius: 8px; padding: 12px; }
+          .total-row { display: flex; justify-content: space-between; margin-bottom: 6px; font-size: 12px; color: #555; }
+          .total-final { display: flex; justify-content: space-between; font-size: 16px; font-weight: 800; border-top: 2px solid #ddd; padding-top: 8px; color: #059669; }
+          .badge-good { color: #059669; font-weight: 700; } .badge-warn { color: #d97706; font-weight: 700; } .badge-bad { color: #dc2626; font-weight: 700; }
+          @media print { body { padding: 0; } }
+        </style>
+      </head><body>${bodyHtml}
+      <script>window.onload = function(){ window.print(); }<\/script>
+      </body></html>
+    `);
+    win.document.close();
+  };
+
+  const printInfo = () => {
+    const rows = [
+      ['Placa', order.placa], ['Marca', order.marca], ['Modelo', order.modelo],
+      ['Año', order.anio], ['Kilometraje', order.kilometraje ? `${fmt(order.kilometraje)} km` : 'N/A'],
+      ['Cliente', order.cliente], ['Teléfono', order.telefono], ['Estado', order.estado],
+    ].map(([l,v]) => `<div><div class="lbl">${l}</div><div class="val">${v || '—'}</div></div>`).join('');
+    printWindow(`Orden ${order.placa}`, `
+      <h1>${order.placa} — ${order.marca} ${order.modelo} ${order.anio}</h1>
+      <p style="color:#555;margin-bottom:16px">${order.cliente} &bull; ${order.telefono}</p>
+      <h2>Datos del Vehículo y Cliente</h2><div class="grid">${rows}</div>
+      ${order.servicios ? `<h2>Servicios a Realizar</h2><p>${order.servicios}</p>` : ''}
+      ${order.notas ? `<h2>Notas</h2><p>${order.notas}</p>` : ''}
+    `);
+  };
+
+  const printReport = () => {
+    if (!reportData) return;
+    const stateClass = { Bueno: 'badge-good', Regular: 'badge-warn', Malo: 'badge-bad' };
+    const rows = reportData.items.map(it => `
+      <tr>
+        <td>${it.category}</td><td>${it.item}</td>
+        <td class="${stateClass[it.state] || ''}">${it.state}</td>
+        <td>${it.manoObra ? '$' + fmt(it.manoObra) : '—'}</td>
+        <td>${it.requiereRepuesto ? (it.cantidadRepuesto||1)+'x $'+(it.valorRepuesto ? fmt(it.valorRepuesto) : '?') : '—'}</td>
+        <td>${it.recibeReparacion ? (it.valorReparacion ? '$'+fmt(it.valorReparacion) : 'Pendiente') : '—'}</td>
+      </tr>
+    `).join('');
+    printWindow(`Reporte Técnico ${order.placa}`, `
+      <h1>Reporte Técnico — ${order.placa}</h1>
+      <p style="color:#555;margin-bottom:16px">${order.marca} ${order.modelo} ${order.anio} &bull; ${order.cliente}</p>
+      <h2>Revisión de Componentes</h2>
+      <table><thead><tr><th>Categoría</th><th>Ítem</th><th>Estado</th><th>Mano de Obra</th><th>Repuesto</th><th>Reparación</th></tr></thead><tbody>${rows}</tbody></table>
+    `);
+  };
+
+  const printQuote = () => {
+    const sub = totals.sub, iva = totals.iva, total = totals.total;
+    const rows = quoteItems.map(it => `
+      <tr>
+        <td>${it.descripcion}</td><td style="text-align:center">${it.cantidad}</td>
+        <td style="text-align:right">$${fmt(it.precio)}</td>
+        <td style="text-align:center">${it.aplicaIva ? 'Sí' : 'No'}</td>
+        <td style="text-align:right;font-weight:700">$${fmt(it.precio*it.cantidad*(it.aplicaIva?1.19:1))}</td>
+      </tr>
+    `).join('');
+    printWindow(`Cotización ${order.placa}`, `
+      <h1>Cotización — ${order.placa}</h1>
+      <p style="color:#555;margin-bottom:16px">${order.marca} ${order.modelo} ${order.anio} &bull; ${order.cliente} &bull; ${order.telefono}</p>
+      <h2>Detalle de Servicios</h2>
+      <table><thead><tr><th style="width:40%">Descripción</th><th>Cant.</th><th>Vr. Unitario</th><th>+IVA</th><th>Total</th></tr></thead><tbody>${rows}</tbody></table>
+      <div class="total-box">
+        <div class="total-row"><span>Subtotal</span><span>$${fmt(sub)}</span></div>
+        <div class="total-row"><span>IVA (19%)</span><span>$${fmt(iva)}</span></div>
+        <div class="total-final"><span>TOTAL</span><span>$${fmt(total)}</span></div>
+      </div>
+    `);
   };
 
   const handleReportPrice = (idx, field, val) => {
@@ -102,7 +191,7 @@ export default function OrderDetailsModal({ order, onClose }) {
     { id: 'cotizacion', label: 'Cotización' },
   ];
 
-  return (
+  return (<>
     <div className="modal-overlay">
       <div className="modal-box" style={{ maxWidth: 960 }}>
         <button onClick={onClose} className="hide-on-print"
@@ -191,7 +280,9 @@ export default function OrderDetailsModal({ order, onClose }) {
                   <p className="section-title"><Camera size={12} style={{ display: 'inline', marginRight: 4 }} />Fotos de Ingreso</p>
                   <div className="img-grid" style={{ marginBottom: '1.5rem', gridTemplateColumns: 'repeat(auto-fill, minmax(120px, 1fr))' }}>
                     {order.fotos.map((src, i) => (
-                      <img key={i} src={src} className="img-thumb" alt={`ingreso-${i}`} />
+                      <img key={i} src={src} className="img-thumb" alt={`ingreso-${i}`}
+                        onClick={() => setLightboxSrc(src)}
+                        title="Clic para ver en grande" />
                     ))}
                   </div>
                 </>
@@ -203,7 +294,7 @@ export default function OrderDetailsModal({ order, onClose }) {
                   className="btn-success" style={{ textDecoration: 'none' }}>
                   <MessageCircle size={16} /> WhatsApp
                 </a>
-                <button onClick={() => window.print()} className="btn-secondary"><Printer size={16} /> Imprimir</button>
+                <button onClick={printInfo} className="btn-secondary"><Printer size={16} /> Imprimir</button>
                 <button onClick={() => setShowConfirm(true)} className="btn-success" style={{ marginLeft: 'auto' }}>
                   <CheckCircle size={16} /> Entregar Vehículo
                 </button>
@@ -299,7 +390,7 @@ export default function OrderDetailsModal({ order, onClose }) {
                     <button onClick={transferToQuote} className="btn-success" style={{ marginLeft: 'auto' }}>
                       Pasar valores a Cotización
                     </button>
-                    <button onClick={() => window.print()} className="btn-secondary"><Printer size={16} /> Imprimir Reporte</button>
+                    <button onClick={printReport} className="btn-secondary"><Printer size={16} /> Imprimir Reporte</button>
                   </div>
                 </>
               )}
@@ -389,7 +480,7 @@ export default function OrderDetailsModal({ order, onClose }) {
 
               <div className="hide-on-print" style={{ display: 'flex', gap: '0.75rem' }}>
                 <button onClick={saveQuote} className="btn-primary">Guardar Cotización</button>
-                <button onClick={() => window.print()} className="btn-secondary"><Printer size={16} /> Imprimir / PDF</button>
+                <button onClick={printQuote} className="btn-secondary"><Printer size={16} /> Imprimir / PDF</button>
               </div>
             </div>
           )}
@@ -413,5 +504,16 @@ export default function OrderDetailsModal({ order, onClose }) {
         )}
       </div>
     </div>
-  );
+
+    {/* Lightbox para fotos */}
+    {lightboxSrc && (
+      <div className="lightbox-overlay" onClick={() => setLightboxSrc(null)}>
+        <button
+          onClick={() => setLightboxSrc(null)}
+          style={{ position: 'fixed', top: '1rem', right: '1.5rem', background: 'rgba(0,0,0,0.7)', border: 'none', borderRadius: '50%', width: 38, height: 38, cursor: 'pointer', color: 'white', fontSize: 20, display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 10000 }}
+        >×</button>
+        <img src={lightboxSrc} alt="foto ampliada" onClick={e => e.stopPropagation()} />
+      </div>
+    )}
+  </>);
 }

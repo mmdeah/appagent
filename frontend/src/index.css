@@ -325,7 +325,24 @@ input[type="checkbox"]:checked::after {
 
 /* ── Image preview ────────────────────────── */
 .img-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(100px, 1fr)); gap: 0.5rem; margin-top: 0.75rem; }
-.img-thumb { width: 100%; aspect-ratio: 1; object-fit: cover; border-radius: var(--radius-sm); border: 1px solid var(--border); }
+.img-thumb { width: 100%; aspect-ratio: 1; object-fit: cover; border-radius: var(--radius-sm); border: 1px solid var(--border); cursor: pointer; transition: transform 0.2s; }
+.img-thumb:hover { transform: scale(1.05); }
+
+/* ── Image Lightbox ────────────────────────── */
+.lightbox-overlay {
+  position: fixed; inset: 0;
+  background: rgba(0,0,0,0.92);
+  display: flex; align-items: center; justify-content: center;
+  z-index: 9999; padding: 1.5rem;
+  cursor: pointer;
+  animation: fadeIn 0.2s ease;
+}
+.lightbox-overlay img {
+  max-width: 100%; max-height: 90vh;
+  object-fit: contain; border-radius: var(--radius);
+  box-shadow: 0 0 60px rgba(0,0,0,0.8);
+  cursor: default;
+}
 
 /* ── Technician ────────────────────────── */
 .tech-vehicle-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 1rem; }
@@ -357,15 +374,10 @@ input[type="checkbox"]:checked::after {
 .price { font-weight: 700; color: var(--success); font-variant-numeric: tabular-nums; }
 
 /* ── Print ────────────────────────── */
+.hide-on-print { }
+.show-on-print { display: none; }
+
 @media print {
-  body * { visibility: hidden; }
-  .printable-content, .printable-content * { visibility: visible; }
-  .printable-content { position: absolute; left: 0; top: 0; width: 100%; color: #000; background: #fff; }
   .hide-on-print { display: none !important; }
   .show-on-print { display: inline !important; }
-
-  /* Fix page breaks */
-  .data-table { page-break-inside: auto; }
-  .data-table tr { page-break-inside: avoid; page-break-after: auto; }
-  .card, .section-title, .info-grid, .info-item, .img-grid, .tech-header, .item-row, .item-details { page-break-inside: avoid; }
 }
