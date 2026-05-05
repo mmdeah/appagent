@@ -8,7 +8,9 @@ export default function AdminView() {
   const [stats, setStats] = useState({ avg: 0, total: 0, expenses: 0, active: 0 });
   const [selectedOrder, setSelectedOrder] = useState(null);
   const [showNewOrder, setShowNewOrder] = useState(false);
-  const [newOrderForm, setNewOrderForm] = useState({ placa: '', cliente: '', telefono: '', marca: '', modelo: '', anio: '' });
+  const [newOrderForm, setNewOrderForm] = useState({ 
+    placa: '', cliente: '', telefono: '', correo: '', marca: '', modelo: '', anio: '', kilometraje: '', servicios: '', notas: '' 
+  });
 
   const fetchOrders = async () => {
     try {
@@ -71,7 +73,7 @@ export default function AdminView() {
     });
     
     setShowNewOrder(false);
-    setNewOrderForm({ placa: '', cliente: '', telefono: '', marca: '', modelo: '', anio: '' });
+    setNewOrderForm({ placa: '', cliente: '', telefono: '', correo: '', marca: '', modelo: '', anio: '', kilometraje: '', servicios: '', notas: '' });
     fetchOrders();
   };
 
@@ -138,17 +140,25 @@ export default function AdminView() {
 
       {showNewOrder && (
         <div className="modal-overlay" style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.5)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 1000 }}>
-          <div className="card" style={{ width: '90%', maxWidth: '500px', background: 'white' }}>
+          <div className="card" style={{ width: '90%', maxWidth: '600px', background: 'white', maxHeight: '90vh', overflowY: 'auto' }}>
             <h2 style={{ marginBottom: '1rem' }}>Ingresar Vehículo</h2>
-            <form onSubmit={handleCreateOrder} style={{ display: 'grid', gap: '1rem' }}>
+            <form onSubmit={handleCreateOrder} style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
               <input placeholder="Placa (Ej. AAA123)" required value={newOrderForm.placa} onChange={e => setNewOrderForm({...newOrderForm, placa: e.target.value})} style={{ padding: '0.5rem' }} />
+              <input placeholder="Kilometraje" required type="number" value={newOrderForm.kilometraje} onChange={e => setNewOrderForm({...newOrderForm, kilometraje: e.target.value})} style={{ padding: '0.5rem' }} />
+              
               <input placeholder="Nombre Cliente" required value={newOrderForm.cliente} onChange={e => setNewOrderForm({...newOrderForm, cliente: e.target.value})} style={{ padding: '0.5rem' }} />
               <input placeholder="Teléfono" required value={newOrderForm.telefono} onChange={e => setNewOrderForm({...newOrderForm, telefono: e.target.value})} style={{ padding: '0.5rem' }} />
+              
+              <input placeholder="Correo" required type="email" value={newOrderForm.correo} onChange={e => setNewOrderForm({...newOrderForm, correo: e.target.value})} style={{ padding: '0.5rem', gridColumn: '1 / -1' }} />
+              
               <input placeholder="Marca" required value={newOrderForm.marca} onChange={e => setNewOrderForm({...newOrderForm, marca: e.target.value})} style={{ padding: '0.5rem' }} />
               <input placeholder="Modelo" required value={newOrderForm.modelo} onChange={e => setNewOrderForm({...newOrderForm, modelo: e.target.value})} style={{ padding: '0.5rem' }} />
               <input placeholder="Año" required type="number" value={newOrderForm.anio} onChange={e => setNewOrderForm({...newOrderForm, anio: e.target.value})} style={{ padding: '0.5rem' }} />
               
-              <div style={{ display: 'flex', gap: '1rem', marginTop: '1rem' }}>
+              <textarea placeholder="Servicios a Realizar" required value={newOrderForm.servicios} onChange={e => setNewOrderForm({...newOrderForm, servicios: e.target.value})} style={{ padding: '0.5rem', gridColumn: '1 / -1', minHeight: '60px' }}></textarea>
+              <textarea placeholder="Notas / Observaciones" value={newOrderForm.notas} onChange={e => setNewOrderForm({...newOrderForm, notas: e.target.value})} style={{ padding: '0.5rem', gridColumn: '1 / -1', minHeight: '60px' }}></textarea>
+              
+              <div style={{ display: 'flex', gap: '1rem', marginTop: '1rem', gridColumn: '1 / -1' }}>
                 <button type="button" className="btn-secondary" onClick={() => setShowNewOrder(false)} style={{ flex: 1 }}>Cancelar</button>
                 <button type="submit" className="btn-primary" style={{ flex: 1 }}>Guardar Orden</button>
               </div>
