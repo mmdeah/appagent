@@ -73,7 +73,7 @@ export default function OrderDetailsModal({ order, onClose }) {
       
       <div class="section-header">Información de la Orden</div>
       <div style="margin-bottom: 24px">
-        <div class="info-row" style="width: 300px"><span>Número de Orden:</span> <span>ORD-${order.id.substring(0,8).toUpperCase()}</span></div>
+        <div class="info-row" style="width: 300px"><span>Número de Orden:</span> <span>ORD-${String(order.id).substring(0,8).toUpperCase()}</span></div>
         <div class="info-row" style="width: 300px"><span>Fecha de Emisión:</span> <span>${new Date().toLocaleDateString('es-CO', { day: 'numeric', month: 'long', year: 'numeric' })}</span></div>
         <div class="info-row" style="width: 300px"><span>Estado:</span> <span>${order.estado}</span></div>
       </div>
@@ -117,7 +117,7 @@ export default function OrderDetailsModal({ order, onClose }) {
       <div class="info-grid">
         <div class="info-block">
           <h3>Información General</h3>
-          <div class="info-row"><span>Orden ID:</span> <span>ORD-${order.id.substring(0,8).toUpperCase()}</span></div>
+          <div class="info-row"><span>Orden ID:</span> <span>ORD-${String(order.id).substring(0,8).toUpperCase()}</span></div>
           <div class="info-row"><span>Fecha:</span> <span>${new Date(reportData.fecha).toLocaleDateString('es-CO', { day: 'numeric', month: 'long', year: 'numeric' })}</span></div>
           <div class="info-row"><span>Placa:</span> <span>${order.placa}</span></div>
         </div>
@@ -162,7 +162,7 @@ export default function OrderDetailsModal({ order, onClose }) {
       
       <div class="section-header">Información de la Orden</div>
       <div style="margin-bottom: 24px">
-        <div class="info-row" style="width: 300px"><span>Número de Orden:</span> <span>COT-${order.id.substring(0,8).toUpperCase()}</span></div>
+        <div class="info-row" style="width: 300px"><span>Número de Orden:</span> <span>COT-${String(order.id).substring(0,8).toUpperCase()}</span></div>
         <div class="info-row" style="width: 300px"><span>Fecha de Emisión:</span> <span>${new Date().toLocaleDateString('es-CO', { day: 'numeric', month: 'long', year: 'numeric' })}</span></div>
         <div class="info-row" style="width: 300px"><span>Estado:</span> <span>${order.estado}</span></div>
       </div>
