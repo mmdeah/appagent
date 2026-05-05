@@ -93,17 +93,48 @@ export default function AdminView() {
     } catch (e) { console.error(e); }
   };
 
+  const updateBalances = () => {
+    const balances = {};
+    PAYMENT_METHODS.forEach(m => {
+      const ingresos = orders.filter(o => o.estado === 'Entregado' && (o.metodoPago === m || (!o.metodoPago && m === 'Efectivo'))).reduce((acc, o) => {
+        let t = 0;
+        if (o.quotes && Array.isArray(o.quotes)) {
+          o.quotes.forEach(q => {
+            if (q.items && Array.isArray(q.items)) {
+              q.items.forEach(it => {
+                const p = parseFloat(it.precio) || 0;
+                const c = parseFloat(it.cantidad) || 0;
+                const sub = p * c;
+                t += it.aplicaIva ? sub * 1.19 : sub;
+              });
+            }
+          });
+        }
+        return acc + t;
+      }, 0);
+
+      const egresos = expenses.filter(g => g.metodoPago === m).reduce((acc, g) => acc + (parseFloat(g.monto) || 0), 0);
+      
+      balances[m] = Math.round(ingresos - egresos);
+    });
+    setBalancesByMethod(balances);
+  };
+
+  useEffect(() => {
+    updateBalances();
+  }, [orders, expenses]);
+
   const fetchOrders = async () => {
     try {
       const res = await fetch(`${API_URL}/orders?_embed=reports&_embed=quotes`);
       const data = await res.json();
-      setOrders(Array.isArray(data) ? data : []);
+      const ordersArr = Array.isArray(data) ? data : [];
+      setOrders(ordersArr);
       
       let incomeTotal = 0;
-      const entregadas = (Array.isArray(data) ? data : []).filter(o => o.estado === 'Entregado');
+      const entregadas = ordersArr.filter(o => o.estado === 'Entregado');
       
       entregadas.forEach(o => {
-        // Sumar de quotes embebidas
         if (o.quotes && Array.isArray(o.quotes)) {
           o.quotes.forEach(q => {
             if (q.items && Array.isArray(q.items)) {
@@ -118,7 +149,7 @@ export default function AdminView() {
         }
       });
 
-      const active = (Array.isArray(data) ? data : []).filter(o => o.estado !== 'Entregado').length;
+      const active = ordersArr.filter(o => o.estado !== 'Entregado').length;
       setStats({ 
         total: Math.round(incomeTotal), 
         avg: entregadas.length > 0 ? incomeTotal / entregadas.length : 0, 
@@ -442,16 +473,7 @@ export default function AdminView() {
                     <h2 style={{ fontSize: '1.1rem', marginBottom: '1rem', fontWeight: 700 }}>Balance por Cuenta</h2>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
                       {PAYMENT_METHODS.map(m => {
-                        const ingresos = orders.filter(o => o.estado === 'Entregado' && (o.metodoPago === m || (!o.metodoPago && m === 'Efectivo'))).reduce((acc, o) => {
-                          let t = 0;
-                          o.quotes?.forEach(q => q.items?.forEach(it => {
-                            const sub = it.precio * it.cantidad;
-                            t += it.aplicaIva ? sub * 1.19 : sub;
-                          }));
-                          return acc + t;
-                        }, 0);
-                        const egresos = expenses.filter(g => g.metodoPago === m).reduce((acc, g) => acc + (parseFloat(g.monto) || 0), 0);
-                        const balance = ingresos - egresos;
+                        const balance = balancesByMethod[m] || 0;
                         return (
                           <div key={m} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0.6rem 0.8rem', background: 'var(--bg)', borderRadius: 'var(--radius-sm)', borderLeft: `4px solid ${balance >= 0 ? 'var(--success)' : 'var(--error)'}` }}>
                             <span style={{ fontSize: '0.8rem', fontWeight: 700 }}>{m}</span>
