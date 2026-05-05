@@ -21,6 +21,25 @@ if (dataDir !== __dirname && !fs.existsSync(dbFile)) {
   }
 }
 
+// Ensure all required collections exist
+try {
+  const dbData = JSON.parse(fs.readFileSync(dbFile, 'utf8'));
+  const requiredKeys = ['orders', 'quotes', 'reports', 'expenses', 'archived_orders', 'todos'];
+  let modified = false;
+  requiredKeys.forEach(key => {
+    if (!dbData[key]) {
+      dbData[key] = [];
+      modified = true;
+    }
+  });
+  if (modified) {
+    fs.writeFileSync(dbFile, JSON.stringify(dbData, null, 2));
+    console.log("Updated db.json with missing collections.");
+  }
+} catch (e) {
+  console.error("Error checking/updating db.json structure:", e);
+}
+
 const router = jsonServer.router(dbFile);
 
 server.use(cors());
