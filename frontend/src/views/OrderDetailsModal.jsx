@@ -59,6 +59,30 @@ export default function OrderDetailsModal({ order, onClose }) {
     onClose();
   };
 
+  const transferToQuote = () => {
+    if (!reportData || !reportData.items) return;
+    const newItems = [];
+    reportData.items.forEach(it => {
+      const mO = parseFloat(it.manoObra) || 0;
+      const vRep = parseFloat(it.valorReparacion) || 0;
+      const vRepuesto = parseFloat(it.valorRepuesto) || 0;
+      const cRepuesto = parseInt(it.cantidadRepuesto) || 1;
+
+      if (mO > 0) newItems.push({ descripcion: `Mano de obra: ${it.item}`, cantidad: 1, precio: mO, aplicaIva: false });
+      if (vRep > 0) newItems.push({ descripcion: `Reparación: ${it.item}`, cantidad: 1, precio: vRep, aplicaIva: false });
+      if (vRepuesto > 0) newItems.push({ descripcion: `Repuesto: ${it.item}`, cantidad: cRepuesto, precio: vRepuesto, aplicaIva: false });
+    });
+
+    if (newItems.length > 0) {
+      const current = quoteItems.filter(q => q.descripcion.trim() !== '' || q.precio > 0);
+      setQuoteItems([...current, ...newItems]);
+      setActiveTab('cotizacion');
+      showStatus('Valores transferidos a la cotización', 'success');
+    } else {
+      showStatus('No hay valores mayores a $0 para transferir', 'warning');
+    }
+  };
+
   const calcTotals = () => {
     let sub = 0, iva = 0;
     quoteItems.forEach(it => {
@@ -217,22 +241,39 @@ export default function OrderDetailsModal({ order, onClose }) {
                             <span style={{ color: stateColor[it.state] || 'var(--text)', fontWeight: 600, fontSize: '0.82rem' }}>{it.state}</span>
                           </td>
                           <td>
-                            <span className="show-on-print">{it.manoObra ? `$${fmt(it.manoObra)}` : '—'}</span>
-                            <input className="hide-on-print" type="number" placeholder="0" value={it.manoObra || ''}
-                              onChange={e => handleReportPrice(idx, 'manoObra', e.target.value)}
-                              style={{ width: 100, fontSize: '0.82rem' }} />
+                            {it.state === 'Bueno' ? <span style={{ color: 'var(--text-muted)' }}>—</span> : (
+                              <>
+                                <span className="show-on-print">{it.manoObra ? `$${fmt(it.manoObra)}` : '—'}</span>
+                                <input className="hide-on-print price-input" type="text" placeholder="0" value={it.manoObra ? fmt(it.manoObra) : ''}
+                                  onChange={e => handleReportPrice(idx, 'manoObra', e.target.value.replace(/\D/g, ''))}
+                                  style={{ width: 100, fontSize: '0.82rem' }} />
+                              </>
+                            )}
                           </td>
-                          <td style={{ fontSize: '0.82rem' }}>{it.requiereRepuesto ? '✓ Sí' : '—'}</td>
+                          <td style={{ fontSize: '0.82rem' }}>
+                            {it.requiereRepuesto ? (
+                               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+                                 <span style={{ fontWeight: 600, color: 'var(--warning)' }}>✓ Requiere</span>
+                                 <div className="hide-on-print" style={{ display: 'flex', gap: '0.4rem' }}>
+                                    <input type="number" min="1" placeholder="Cant" value={it.cantidadRepuesto || 1} onChange={e => handleReportPrice(idx, 'cantidadRepuesto', parseInt(e.target.value)||1)} style={{ width: 55, fontSize: '0.8rem', padding: '0.4rem' }} />
+                                    <input type="text" className="price-input" placeholder="$ Valor" value={it.valorRepuesto ? fmt(it.valorRepuesto) : ''} onChange={e => handleReportPrice(idx, 'valorRepuesto', e.target.value.replace(/\D/g, ''))} style={{ width: 90, fontSize: '0.8rem', padding: '0.4rem' }} />
+                                 </div>
+                                 <span className="show-on-print">
+                                    {it.cantidadRepuesto || 1}x {it.valorRepuesto ? `$${fmt(it.valorRepuesto)}` : 'Pendiente'}
+                                 </span>
+                               </div>
+                            ) : <span style={{ color: 'var(--text-muted)' }}>—</span>}
+                          </td>
                           <td>
                             {it.recibeReparacion ? (
                               <>
                                 <span className="show-on-print">{it.valorReparacion ? `$${fmt(it.valorReparacion)}` : 'Pendiente'}</span>
-                                <input className="hide-on-print" type="number" placeholder="Pendiente (Admin)"
-                                  value={it.valorReparacion || ''}
-                                  onChange={e => handleReportPrice(idx, 'valorReparacion', e.target.value)}
+                                <input className="hide-on-print price-input" type="text" placeholder="Pendiente"
+                                  value={it.valorReparacion ? fmt(it.valorReparacion) : ''}
+                                  onChange={e => handleReportPrice(idx, 'valorReparacion', e.target.value.replace(/\D/g, ''))}
                                   style={{ width: 110, fontSize: '0.82rem' }} />
                               </>
-                            ) : '—'}
+                            ) : <span style={{ color: 'var(--text-muted)' }}>—</span>}
                           </td>
                         </tr>
                       ))}
@@ -253,8 +294,11 @@ export default function OrderDetailsModal({ order, onClose }) {
                     </>
                   )}
 
-                  <div className="hide-on-print" style={{ display: 'flex', gap: '0.75rem' }}>
+                  <div className="hide-on-print" style={{ display: 'flex', gap: '0.75rem', marginTop: '1rem' }}>
                     <button onClick={saveReport} className="btn-primary">Guardar Precios</button>
+                    <button onClick={transferToQuote} className="btn-success" style={{ marginLeft: 'auto' }}>
+                      Pasar valores a Cotización
+                    </button>
                     <button onClick={() => window.print()} className="btn-secondary"><Printer size={16} /> Imprimir Reporte</button>
                   </div>
                 </>
@@ -296,13 +340,13 @@ export default function OrderDetailsModal({ order, onClose }) {
                           <span className="show-on-print">{it.cantidad}</span>
                         </td>
                         <td style={{ textAlign: 'center' }}>
-                          <input className="hide-on-print" type="number" placeholder="0" value={it.precio}
-                            onChange={e => { const q=[...quoteItems]; q[idx].precio=parseFloat(e.target.value)||0; setQuoteItems(q); }}
-                            style={{ width: 100, textAlign: 'right', fontSize: '0.85rem' }} />
+                          <input className="hide-on-print price-input" type="text" placeholder="0" value={it.precio ? fmt(it.precio) : ''}
+                            onChange={e => { const q=[...quoteItems]; q[idx].precio=parseFloat(e.target.value.replace(/\D/g, ''))||0; setQuoteItems(q); }}
+                            style={{ width: 110, textAlign: 'right', fontSize: '0.85rem' }} />
                           <span className="show-on-print">${fmt(it.precio)}</span>
                         </td>
                         <td style={{ textAlign: 'center' }}>
-                          <input className="hide-on-print" type="checkbox" style={{ width: 'auto', padding: 0, cursor: 'pointer' }}
+                          <input className="hide-on-print" type="checkbox"
                             checked={it.aplicaIva}
                             onChange={e => { const q=[...quoteItems]; q[idx].aplicaIva=e.target.checked; setQuoteItems(q); }} />
                           <span className="show-on-print">{it.aplicaIva ? 'Sí' : 'No'}</span>

@@ -53,7 +53,16 @@ export default function TechnicianView() {
         delete next[key];
         return next;
       }
-      return { ...prev, [key]: { ...current, state, category, item } };
+      return { 
+        ...prev, 
+        [key]: { 
+          ...current, 
+          state, 
+          category, 
+          item,
+          requiereRepuesto: state === 'Malo' ? true : current.requiereRepuesto
+        } 
+      };
     });
   };
 
@@ -153,7 +162,10 @@ export default function TechnicianView() {
         </button>
         <div style={{ textAlign: 'center' }}>
           <div style={{ fontWeight: 700 }}>Revisión: {selectedOrder.placa}</div>
-          <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>{selectedOrder.marca} {selectedOrder.modelo} {selectedOrder.anio}</div>
+          <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>
+            {selectedOrder.marca} {selectedOrder.modelo} {selectedOrder.anio}
+            {selectedOrder.kilometraje ? ` · ${fmt(selectedOrder.kilometraje)} km` : ''}
+          </div>
         </div>
         <button className="btn-success" onClick={submitReport} style={{ gap: '0.5rem' }}>
           <SendHorizonal size={16} /> Enviar
@@ -163,6 +175,23 @@ export default function TechnicianView() {
       <div style={{ maxWidth: 800, margin: '0 auto', padding: '1.5rem' }}>
         {statusMsg.text && (
           <div className={`toast toast-${statusMsg.type}`}>{statusMsg.text}</div>
+        )}
+
+        {(selectedOrder.servicios || selectedOrder.notas) && (
+          <div className="card" style={{ marginBottom: '1.5rem', borderLeft: '4px solid var(--primary)', padding: '1rem 1.5rem' }}>
+            {selectedOrder.servicios && (
+              <div style={{ marginBottom: selectedOrder.notas ? '0.75rem' : '0' }}>
+                <div style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--primary)', textTransform: 'uppercase', marginBottom: '0.2rem' }}>Servicios a Realizar</div>
+                <div style={{ fontSize: '0.9rem' }}>{selectedOrder.servicios}</div>
+              </div>
+            )}
+            {selectedOrder.notas && (
+              <div>
+                <div style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--primary)', textTransform: 'uppercase', marginBottom: '0.2rem' }}>Notas de Orden</div>
+                <div style={{ fontSize: '0.9rem' }}>{selectedOrder.notas}</div>
+              </div>
+            )}
+          </div>
         )}
 
         {Object.entries(categories).map(([category, items]) => (
@@ -196,19 +225,20 @@ export default function TechnicianView() {
                     <div className="item-details">
                       <label style={{ fontSize: '0.82rem', color: 'var(--text-muted)' }}>
                         Mano de Obra ($):
-                        <input type="number" placeholder="0" value={data?.manoObra || ''}
-                          onChange={e => handleDetail(category, item, 'manoObra', e.target.value)}
+                        <input type="text" className="price-input" placeholder="0" value={data?.manoObra ? fmt(data.manoObra) : ''}
+                          onChange={e => handleDetail(category, item, 'manoObra', e.target.value.replace(/\D/g, ''))}
                           style={{ marginTop: '0.3rem' }} />
                       </label>
                       <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
                         <label style={{ fontSize: '0.82rem', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '0.4rem', cursor: 'pointer' }}>
-                          <input type="checkbox" style={{ width: 'auto', padding: 0 }}
+                          <input type="checkbox"
+
                             checked={data?.requiereRepuesto || false}
                             onChange={e => handleDetail(category, item, 'requiereRepuesto', e.target.checked)} />
                           Requiere Repuesto
                         </label>
                         <label style={{ fontSize: '0.82rem', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '0.4rem', cursor: 'pointer' }}>
-                          <input type="checkbox" style={{ width: 'auto', padding: 0 }}
+                          <input type="checkbox"
                             checked={data?.recibeReparacion || false}
                             onChange={e => handleDetail(category, item, 'recibeReparacion', e.target.checked)} />
                           Recibe Reparación
@@ -217,8 +247,8 @@ export default function TechnicianView() {
                       {data?.recibeReparacion && (
                         <label style={{ fontSize: '0.82rem', color: 'var(--text-muted)', gridColumn: '1 / -1' }}>
                           Valor Reparación ($) — dejar vacío si Admin lo define:
-                          <input type="number" placeholder="Pendiente (Admin)" value={data?.valorReparacion || ''}
-                            onChange={e => handleDetail(category, item, 'valorReparacion', e.target.value)}
+                          <input type="text" className="price-input" placeholder="Pendiente (Admin)" value={data?.valorReparacion ? fmt(data.valorReparacion) : ''}
+                            onChange={e => handleDetail(category, item, 'valorReparacion', e.target.value.replace(/\D/g, ''))}
                             style={{ marginTop: '0.3rem' }} />
                         </label>
                       )}

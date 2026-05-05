@@ -122,6 +122,47 @@ input:focus, textarea:focus, select:focus {
 }
 input::placeholder, textarea::placeholder { color: var(--text-muted); }
 
+input[type="checkbox"] {
+  appearance: none;
+  width: 1.25rem;
+  height: 1.25rem;
+  border: 1.5px solid var(--border);
+  border-radius: 4px;
+  background-color: var(--bg);
+  position: relative;
+  cursor: pointer;
+  transition: all var(--transition);
+  padding: 0;
+  margin: 0;
+  display: inline-block;
+  vertical-align: middle;
+}
+input[type="checkbox"]:checked {
+  background-color: var(--primary);
+  border-color: var(--primary);
+}
+input[type="checkbox"]:checked::after {
+  content: '✓';
+  color: white;
+  position: absolute;
+  top: 48%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  font-size: 0.85rem;
+  font-weight: bold;
+}
+
+.price-input {
+  text-align: right;
+  font-weight: 600;
+  color: var(--success) !important;
+  background-color: rgba(16,185,129,0.05) !important;
+}
+.price-input:focus {
+  border-color: var(--success);
+  box-shadow: 0 0 0 3px rgba(16,185,129,0.2);
+}
+
 /* ── Status badges ────────────────────────── */
 .badge {
   display: inline-flex; align-items: center;
@@ -322,4 +363,9 @@ input::placeholder, textarea::placeholder { color: var(--text-muted); }
   .printable-content { position: absolute; left: 0; top: 0; width: 100%; color: #000; background: #fff; }
   .hide-on-print { display: none !important; }
   .show-on-print { display: inline !important; }
+
+  /* Fix page breaks */
+  .data-table { page-break-inside: auto; }
+  .data-table tr { page-break-inside: avoid; page-break-after: auto; }
+  .card, .section-title, .info-grid, .info-item, .img-grid, .tech-header, .item-row, .item-details { page-break-inside: avoid; }
 }
