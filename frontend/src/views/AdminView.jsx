@@ -34,17 +34,31 @@ export default function AdminView() {
   const fetchExpenses = async () => {
     try {
       const res = await fetch(`${API_URL}/expenses`);
+      if (res.status === 404) {
+        setExpenses([]);
+        return;
+      }
       const data = await res.json();
-      setExpenses(data);
-    } catch (e) { console.error(e); }
+      setExpenses(Array.isArray(data) ? data : []);
+    } catch (e) { 
+      console.error(e);
+      setExpenses([]);
+    }
   };
 
   const fetchTodos = async () => {
     try {
       const res = await fetch(`${API_URL}/todos`);
+      if (res.status === 404) {
+        setTodos([]);
+        return;
+      }
       const data = await res.json();
-      setTodos(data);
-    } catch (e) { console.error(e); }
+      setTodos(Array.isArray(data) ? data : []);
+    } catch (e) { 
+      console.error(e);
+      setTodos([]);
+    }
   };
 
   const addTodo = async (e) => {
