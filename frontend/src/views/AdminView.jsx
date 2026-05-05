@@ -7,7 +7,7 @@ import { PlusCircle, BarChart3, Camera, X, Car, Trash2, Zap, LayoutDashboard, Hi
 
 const fmt = (n) => (parseFloat(n) || 0).toLocaleString('es-CO', { minimumFractionDigits: 0 });
 
-const COLUMNS = ['Recepción', 'Proceso', 'Calidad'];
+const COLUMNS = ['Recepción', 'Proceso', 'Calidad', 'Docs Rápidos'];
 
 const emptyForm = { placa: '', cliente: '', telefono: '', correo: '', marca: '', modelo: '', anio: '', kilometraje: '', servicios: '', notas: '' };
 
@@ -126,7 +126,7 @@ export default function AdminView() {
       const payload = {
         ...quickOrderForm,
         placa: quickOrderForm.placa.toUpperCase(),
-        estado: 'Entregado',
+        estado: 'Docs Rápidos',
         fecha: new Date().toISOString(),
         fotos: []
       };
@@ -142,8 +142,8 @@ export default function AdminView() {
     } catch (e) { console.error(e); }
   };
 
-  const colColor = { 'Recepción': '#6366f1', 'Proceso': '#f59e0b', 'Calidad': '#10b981' };
-  const colBg   = { 'Recepción': 'rgba(99,102,241,0.08)', 'Proceso': 'rgba(245,158,11,0.08)', 'Calidad': 'rgba(16,185,129,0.08)' };
+  const colColor = { 'Recepción': '#6366f1', 'Proceso': '#f59e0b', 'Calidad': '#10b981', 'Docs Rápidos': '#ec4899' };
+  const colBg   = { 'Recepción': 'rgba(99,102,241,0.08)', 'Proceso': 'rgba(245,158,11,0.08)', 'Calidad': 'rgba(16,185,129,0.08)', 'Docs Rápidos': 'rgba(236,72,153,0.08)' };
 
   return (
     <div style={{ minHeight: '100vh', background: 'var(--bg)' }}>
@@ -192,6 +192,11 @@ export default function AdminView() {
             <div className="value">${fmt(stats.avg)}</div>
             <div className="sub">Valor por orden entregada</div>
           </div>
+          <div className="stat-card">
+            <div className="label">Ganancia Neta</div>
+            <div className="value" style={{ color: '#10b981' }}>${fmt(stats.total - expenses.reduce((acc, g) => acc + (parseFloat(g.monto) || 0), 0))}</div>
+            <div className="sub">Facturado - Gastos</div>
+          </div>
         </div>
 
         {/* Navigation Tabs */}
@@ -211,7 +216,7 @@ export default function AdminView() {
 
         {/* Content based on activeTab */}
         {activeTab === 'Kanban' && (
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '1.25rem' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '1.25rem' }}>
             {COLUMNS.map(col => (
               <div key={col} className="kanban-column">
                 <div className="kanban-header">
@@ -244,6 +249,7 @@ export default function AdminView() {
                           onChange={e => { e.stopPropagation(); moveOrder(o.id, e.target.value); }}
                           style={{ fontSize: '0.75rem', padding: '0.2rem 0.4rem', width: 'auto', borderRadius: 6 }}>
                           {COLUMNS.map(c => <option key={c} value={c}>{c}</option>)}
+                          <option value="Entregado">Entregar ✅</option>
                         </select>
                         <button onClick={e => { e.stopPropagation(); deleteOrder(o.id); }} style={{ background: 'none', border: 'none', color: 'var(--error)', cursor: 'pointer', display: 'flex', padding: '0.2rem' }} title="Eliminar orden">
                           <Trash2 size={14} />
