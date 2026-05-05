@@ -234,36 +234,60 @@ export default function AdminView() {
       </div>
 
       <div style={{ maxWidth: 1400, margin: '0 auto', padding: '1.5rem 1.5rem 4rem' }}>
-        {/* Main Layout Grid: Stats and Content + Sidebar */}
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 320px', gap: '1.5rem', alignItems: 'start' }}>
-          
-          {/* LEFT COLUMN: Stats and Tabs */}
-          <div>
-            {/* Stats row */}
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '1rem', marginBottom: '1.75rem' }}>
-              <div className="stat-card">
-                <div className="label">Órdenes Activas</div>
-                <div className="value" style={{ color: '#818cf8' }}>{stats.active}</div>
-                <div className="sub">En progreso actualmente</div>
-              </div>
-              <div className="stat-card">
-                <div className="label">Total Facturado</div>
-                <div className="value">${fmt(stats.total)}</div>
-                <div className="sub">De órdenes entregadas</div>
-              </div>
-              <div className="stat-card">
-                <div className="label">Gastos Registrados</div>
-                <div className="value" style={{ color: 'var(--error)' }}>${fmt(expenses.reduce((acc, g) => acc + (parseFloat(g.monto) || 0), 0))}</div>
-                <div className="sub">Salidas de dinero</div>
-              </div>
-              <div className="stat-card">
-                <div className="label">Ganancia Neta</div>
-                <div className="value" style={{ color: '#10b981' }}>${fmt(stats.total - expenses.reduce((acc, g) => acc + (parseFloat(g.monto) || 0), 0))}</div>
-                <div className="sub">Facturado - Gastos</div>
-              </div>
-            </div>
+        {/* Stats row */}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '1rem', marginBottom: '1.75rem' }}>
+          <div className="stat-card">
+            <div className="label">Órdenes Activas</div>
+            <div className="value" style={{ color: '#818cf8' }}>{stats.active}</div>
+            <div className="sub">En progreso actualmente</div>
+          </div>
+          <div className="stat-card">
+            <div className="label">Total Facturado</div>
+            <div className="value">${fmt(stats.total)}</div>
+            <div className="sub">De órdenes entregadas</div>
+          </div>
+          <div className="stat-card">
+            <div className="label">Gastos Registrados</div>
+            <div className="value" style={{ color: 'var(--error)' }}>${fmt(expenses.reduce((acc, g) => acc + (parseFloat(g.monto) || 0), 0))}</div>
+            <div className="sub">Salidas de dinero</div>
+          </div>
+          <div className="stat-card">
+            <div className="label">Ganancia Neta</div>
+            <div className="value" style={{ color: '#10b981' }}>${fmt(stats.total - expenses.reduce((acc, g) => acc + (parseFloat(g.monto) || 0), 0))}</div>
+            <div className="sub">Facturado - Gastos</div>
+          </div>
+        </div>
 
-            {/* Navigation Tabs */}
+        {/* Compact To-Do List Row */}
+        <div className="card" style={{ padding: '1rem 1.5rem', marginBottom: '1.75rem', display: 'flex', alignItems: 'center', gap: '2rem', overflow: 'hidden' }}>
+          <div style={{ flexShrink: 0, minWidth: 220 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.4rem' }}>
+              <PlusCircle size={16} color="var(--primary)" />
+              <h2 style={{ fontSize: '0.9rem', fontWeight: 800 }}>Tareas Pendientes</h2>
+            </div>
+            <form onSubmit={addTodo} style={{ display: 'flex', gap: '0.4rem' }}>
+              <input type="text" placeholder="Nueva tarea..." value={newTodo} onChange={e => setNewTodo(e.target.value)} style={{ flex: 1, fontSize: '0.8rem', padding: '0.4rem 0.6rem' }} />
+              <button type="submit" className="btn-primary" style={{ padding: '0.4rem' }}><PlusCircle size={16} /></button>
+            </form>
+          </div>
+          
+          <div style={{ display: 'flex', gap: '0.75rem', overflowX: 'auto', paddingBottom: '0.25rem', flex: 1, scrollbarWidth: 'none' }}>
+            {todos.filter(t => !t.completed).length === 0 && (
+              <span style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>No hay pendientes importantes hoy.</span>
+            )}
+            {todos.filter(t => !t.completed).map(t => (
+              <div key={t.id} style={{ flexShrink: 0, padding: '0.5rem 0.85rem', background: 'var(--bg)', borderRadius: 10, display: 'flex', alignItems: 'center', gap: '0.6rem', border: '1px solid var(--border)', transition: 'all 0.2s' }}>
+                <input type="checkbox" checked={t.completed} onChange={() => toggleTodo(t)} style={{ cursor: 'pointer' }} />
+                <span style={{ fontSize: '0.82rem', fontWeight: 500, whiteSpace: 'nowrap' }}>{t.text}</span>
+                <button onClick={() => deleteTodo(t.id)} style={{ background: 'none', border: 'none', color: 'var(--error)', cursor: 'pointer', padding: 0, opacity: 0.4 }}>
+                  <X size={12} />
+                </button>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Navigation Tabs */}
             <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1.5rem', borderBottom: '1px solid var(--border)', paddingBottom: '0.5rem', overflowX: 'auto' }}>
               {[
                 { id: 'Kanban', icon: <LayoutDashboard size={16} />, label: 'Kanban' },
@@ -485,38 +509,6 @@ export default function AdminView() {
             )}
           </div>
 
-          {/* RIGHT COLUMN: To-Do List Sidebar */}
-          <div className="card" style={{ padding: '1.5rem', position: 'sticky', top: 100 }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', marginBottom: '1.25rem' }}>
-              <div style={{ width: 32, height: 32, borderRadius: 8, background: 'rgba(99,102,241,0.1)', color: 'var(--primary)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                <PlusCircle size={18} />
-              </div>
-              <h2 style={{ fontSize: '1.1rem', fontWeight: 700 }}>Tareas Pendientes</h2>
-            </div>
-            
-            <form onSubmit={addTodo} style={{ display: 'flex', gap: '0.5rem', marginBottom: '1.5rem' }}>
-              <input type="text" placeholder="¿Qué hay que hacer?" value={newTodo} onChange={e => setNewTodo(e.target.value)} style={{ flex: 1, fontSize: '0.85rem', padding: '0.6rem' }} />
-              <button type="submit" className="btn-primary" style={{ padding: '0.6rem' }}><PlusCircle size={18} /></button>
-            </form>
-
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem', maxHeight: 'calc(100vh - 350px)', overflowY: 'auto', paddingRight: '0.4rem' }}>
-              {todos.length === 0 && (
-                <div style={{ textAlign: 'center', padding: '2rem 0', color: 'var(--text-muted)', fontSize: '0.85rem' }}>No hay tareas pendientes</div>
-              )}
-              {todos.map(t => (
-                <div key={t.id} style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', padding: '0.75rem', background: 'var(--bg)', borderRadius: 'var(--radius-sm)', borderLeft: t.completed ? '4px solid var(--success)' : '4px solid #cbd5e1', transition: 'all 0.2s' }}>
-                  <input type="checkbox" checked={t.completed} onChange={() => toggleTodo(t)} style={{ width: 16, height: 16, cursor: 'pointer' }} />
-                  <span style={{ flex: 1, fontSize: '0.85rem', textDecoration: t.completed ? 'line-through' : 'none', color: t.completed ? 'var(--text-muted)' : 'inherit', fontWeight: 500, cursor: 'pointer' }} onClick={() => toggleTodo(t)}>
-                    {t.text}
-                  </span>
-                  <button onClick={() => deleteTodo(t.id)} style={{ background: 'none', border: 'none', color: 'var(--error)', cursor: 'pointer', padding: '0.2rem', opacity: 0.6 }} title="Eliminar tarea">
-                    <Trash2 size={14} />
-                  </button>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
       </div>
 
       {/* New Order Modal */}
