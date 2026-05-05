@@ -13,6 +13,8 @@ export default function OrderDetailsModal({ order, onClose }) {
   const [statusMsg, setStatusMsg] = useState({ text: '', type: '' });
   const [showConfirm, setShowConfirm] = useState(false);
   const [lightboxSrc, setLightboxSrc] = useState(null);
+  const [metodoPago, setMetodoPago] = useState('Efectivo');
+  const PAYMENT_METHODS = ['Efectivo', 'Nequi', 'Bancolombia', 'Banco de Bogota', 'Tarjeta'];
 
   const showStatus = (text, type = 'success') => {
     setStatusMsg({ text, type });
@@ -149,7 +151,7 @@ export default function OrderDetailsModal({ order, onClose }) {
   const doDeliver = async () => {
     await fetch(`${API_URL}/orders/${order.id}`, {
       method: 'PATCH', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ estado: 'Entregado', fechaEntrega: new Date().toISOString() })
+      body: JSON.stringify({ estado: 'Entregado', fechaEntrega: new Date().toISOString(), metodoPago })
     });
     onClose();
   };
@@ -497,13 +499,18 @@ export default function OrderDetailsModal({ order, onClose }) {
           <div className="modal-overlay hide-on-print" style={{ zIndex: 2000 }}>
             <div className="modal-box" style={{ maxWidth: 420, textAlign: 'center' }}>
               <h3 style={{ fontWeight: 700, marginBottom: '0.75rem', color: 'var(--warning)' }}>⚠ Confirmar Entrega</h3>
-              <p style={{ color: 'var(--text-muted)', marginBottom: '2rem', lineHeight: 1.6, fontSize: '0.9rem' }}>
-                ¿Seguro que deseas entregar el vehículo <strong style={{ color: 'var(--text)' }}>{order.placa}</strong>?<br/>
-                Se descargará un archivo con toda la información y la orden saldrá del tablero.
+              <p style={{ color: 'var(--text-muted)', marginBottom: '1.25rem', lineHeight: 1.6, fontSize: '0.9rem' }}>
+                ¿Confirmas que el vehículo ha sido entregado y el cliente ha realizado el pago total?
               </p>
+              <div style={{ marginBottom: '2rem', textAlign: 'left' }}>
+                <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-muted)', marginBottom: '0.4rem' }}>Método de Pago del Cliente:</label>
+                <select value={metodoPago} onChange={e => setMetodoPago(e.target.value)} style={{ width: '100%' }}>
+                  {PAYMENT_METHODS.map(m => <option key={m} value={m}>{m}</option>)}
+                </select>
+              </div>
               <div style={{ display: 'flex', gap: '0.75rem' }}>
                 <button className="btn-secondary" style={{ flex: 1, justifyContent: 'center' }} onClick={() => setShowConfirm(false)}>Cancelar</button>
-                <button className="btn-danger" style={{ flex: 1, justifyContent: 'center' }} onClick={doDeliver}>Sí, Entregar</button>
+                <button className="btn-primary" style={{ flex: 1, justifyContent: 'center', background: 'var(--success)', borderColor: 'var(--success)', color: 'white' }} onClick={doDeliver}>Confirmar Pago y Entrega</button>
               </div>
             </div>
           </div>
