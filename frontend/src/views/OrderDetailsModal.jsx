@@ -14,6 +14,7 @@ export default function OrderDetailsModal({ order, onClose }) {
   const [showConfirm, setShowConfirm] = useState(false);
   const [lightboxSrc, setLightboxSrc] = useState(null);
   const [metodoPago, setMetodoPago] = useState('Efectivo');
+  const [notasEntrega, setNotasEntrega] = useState(order.notasEntrega || '');
   const PAYMENT_METHODS = ['Efectivo', 'Nequi', 'Bancolombia', 'Banco de Bogota', 'Tarjeta'];
 
   const showStatus = (text, type = 'success') => {
@@ -198,6 +199,13 @@ export default function OrderDetailsModal({ order, onClose }) {
         <div class="total-row final"><span>TOTAL:</span> <span>$${fmt(total)} COP</span></div>
       </div>
       
+      ${order.notasEntrega || notasEntrega ? `
+        <div style="margin-top: 32px; padding: 16px; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px;">
+          <h3 style="font-size: 10px; text-transform: uppercase; color: #64748b; margin-bottom: 8px; font-weight: 700;">Notas y Garantía</h3>
+          <p style="font-size: 11px; line-height: 1.6; color: #1e293b;">${order.notasEntrega || notasEntrega}</p>
+        </div>
+      ` : ''}
+      
       <div style="margin-top: 60px; border-top: 1px solid #e2e8f0; padding-top: 20px; font-size: 10px; color: #94a3b8; text-align: center;">
         Esta es una representación física de un documento digital. Generado por AppTaller2.
       </div>
@@ -239,7 +247,12 @@ export default function OrderDetailsModal({ order, onClose }) {
     
     await fetch(`${API_URL}/orders/${order.id}`, {
       method: 'PATCH', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ estado: 'Entregado', fechaEntrega: new Date().toISOString(), metodoPago })
+      body: JSON.stringify({ 
+        estado: 'Entregado', 
+        fechaEntrega: new Date().toISOString(), 
+        metodoPago,
+        notasEntrega 
+      })
     });
     onClose();
   };
@@ -591,10 +604,17 @@ export default function OrderDetailsModal({ order, onClose }) {
                 ¿Confirmas que el vehículo ha sido entregado y el cliente ha realizado el pago total?
               </p>
               <div style={{ marginBottom: '2rem', textAlign: 'left' }}>
-                <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-muted)', marginBottom: '0.4rem' }}>Método de Pago del Cliente:</label>
-                <select value={metodoPago} onChange={e => setMetodoPago(e.target.value)} style={{ width: '100%' }}>
+                <select value={metodoPago} onChange={e => setMetodoPago(e.target.value)} style={{ width: '100%', marginBottom: '1.25rem' }}>
                   {PAYMENT_METHODS.map(m => <option key={m} value={m}>{m}</option>)}
                 </select>
+
+                <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-muted)', marginBottom: '0.4rem' }}>Notas de Entrega / Garantía:</label>
+                <textarea 
+                  placeholder="Ej: Garantía de 3 meses por mano de obra. Recomendaciones..." 
+                  value={notasEntrega} 
+                  onChange={e => setNotasEntrega(e.target.value)} 
+                  style={{ width: '100%', minHeight: 80, fontSize: '0.85rem' }} 
+                />
               </div>
               <div style={{ display: 'flex', gap: '0.75rem' }}>
                 <button className="btn-secondary" style={{ flex: 1, justifyContent: 'center' }} onClick={() => setShowConfirm(false)}>Cancelar</button>
