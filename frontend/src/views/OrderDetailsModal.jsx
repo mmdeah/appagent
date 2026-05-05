@@ -108,7 +108,7 @@ export default function OrderDetailsModal({ order, onClose }) {
         <td class="col-desc"><strong>${it.item}</strong><br><small style="color: #64748b">${it.category}</small></td>
         <td style="text-align: center"><span class="badge ${stateBadge[it.state] || ''}">${it.state}</span></td>
         <td style="text-align: center">${it.requiereRepuesto ? 'SI' : 'NO'}</td>
-        <td class="col-price">${it.manoObra > 0 ? '$' + fmt(it.manoObra) + ' COP' : '—'}</td>
+        <td style="text-align: center">${it.recibeReparacion ? 'SI' : 'NO'}</td>
       </tr>
     `).join('');
     printWindow(`Reporte Técnico ${order.placa}`, `
@@ -133,7 +133,7 @@ export default function OrderDetailsModal({ order, onClose }) {
       <table>
         <thead>
           <tr>
-            <th>#</th><th>Descripción / Sistema</th><th style="text-align: center">Estado</th><th style="text-align: center">Repuesto</th><th style="text-align: right">Mano de Obra</th>
+            <th>#</th><th>Descripción / Sistema</th><th style="text-align: center">Estado</th><th style="text-align: center">Repuesto</th><th style="text-align: center">Reparación</th>
           </tr>
         </thead>
         <tbody>${rows}</tbody>
