@@ -1,5 +1,5 @@
 {
-  "name": "appagent",
+  "name": "frontend",
   "private": true,
   "version": "0.0.0",
   "type": "module",
@@ -7,13 +7,9 @@
     "dev": "vite",
     "build": "vite build",
     "lint": "eslint .",
-    "preview": "vite preview",
-    "server": "json-server --watch db.json --port 3001",
-    "start": "node server.js"
+    "preview": "vite preview"
   },
   "dependencies": {
-    "express": "^5.2.1",
-    "json-server": "^0.17.4",
     "lucide-react": "^1.14.0",
     "react": "^19.2.5",
     "react-dom": "^19.2.5",
