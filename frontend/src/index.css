@@ -24,6 +24,50 @@
   --transition: 0.2s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
+[data-theme="light"] {
+  --primary: #4f46e5;
+  --primary-dark: #3730a3;
+  --primary-light: #e0e7ff;
+  --bg: #f1f5f9;
+  --bg-surface: #ffffff;
+  --bg-card: #ffffff;
+  --surface: #ffffff;
+  --surface2: #e2e8f0;
+  --text: #0f172a;
+  --text-muted: #64748b;
+  --border: #cbd5e1;
+  --success: #059669;
+  --warning: #d97706;
+  --danger: #dc2626;
+  --shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1);
+  --shadow-lg: 0 20px 40px -10px rgb(0 0 0 / 0.15);
+}
+
+/* ── Theme toggle button ────────────────── */
+.theme-toggle {
+  width: 44px; height: 24px;
+  border-radius: 999px;
+  border: none; cursor: pointer;
+  background: var(--surface2);
+  border: 1.5px solid var(--border);
+  position: relative;
+  transition: background 0.3s;
+  flex-shrink: 0;
+}
+.theme-toggle::after {
+  content: '';
+  position: absolute;
+  top: 3px; left: 3px;
+  width: 16px; height: 16px;
+  border-radius: 50%;
+  background: var(--text-muted);
+  transition: transform 0.3s, background 0.3s;
+}
+[data-theme="light"] .theme-toggle::after {
+  transform: translateX(20px);
+  background: var(--primary);
+}
+
 * { box-sizing: border-box; margin: 0; padding: 0; }
 
 body {

@@ -1,7 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useContext } from 'react';
 import { API_URL } from '../api';
 import OrderDetailsModal from './OrderDetailsModal';
-import { PlusCircle, BarChart3, TrendingUp, DollarSign, ClipboardList, X, Car } from 'lucide-react';
+import { ThemeContext } from '../App';
+import { PlusCircle, BarChart3, TrendingUp, DollarSign, ClipboardList, X, Car, Sun, Moon } from 'lucide-react';
 
 const fmt = (n) => (parseFloat(n) || 0).toLocaleString('es-CO', { minimumFractionDigits: 0 });
 
@@ -10,6 +11,7 @@ const COLUMNS = ['Recepción', 'Proceso', 'Calidad'];
 const emptyForm = { placa: '', cliente: '', telefono: '', correo: '', marca: '', modelo: '', anio: '', kilometraje: '', servicios: '', notas: '' };
 
 export default function AdminView() {
+  const { theme, toggleTheme } = useContext(ThemeContext);
   const [orders, setOrders] = useState([]);
   const [stats, setStats] = useState({ avg: 0, total: 0, active: 0 });
   const [selectedOrder, setSelectedOrder] = useState(null);
@@ -94,9 +96,12 @@ export default function AdminView() {
             <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>Taller Automotriz</div>
           </div>
         </div>
-        <button className="btn-primary" style={{ gap: '0.5rem' }} onClick={() => setShowNewOrder(true)}>
-          <PlusCircle size={16} /> Nueva Orden
-        </button>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+            <button onClick={toggleTheme} className="theme-toggle" title={theme === 'dark' ? 'Cambiar a tema claro' : 'Cambiar a tema oscuro'} />
+            <button className="btn-primary" style={{ gap: '0.5rem' }} onClick={() => setShowNewOrder(true)}>
+              <PlusCircle size={16} /> Nueva Orden
+            </button>
+          </div>
       </div>
 
       <div style={{ maxWidth: 1300, margin: '0 auto', padding: '1.5rem 1.5rem 4rem' }}>

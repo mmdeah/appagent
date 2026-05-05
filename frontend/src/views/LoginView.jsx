@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useContext } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Shield, Wrench, Car, ArrowLeft, Lock } from 'lucide-react';
+import { ThemeContext } from '../App';
 
 const roles = [
   {
@@ -33,6 +34,7 @@ const roles = [
 ];
 
 export default function LoginView() {
+  const { theme, toggleTheme } = useContext(ThemeContext);
   const [selected, setSelected] = useState(null);
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
@@ -53,6 +55,9 @@ export default function LoginView() {
       <div className="login-box">
         {/* Logo / Header */}
         <div style={{ textAlign: 'center', marginBottom: '2rem' }}>
+          <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '0.75rem' }}>
+            <button onClick={toggleTheme} className="theme-toggle" title="Cambiar tema" />
+          </div>
           <div style={{ width: 56, height: 56, borderRadius: 14, background: 'linear-gradient(135deg, #6366f1, #4f46e5)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 1rem' }}>
             <Wrench size={26} color="white" />
           </div>

@@ -1,5 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useContext } from 'react';
 import { API_URL } from '../api';
+import { ThemeContext } from '../App';
 import { Wrench, Car, ChevronRight, ClipboardList, ArrowLeft, CheckCircle, AlertTriangle, XCircle, PlusCircle, SendHorizonal } from 'lucide-react';
 
 const categories = {
@@ -29,18 +30,19 @@ const StateBtn = ({ current, value, label }) => {
 };
 
 export default function TechnicianView() {
+  const { theme, toggleTheme } = useContext(ThemeContext);
   const [orders, setOrders] = useState([]);
   const [selectedOrder, setSelectedOrder] = useState(null);
   const [reportData, setReportData] = useState({});
   const [scannerCodes, setScannerCodes] = useState([{ prefix: 'P', code: '', description: '' }]);
+  const [precioDiagnostico, setPrecioDiagnostico] = useState('');
   const [statusMsg, setStatusMsg] = useState({ text: '', type: '' });
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Mejora #1: traer TODAS las órdenes sin importar el estado
     fetch(`${API_URL}/orders`)
       .then(res => res.json())
-      .then(data => { setOrders(data); setLoading(false); })
+      .then(data => { setOrders(data.filter(o => o.estado !== 'Entregado')); setLoading(false); })
       .catch(() => setLoading(false));
   }, []);
 
@@ -76,7 +78,13 @@ export default function TechnicianView() {
   const submitReport = async () => {
     const items = Object.values(reportData);
     const validCodes = scannerCodes.filter(c => c.code.length > 0);
-    const payload = { orderId: selectedOrder.id, items, scannerCodes: validCodes, fecha: new Date().toISOString() };
+    const payload = {
+      orderId: selectedOrder.id,
+      items,
+      scannerCodes: validCodes,
+      precioDiagnostico: validCodes.length > 0 ? (parseFloat(precioDiagnostico.replace(/\D/g,'')) || 0) : 0,
+      fecha: new Date().toISOString()
+    };
     try {
       await fetch(`${API_URL}/reports`, {
         method: 'POST',
@@ -84,7 +92,7 @@ export default function TechnicianView() {
         body: JSON.stringify(payload)
       });
       setStatusMsg({ text: '✓ Reporte subido exitosamente', type: 'success' });
-      setTimeout(() => { setSelectedOrder(null); setReportData({}); setStatusMsg({ text: '', type: '' }); }, 2000);
+      setTimeout(() => { setSelectedOrder(null); setReportData({}); setScannerCodes([{ prefix: 'P', code: '', description: '' }]); setPrecioDiagnostico(''); setStatusMsg({ text: '', type: '' }); }, 2000);
     } catch (e) {
       setStatusMsg({ text: '✗ Error al subir el reporte', type: 'error' });
     }
@@ -99,7 +107,7 @@ export default function TechnicianView() {
     return (
       <div style={{ minHeight: '100vh', background: 'var(--bg)' }}>
         <div className="tech-header">
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
             <div style={{ width: 36, height: 36, borderRadius: 9, background: 'linear-gradient(135deg, #059669, #10b981)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               <Wrench size={18} color="white" />
             </div>
@@ -108,6 +116,7 @@ export default function TechnicianView() {
               <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>{orders.length} vehículo{orders.length !== 1 ? 's' : ''}</div>
             </div>
           </div>
+          <button onClick={toggleTheme} className="theme-toggle" title="Cambiar tema" />
         </div>
 
         <div style={{ padding: '2rem', maxWidth: 1100, margin: '0 auto' }}>
@@ -281,6 +290,21 @@ export default function TechnicianView() {
             onClick={() => setScannerCodes([...scannerCodes, { prefix: 'P', code: '', description: '' }])}>
             <PlusCircle size={14} /> Añadir código DTC
           </button>
+
+          {/* Precio diagnóstico si hay códigos */}
+          {scannerCodes.some(c => c.code.trim().length > 0) && (
+            <div style={{ marginTop: '1.25rem', padding: '1rem', background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.25)', borderRadius: 'var(--radius-sm)' }}>
+              <div style={{ fontSize: '0.78rem', fontWeight: 700, color: 'var(--warning)', textTransform: 'uppercase', marginBottom: '0.4rem' }}>💡 Servicio: Diagnóstico Código de Avería</div>
+              <label style={{ fontSize: '0.82rem', color: 'var(--text-muted)' }}>
+                Precio del servicio de diagnóstico ($):
+                <input type="text" className="price-input"
+                  placeholder="Ej. 80.000"
+                  value={precioDiagnostico}
+                  onChange={e => setPrecioDiagnostico(e.target.value.replace(/\D/g,'') ? parseInt(e.target.value.replace(/\D/g,'')).toLocaleString('es-CO') : '')}
+                  style={{ marginTop: '0.4rem' }} />
+              </label>
+            </div>
+          )}
         </div>
 
         {statusMsg.text && (

@@ -1,29 +1,39 @@
-import React, { useState } from 'react';
+import React, { useState, useContext } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Search, ArrowLeft } from 'lucide-react';
+import { Search, ArrowLeft, CheckCircle, Clock, Wrench, ChevronRight, XCircle } from 'lucide-react';
 import { API_URL } from '../api';
+import { ThemeContext } from '../App';
 
 const fmt = (n) => (parseFloat(n) || 0).toLocaleString('es-CO', { minimumFractionDigits: 0 });
 
+const ESTADO_CONFIG = {
+  'Recepción': { label: 'Recepción', color: '#818cf8', bg: 'rgba(99,102,241,0.12)', icon: '📋' },
+  'Proceso':   { label: 'En Proceso', color: '#fbbf24', bg: 'rgba(245,158,11,0.12)', icon: '🔧' },
+  'Calidad':   { label: 'Control de Calidad', color: '#34d399', bg: 'rgba(16,185,129,0.12)', icon: '✅' },
+  'Entregado': { label: 'Entregado', color: '#94a3b8', bg: 'rgba(148,163,184,0.12)', icon: '🏁' },
+};
+
 export default function ClientView() {
+  const { theme, toggleTheme } = useContext(ThemeContext);
   const [placa, setPlaca] = useState('');
-  const [order, setOrder] = useState(null);
+  const [orders, setOrders] = useState([]);
+  const [selectedOrder, setSelectedOrder] = useState(null);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
 
-  const searchOrder = async (e) => {
+  const searchOrders = async (e) => {
     e.preventDefault();
     if (!placa) return;
-    setLoading(true); setError('');
+    setLoading(true); setError(''); setSelectedOrder(null);
     try {
       const res = await fetch(`${API_URL}/orders?placa=${placa.trim().toUpperCase()}&_embed=reports&_embed=quotes`);
       const data = await res.json();
       if (data.length > 0) {
-        setOrder(data[0]);
+        setOrders(data);
       } else {
-        setError('No se encontró una orden para esta placa. Verifica e intenta de nuevo.');
-        setOrder(null);
+        setError('No se encontraron órdenes para esta placa. Verifica e intenta de nuevo.');
+        setOrders([]);
       }
     } catch {
       setError('Error al conectar. Intenta de nuevo en un momento.');
@@ -33,32 +43,22 @@ export default function ClientView() {
   };
 
   const stateColor = { Bueno: '#34d399', Regular: '#fbbf24', Malo: '#f87171' };
-  const statusBadge = (s) => {
-    const m = { 'Recepción': 'badge-blue', 'Proceso': 'badge-yellow', 'Calidad': 'badge-green', 'Entregado': 'badge-red' };
-    return <span className={`badge ${m[s] || 'badge-blue'}`}>{s}</span>;
-  };
 
-  const report = order?.reports?.[0];
-  const quote  = order?.quotes?.[0];
-
-  const totals = quote?.items?.reduce((acc, it) => {
-    const lt = it.precio * it.cantidad;
-    acc.sub += lt;
-    if (it.aplicaIva) acc.iva += lt * 0.19;
-    return acc;
-  }, { sub: 0, iva: 0 }) || { sub: 0, iva: 0 };
-
-  if (!order) {
+  // ── Vista de búsqueda (sin resultados aún)
+  if (orders.length === 0) {
     return (
       <div className="login-page">
         <div style={{ width: '100%', maxWidth: 500, background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 'var(--radius)', padding: '2.5rem', boxShadow: 'var(--shadow-lg)' }}>
+          <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '0.75rem' }}>
+            <button onClick={toggleTheme} className="theme-toggle" title="Cambiar tema" />
+          </div>
           <div style={{ textAlign: 'center', marginBottom: '2rem' }}>
             <div style={{ fontSize: '2.5rem', marginBottom: '0.5rem' }}>🔍</div>
             <h1 style={{ fontWeight: 800, fontSize: '1.5rem', marginBottom: '0.25rem' }}>Consulta tu Vehículo</h1>
             <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem' }}>Ingresa tu placa para ver el estado de tu orden de servicio</p>
           </div>
 
-          <form onSubmit={searchOrder}>
+          <form onSubmit={searchOrders}>
             <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '0.4rem' }}>
               Número de Placa
             </label>
@@ -89,25 +89,96 @@ export default function ClientView() {
     );
   }
 
+  // ── Vista de listado de tickets (sin orden seleccionada)
+  if (!selectedOrder) {
+    return (
+      <div style={{ minHeight: '100vh', background: 'var(--bg)', padding: '1.5rem' }}>
+        <div style={{ maxWidth: 700, margin: '0 auto' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
+            <button onClick={() => setOrders([])} className="btn-secondary">
+              <ArrowLeft size={16} /> Buscar otra placa
+            </button>
+            <button onClick={toggleTheme} className="theme-toggle" title="Cambiar tema" />
+          </div>
+
+          <div style={{ textAlign: 'center', marginBottom: '1.75rem' }}>
+            <div style={{ fontWeight: 800, fontSize: '2rem', letterSpacing: '0.05em' }}>{placa}</div>
+            <div style={{ color: 'var(--text-muted)', fontSize: '0.9rem' }}>
+              {orders.length} orden{orders.length !== 1 ? 'es' : ''} encontrada{orders.length !== 1 ? 's' : ''}
+            </div>
+          </div>
+
+          <div style={{ display: 'grid', gap: '0.85rem' }}>
+            {orders.map(o => {
+              const cfg = ESTADO_CONFIG[o.estado] || ESTADO_CONFIG['Recepción'];
+              const fecha = o.fecha ? new Date(o.fecha).toLocaleDateString('es-CO', { day: '2-digit', month: 'short', year: 'numeric' }) : 'N/A';
+              const hasQuote = o.quotes?.length > 0 && o.quotes[0].items?.length > 0;
+              return (
+                <div key={o.id}
+                  onClick={() => setSelectedOrder(o)}
+                  style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 'var(--radius)', padding: '1.25rem 1.5rem', cursor: 'pointer', transition: 'all 0.2s', display: 'flex', alignItems: 'center', gap: '1rem' }}
+                  onMouseEnter={e => { e.currentTarget.style.borderColor = 'var(--primary)'; e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.boxShadow = 'var(--shadow-lg)'; }}
+                  onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--border)'; e.currentTarget.style.transform = ''; e.currentTarget.style.boxShadow = ''; }}
+                >
+                  <div style={{ width: 48, height: 48, borderRadius: 12, background: cfg.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.4rem', flexShrink: 0 }}>
+                    {cfg.icon}
+                  </div>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.2rem' }}>
+                      <span style={{ fontWeight: 700, fontSize: '1rem' }}>{o.marca} {o.modelo} {o.anio}</span>
+                      <span style={{ background: cfg.bg, color: cfg.color, borderRadius: 999, padding: '0.15rem 0.65rem', fontSize: '0.72rem', fontWeight: 700 }}>{cfg.label}</span>
+                    </div>
+                    <div style={{ fontSize: '0.82rem', color: 'var(--text-muted)' }}>
+                      Ingreso: {fecha} · {o.servicios ? (o.servicios.length > 55 ? o.servicios.slice(0,55)+'...' : o.servicios) : 'Sin descripción'}
+                    </div>
+                  </div>
+                  <ChevronRight size={18} color="var(--text-muted)" style={{ flexShrink: 0 }} />
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // ── Vista detalle de la orden seleccionada
+  const order = selectedOrder;
+  const report = order?.reports?.[0];
+  const quote  = order?.quotes?.[0];
+  const totals = quote?.items?.reduce((acc, it) => {
+    const lt = it.precio * it.cantidad;
+    acc.sub += lt;
+    if (it.aplicaIva) acc.iva += lt * 0.19;
+    return acc;
+  }, { sub: 0, iva: 0 }) || { sub: 0, iva: 0 };
+
+  const cfg = ESTADO_CONFIG[order.estado] || ESTADO_CONFIG['Recepción'];
+
   return (
     <div style={{ minHeight: '100vh', background: 'var(--bg)', padding: '1.5rem' }}>
       <div style={{ maxWidth: 720, margin: '0 auto' }}>
-        <button onClick={() => setOrder(null)} className="btn-secondary" style={{ marginBottom: '1.5rem' }}>
-          <ArrowLeft size={16} /> Buscar otra placa
-        </button>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
+          <button onClick={() => setSelectedOrder(null)} className="btn-secondary">
+            <ArrowLeft size={16} /> Ver todas las órdenes
+          </button>
+          <button onClick={toggleTheme} className="theme-toggle" title="Cambiar tema" />
+        </div>
 
-        {/* Header card */}
-        <div className="card" style={{ marginBottom: '1rem', background: 'linear-gradient(135deg, rgba(99,102,241,0.15), rgba(79,70,229,0.08))', border: '1px solid rgba(99,102,241,0.3)' }}>
+        {/* Header ticket */}
+        <div className="card" style={{ marginBottom: '1rem', background: `linear-gradient(135deg, ${cfg.bg}, transparent)`, border: `1px solid ${cfg.color}40` }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '0.5rem' }}>
             <div>
               <div style={{ fontWeight: 800, fontSize: '1.6rem', letterSpacing: '0.03em' }}>{order.placa}</div>
               <div style={{ color: 'var(--text-muted)', fontSize: '0.9rem' }}>{order.marca} {order.modelo} {order.anio}</div>
             </div>
-            {statusBadge(order.estado)}
+            <span style={{ background: cfg.bg, color: cfg.color, borderRadius: 999, padding: '0.3rem 1rem', fontSize: '0.82rem', fontWeight: 700 }}>
+              {cfg.icon} {cfg.label}
+            </span>
           </div>
         </div>
 
-        {/* Service info */}
+        {/* Order info */}
         <div className="card">
           <p className="section-title">Tu Orden de Servicio</p>
           <div className="info-grid">

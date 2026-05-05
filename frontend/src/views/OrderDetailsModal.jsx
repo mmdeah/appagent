@@ -137,13 +137,9 @@ export default function OrderDetailsModal({ order, onClose }) {
   };
 
   const doDeliver = async () => {
-    const dataStr = 'data:text/json;charset=utf-8,' + encodeURIComponent(JSON.stringify(order, null, 2));
-    const a = document.createElement('a');
-    a.href = dataStr; a.download = `orden_${order.placa}_${Date.now()}.json`;
-    document.body.appendChild(a); a.click(); a.remove();
     await fetch(`${API_URL}/orders/${order.id}`, {
       method: 'PATCH', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ estado: 'Entregado' })
+      body: JSON.stringify({ estado: 'Entregado', fechaEntrega: new Date().toISOString() })
     });
     onClose();
   };
