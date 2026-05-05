@@ -1,166 +1,227 @@
 import React, { useState, useEffect } from 'react';
 import { API_URL } from '../api';
 import OrderDetailsModal from './OrderDetailsModal';
-import { PlusCircle } from 'lucide-react';
+import { PlusCircle, BarChart3, TrendingUp, DollarSign, ClipboardList, X, Car } from 'lucide-react';
+
+const fmt = (n) => (parseFloat(n) || 0).toLocaleString('es-CO', { minimumFractionDigits: 0 });
+
+const COLUMNS = ['Recepción', 'Proceso', 'Calidad'];
+
+const emptyForm = { placa: '', cliente: '', telefono: '', correo: '', marca: '', modelo: '', anio: '', kilometraje: '', servicios: '', notas: '' };
 
 export default function AdminView() {
   const [orders, setOrders] = useState([]);
-  const [stats, setStats] = useState({ avg: 0, total: 0, expenses: 0, active: 0 });
+  const [stats, setStats] = useState({ avg: 0, total: 0, active: 0 });
   const [selectedOrder, setSelectedOrder] = useState(null);
   const [showNewOrder, setShowNewOrder] = useState(false);
-  const [newOrderForm, setNewOrderForm] = useState({ 
-    placa: '', cliente: '', telefono: '', correo: '', marca: '', modelo: '', anio: '', kilometraje: '', servicios: '', notas: '' 
-  });
+  const [form, setForm] = useState(emptyForm);
+  const [photos, setPhotos] = useState([]);
+  const [formStatus, setFormStatus] = useState({ text: '', type: '' });
 
   const fetchOrders = async () => {
     try {
       const res = await fetch(`${API_URL}/orders?_embed=reports&_embed=quotes`);
       const data = await res.json();
       setOrders(data);
-      
-      const active = data.length;
-      let totalFacturado = 0;
-      
-      data.forEach(order => {
-        if (order.quotes && order.quotes.length > 0) {
-          order.quotes.forEach(quote => {
-            if (quote.items) {
-              quote.items.forEach(item => {
-                const subtotal = (item.precio * item.cantidad);
-                const totalItem = item.aplicaIva ? subtotal * 1.19 : subtotal;
-                totalFacturado += totalItem;
-              });
-            }
-          });
-        }
-      });
-      
-      const avg = active > 0 ? (totalFacturado / active) : 0;
-      setStats({ avg, total: totalFacturado, expenses: 0, active });
-    } catch (e) {
-      console.error(e);
-    }
+      let total = 0;
+      data.forEach(o => o.quotes?.forEach(q => q.items?.forEach(it => {
+        const sub = it.precio * it.cantidad;
+        total += it.aplicaIva ? sub * 1.19 : sub;
+      })));
+      const active = data.filter(o => o.estado !== 'Entregado').length;
+      setStats({ total, avg: active > 0 ? total / active : 0, active });
+    } catch (e) { console.error(e); }
   };
 
-  useEffect(() => {
-    fetchOrders();
-  }, []);
+  useEffect(() => { fetchOrders(); }, []);
 
-  const kanbanColumns = ['Recepción', 'Proceso', 'Calidad'];
-
-  const moveOrder = async (orderId, newStatus) => {
-    await fetch(`${API_URL}/orders/${orderId}`, {
+  const moveOrder = async (id, estado) => {
+    await fetch(`${API_URL}/orders/${id}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ estado: newStatus })
+      body: JSON.stringify({ estado })
     });
     fetchOrders();
+  };
+
+  // Mejora #2: Convertir fotos a Base64 para guardarlas en la orden
+  const handlePhotos = (e) => {
+    const files = Array.from(e.target.files);
+    Promise.all(files.map(f => new Promise((res) => {
+      const reader = new FileReader();
+      reader.onload = ev => res(ev.target.result);
+      reader.readAsDataURL(f);
+    }))).then(results => setPhotos(prev => [...prev, ...results]));
   };
 
   const handleCreateOrder = async (e) => {
     e.preventDefault();
-    if (!newOrderForm.placa) return;
-    
-    await fetch(`${API_URL}/orders`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        ...newOrderForm,
-        placa: newOrderForm.placa.toUpperCase(),
-        estado: 'Recepción',
-        fecha: new Date().toISOString()
-      })
-    });
-    
-    setShowNewOrder(false);
-    setNewOrderForm({ placa: '', cliente: '', telefono: '', correo: '', marca: '', modelo: '', anio: '', kilometraje: '', servicios: '', notas: '' });
-    fetchOrders();
+    if (!form.placa) return;
+    try {
+      await fetch(`${API_URL}/orders`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          ...form,
+          placa: form.placa.toUpperCase(),
+          estado: 'Recepción',
+          fecha: new Date().toISOString(),
+          fotos: photos
+        })
+      });
+      setShowNewOrder(false);
+      setForm(emptyForm);
+      setPhotos([]);
+      fetchOrders();
+    } catch (e) {
+      setFormStatus({ text: 'Error al crear la orden', type: 'error' });
+    }
   };
 
+  const colColor = { 'Recepción': '#6366f1', 'Proceso': '#f59e0b', 'Calidad': '#10b981' };
+  const colBg   = { 'Recepción': 'rgba(99,102,241,0.08)', 'Proceso': 'rgba(245,158,11,0.08)', 'Calidad': 'rgba(16,185,129,0.08)' };
+
   return (
-    <div style={{ padding: '2rem', maxWidth: '1200px', margin: '0 auto' }}>
-      <h1>Panel de Administración</h1>
-      
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '1rem', margin: '2rem 0' }}>
-        <div className="card" style={{ textAlign: 'center' }}>
-          <h3 style={{ color: 'var(--text-muted)', fontSize: '0.9rem' }}>Órdenes Activas</h3>
-          <p style={{ fontSize: '2rem', fontWeight: 'bold', color: 'var(--primary)' }}>{stats.active}</p>
-        </div>
-        <div className="card" style={{ textAlign: 'center' }}>
-          <h3 style={{ color: 'var(--text-muted)', fontSize: '0.9rem' }}>Total Facturado</h3>
-          <p style={{ fontSize: '1.5rem', fontWeight: 'bold' }}>${stats.total.toLocaleString()}</p>
-        </div>
-        <div className="card" style={{ textAlign: 'center' }}>
-          <h3 style={{ color: 'var(--text-muted)', fontSize: '0.9rem' }}>Promedio O.S</h3>
-          <p style={{ fontSize: '1.5rem', fontWeight: 'bold' }}>${stats.avg.toLocaleString()}</p>
-        </div>
-        <div className="card" style={{ textAlign: 'center' }}>
-          <h3 style={{ color: 'var(--text-muted)', fontSize: '0.9rem' }}>Gastos Totales</h3>
-          <p style={{ fontSize: '1.5rem', fontWeight: 'bold' }}>${stats.expenses.toLocaleString()}</p>
-        </div>
-      </div>
-
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '1.5rem' }}>
-        {kanbanColumns.map(col => (
-          <div key={col} style={{ background: '#f1f5f9', padding: '1.5rem', borderRadius: '12px', minHeight: '500px' }}>
-            <h2 style={{ marginBottom: '1rem', borderBottom: '2px solid #cbd5e1', paddingBottom: '0.5rem' }}>{col}</h2>
-            {orders.filter(o => o.estado === col).map(o => (
-              <div 
-                key={o.id} 
-                className="card" 
-                style={{ marginBottom: '1rem', cursor: 'pointer', transition: 'transform 0.2s' }} 
-                onClick={() => setSelectedOrder(o)}
-                onMouseOver={e => e.currentTarget.style.transform = 'translateY(-2px)'}
-                onMouseOut={e => e.currentTarget.style.transform = 'translateY(0)'}
-              >
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <h4 style={{ fontSize: '1.2rem', margin: 0 }}>{o.placa}</h4>
-                  <span style={{ fontSize: '0.8rem', background: 'var(--primary)', color: 'white', padding: '0.2rem 0.5rem', borderRadius: '4px' }}>
-                    {o.reports?.length > 0 ? '✓ Revisado' : '⏳ Pdte'}
-                  </span>
-                </div>
-                <p style={{ margin: '0.5rem 0', color: 'var(--text-muted)' }}>{o.marca} {o.modelo}</p>
-                <select 
-                  value={o.estado} 
-                  onChange={(e) => { e.stopPropagation(); moveOrder(o.id, e.target.value); }}
-                  style={{ padding: '0.5rem', width: '100%', borderRadius: '4px', border: '1px solid var(--border)' }}
-                >
-                  {kanbanColumns.map(c => <option key={c} value={c}>{c}</option>)}
-                </select>
-              </div>
-            ))}
-            {col === 'Recepción' && (
-              <button className="btn-secondary" style={{ width: '100%', marginTop: '1rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem' }} onClick={() => setShowNewOrder(true)}>
-                <PlusCircle size={18} /> Nueva Orden
-              </button>
-            )}
+    <div style={{ minHeight: '100vh', background: 'var(--bg)' }}>
+      {/* Top nav */}
+      <div style={{ background: 'var(--bg-card)', borderBottom: '1px solid var(--border)', padding: '1rem 2rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', position: 'sticky', top: 0, zIndex: 50 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+          <div style={{ width: 36, height: 36, borderRadius: 9, background: 'linear-gradient(135deg,#6366f1,#4f46e5)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <BarChart3 size={18} color="white" />
           </div>
-        ))}
+          <div>
+            <div style={{ fontWeight: 700, lineHeight: 1 }}>Panel Admin</div>
+            <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>Taller Automotriz</div>
+          </div>
+        </div>
+        <button className="btn-primary" style={{ gap: '0.5rem' }} onClick={() => setShowNewOrder(true)}>
+          <PlusCircle size={16} /> Nueva Orden
+        </button>
       </div>
 
+      <div style={{ maxWidth: 1300, margin: '0 auto', padding: '1.5rem 1.5rem 4rem' }}>
+        {/* Stats row */}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem', marginBottom: '1.75rem' }}>
+          <div className="stat-card">
+            <div className="label">Órdenes Activas</div>
+            <div className="value" style={{ color: '#818cf8' }}>{stats.active}</div>
+            <div className="sub">En progreso actualmente</div>
+          </div>
+          <div className="stat-card">
+            <div className="label">Total Facturado</div>
+            <div className="value">${fmt(stats.total)}</div>
+            <div className="sub">Suma de todas las cotizaciones</div>
+          </div>
+          <div className="stat-card">
+            <div className="label">Promedio por O.S.</div>
+            <div className="value">${fmt(stats.avg)}</div>
+            <div className="sub">Valor promedio por orden</div>
+          </div>
+        </div>
+
+        {/* Kanban */}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '1.25rem' }}>
+          {COLUMNS.map(col => (
+            <div key={col} className="kanban-column">
+              <div className="kanban-header">
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                  <span style={{ width: 10, height: 10, borderRadius: '50%', background: colColor[col], display: 'inline-block' }}></span>
+                  <span style={{ fontWeight: 600, fontSize: '0.9rem' }}>{col}</span>
+                </div>
+                <span style={{ background: colBg[col], color: colColor[col], borderRadius: 999, padding: '0.15rem 0.6rem', fontSize: '0.75rem', fontWeight: 700 }}>
+                  {orders.filter(o => o.estado === col).length}
+                </span>
+              </div>
+
+              {orders.filter(o => o.estado === col).map(o => (
+                <div key={o.id} className="kanban-card" onClick={() => setSelectedOrder(o)}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '0.5rem' }}>
+                    <div>
+                      <div style={{ fontWeight: 700, fontSize: '1rem' }}>{o.placa}</div>
+                      <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>{o.marca} {o.modelo}</div>
+                    </div>
+                    <span style={{ fontSize: '0.72rem', background: o.reports?.length > 0 ? 'rgba(16,185,129,0.15)' : 'rgba(245,158,11,0.15)', color: o.reports?.length > 0 ? '#34d399' : '#fbbf24', padding: '0.2rem 0.5rem', borderRadius: 999, fontWeight: 600, whiteSpace: 'nowrap' }}>
+                      {o.reports?.length > 0 ? '✓ Revisado' : '⏳ Pdte'}
+                    </span>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '0.5rem' }}>
+                    <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>{o.cliente}</span>
+                    <select
+                      value={o.estado}
+                      onClick={e => e.stopPropagation()}
+                      onChange={e => { e.stopPropagation(); moveOrder(o.id, e.target.value); }}
+                      style={{ fontSize: '0.75rem', padding: '0.2rem 0.4rem', width: 'auto', borderRadius: 6 }}>
+                      {COLUMNS.map(c => <option key={c} value={c}>{c}</option>)}
+                    </select>
+                  </div>
+                </div>
+              ))}
+
+              {orders.filter(o => o.estado === col).length === 0 && (
+                <div style={{ textAlign: 'center', padding: '2rem 0', color: 'var(--text-muted)', fontSize: '0.82rem' }}>
+                  Sin órdenes
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* New Order Modal */}
       {showNewOrder && (
-        <div className="modal-overlay" style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.5)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 1000 }}>
-          <div className="card" style={{ width: '90%', maxWidth: '600px', background: 'white', maxHeight: '90vh', overflowY: 'auto' }}>
-            <h2 style={{ marginBottom: '1rem' }}>Ingresar Vehículo</h2>
-            <form onSubmit={handleCreateOrder} style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
-              <input placeholder="Placa (Ej. AAA123)" required value={newOrderForm.placa} onChange={e => setNewOrderForm({...newOrderForm, placa: e.target.value})} style={{ padding: '0.5rem' }} />
-              <input placeholder="Kilometraje" required type="number" value={newOrderForm.kilometraje} onChange={e => setNewOrderForm({...newOrderForm, kilometraje: e.target.value})} style={{ padding: '0.5rem' }} />
-              
-              <input placeholder="Nombre Cliente" required value={newOrderForm.cliente} onChange={e => setNewOrderForm({...newOrderForm, cliente: e.target.value})} style={{ padding: '0.5rem' }} />
-              <input placeholder="Teléfono" required value={newOrderForm.telefono} onChange={e => setNewOrderForm({...newOrderForm, telefono: e.target.value})} style={{ padding: '0.5rem' }} />
-              
-              <input placeholder="Correo" required type="email" value={newOrderForm.correo} onChange={e => setNewOrderForm({...newOrderForm, correo: e.target.value})} style={{ padding: '0.5rem', gridColumn: '1 / -1' }} />
-              
-              <input placeholder="Marca" required value={newOrderForm.marca} onChange={e => setNewOrderForm({...newOrderForm, marca: e.target.value})} style={{ padding: '0.5rem' }} />
-              <input placeholder="Modelo" required value={newOrderForm.modelo} onChange={e => setNewOrderForm({...newOrderForm, modelo: e.target.value})} style={{ padding: '0.5rem' }} />
-              <input placeholder="Año" required type="number" value={newOrderForm.anio} onChange={e => setNewOrderForm({...newOrderForm, anio: e.target.value})} style={{ padding: '0.5rem' }} />
-              
-              <textarea placeholder="Servicios a Realizar" required value={newOrderForm.servicios} onChange={e => setNewOrderForm({...newOrderForm, servicios: e.target.value})} style={{ padding: '0.5rem', gridColumn: '1 / -1', minHeight: '60px' }}></textarea>
-              <textarea placeholder="Notas / Observaciones" value={newOrderForm.notas} onChange={e => setNewOrderForm({...newOrderForm, notas: e.target.value})} style={{ padding: '0.5rem', gridColumn: '1 / -1', minHeight: '60px' }}></textarea>
-              
-              <div style={{ display: 'flex', gap: '1rem', marginTop: '1rem', gridColumn: '1 / -1' }}>
-                <button type="button" className="btn-secondary" onClick={() => setShowNewOrder(false)} style={{ flex: 1 }}>Cancelar</button>
-                <button type="submit" className="btn-primary" style={{ flex: 1 }}>Guardar Orden</button>
+        <div className="modal-overlay">
+          <div className="modal-box" style={{ maxWidth: 640 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
+              <h2 style={{ fontWeight: 700, fontSize: '1.2rem' }}>📋 Ingresar Vehículo</h2>
+              <button onClick={() => { setShowNewOrder(false); setPhotos([]); }} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)' }}><X size={20} /></button>
+            </div>
+
+            {formStatus.text && <div className={`toast toast-${formStatus.type}`}>{formStatus.text}</div>}
+
+            <form onSubmit={handleCreateOrder}>
+              <p className="section-title">Vehículo</p>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem', marginBottom: '1.25rem' }}>
+                <input required placeholder="Placa (Ej. AAA123)" value={form.placa} onChange={e => setForm({...form, placa: e.target.value.toUpperCase()})} />
+                <input required placeholder="Kilometraje" type="number" value={form.kilometraje} onChange={e => setForm({...form, kilometraje: e.target.value})} />
+                <input required placeholder="Marca" value={form.marca} onChange={e => setForm({...form, marca: e.target.value})} />
+                <input required placeholder="Modelo" value={form.modelo} onChange={e => setForm({...form, modelo: e.target.value})} />
+                <input required placeholder="Año" type="number" value={form.anio} onChange={e => setForm({...form, anio: e.target.value})} style={{ gridColumn: '1 / -1' }} />
+              </div>
+
+              <p className="section-title">Cliente</p>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem', marginBottom: '1.25rem' }}>
+                <input required placeholder="Nombre completo" value={form.cliente} onChange={e => setForm({...form, cliente: e.target.value})} />
+                <input required placeholder="Teléfono" value={form.telefono} onChange={e => setForm({...form, telefono: e.target.value})} />
+                <input placeholder="Correo electrónico" type="email" value={form.correo} onChange={e => setForm({...form, correo: e.target.value})} style={{ gridColumn: '1 / -1' }} />
+              </div>
+
+              <p className="section-title">Servicio</p>
+              <div style={{ display: 'grid', gap: '0.75rem', marginBottom: '1.25rem' }}>
+                <textarea required placeholder="Servicios a realizar" value={form.servicios} onChange={e => setForm({...form, servicios: e.target.value})} style={{ minHeight: 70 }} />
+                <textarea placeholder="Notas / Observaciones" value={form.notas} onChange={e => setForm({...form, notas: e.target.value})} style={{ minHeight: 55 }} />
+              </div>
+
+              {/* Mejora #2: Fotos de ingreso */}
+              <p className="section-title">Fotos de Ingreso</p>
+              <label style={{ display: 'block', border: '2px dashed var(--border)', borderRadius: 'var(--radius-sm)', padding: '1rem', textAlign: 'center', cursor: 'pointer', marginBottom: '0.75rem', color: 'var(--text-muted)', fontSize: '0.85rem', transition: 'border-color 0.2s' }}>
+                📷 Haz clic para seleccionar fotos (o arrastra aquí)
+                <input type="file" accept="image/*" multiple style={{ display: 'none' }} onChange={handlePhotos} />
+              </label>
+              {photos.length > 0 && (
+                <div className="img-grid" style={{ marginBottom: '1.25rem' }}>
+                  {photos.map((src, i) => (
+                    <div key={i} style={{ position: 'relative' }}>
+                      <img src={src} className="img-thumb" alt={`foto-${i}`} />
+                      <button type="button" onClick={() => setPhotos(photos.filter((_, j) => j !== i))}
+                        style={{ position: 'absolute', top: 2, right: 2, background: 'rgba(0,0,0,0.7)', border: 'none', borderRadius: '50%', width: 18, height: 18, cursor: 'pointer', color: 'white', fontSize: 10, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>✕</button>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              <div style={{ display: 'flex', gap: '0.75rem' }}>
+                <button type="button" className="btn-secondary" style={{ flex: 1, justifyContent: 'center' }} onClick={() => setShowNewOrder(false)}>Cancelar</button>
+                <button type="submit" className="btn-primary" style={{ flex: 2, justifyContent: 'center' }}>Guardar Orden</button>
               </div>
             </form>
           </div>
@@ -168,10 +229,7 @@ export default function AdminView() {
       )}
 
       {selectedOrder && (
-        <OrderDetailsModal 
-          order={selectedOrder} 
-          onClose={() => { setSelectedOrder(null); fetchOrders(); }} 
-        />
+        <OrderDetailsModal order={selectedOrder} onClose={() => { setSelectedOrder(null); fetchOrders(); }} />
       )}
     </div>
   );
