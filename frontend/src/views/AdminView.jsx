@@ -30,6 +30,7 @@ export default function AdminView() {
   const [orderToDelete, setOrderToDelete] = useState(null);
   const [todos, setTodos] = useState([]);
   const [newTodo, setNewTodo] = useState('');
+  const [balancesByMethod, setBalancesByMethod] = useState({});
 
   const fetchExpenses = async () => {
     try {
