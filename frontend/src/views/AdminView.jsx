@@ -97,16 +97,36 @@ export default function AdminView() {
     try {
       const res = await fetch(`${API_URL}/orders?_embed=reports&_embed=quotes`);
       const data = await res.json();
-      setOrders(data);
-      let total = 0;
-      const entregadas = data.filter(o => o.estado === 'Entregado');
-      entregadas.forEach(o => o.quotes?.forEach(q => q.items?.forEach(it => {
-        const sub = it.precio * it.cantidad;
-        total += it.aplicaIva ? sub * 1.19 : sub;
-      })));
-      const active = data.filter(o => o.estado !== 'Entregado').length;
-      setStats({ total, avg: entregadas.length > 0 ? total / entregadas.length : 0, active });
-    } catch (e) { console.error(e); }
+      setOrders(Array.isArray(data) ? data : []);
+      
+      let incomeTotal = 0;
+      const entregadas = (Array.isArray(data) ? data : []).filter(o => o.estado === 'Entregado');
+      
+      entregadas.forEach(o => {
+        // Sumar de quotes embebidas
+        if (o.quotes && Array.isArray(o.quotes)) {
+          o.quotes.forEach(q => {
+            if (q.items && Array.isArray(q.items)) {
+              q.items.forEach(it => {
+                const precio = parseFloat(it.precio) || 0;
+                const cantidad = parseFloat(it.cantidad) || 0;
+                const sub = precio * cantidad;
+                incomeTotal += it.aplicaIva ? sub * 1.19 : sub;
+              });
+            }
+          });
+        }
+      });
+
+      const active = (Array.isArray(data) ? data : []).filter(o => o.estado !== 'Entregado').length;
+      setStats({ 
+        total: Math.round(incomeTotal), 
+        avg: entregadas.length > 0 ? incomeTotal / entregadas.length : 0, 
+        active 
+      });
+    } catch (e) { 
+      console.error("Error fetching orders for stats:", e); 
+    }
   };
 
   useEffect(() => { fetchOrders(); fetchExpenses(); fetchTodos(); }, []);

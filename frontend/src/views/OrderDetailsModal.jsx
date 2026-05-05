@@ -234,6 +234,9 @@ export default function OrderDetailsModal({ order, onClose }) {
   };
 
   const doDeliver = async () => {
+    // Primero guardamos la cotización para asegurar que las estadísticas se actualicen
+    await saveQuote();
+    
     await fetch(`${API_URL}/orders/${order.id}`, {
       method: 'PATCH', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ estado: 'Entregado', fechaEntrega: new Date().toISOString(), metodoPago })
