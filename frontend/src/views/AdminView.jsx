@@ -26,6 +26,7 @@ export default function AdminView() {
   const [expenseForm, setExpenseForm] = useState({ fecha: new Date().toISOString().split('T')[0], concepto: '', monto: '' });
   const [quickOrderForm, setQuickOrderForm] = useState({ placa: '', cliente: '', marca: '', modelo: '', anio: '', servicios: '' });
   const [formStatus, setFormStatus] = useState({ text: '', type: '' });
+  const [orderToDelete, setOrderToDelete] = useState(null);
 
   const fetchExpenses = async () => {
     try {
@@ -53,10 +54,15 @@ export default function AdminView() {
 
   useEffect(() => { fetchOrders(); fetchExpenses(); }, []);
 
-  const deleteOrder = async (id) => {
-    if(!window.confirm('¿Estás seguro de eliminar esta orden permanentemente? Esta acción no se puede deshacer.')) return;
+  const deleteOrder = (id) => {
+    setOrderToDelete(id);
+  };
+
+  const confirmDeleteOrder = async () => {
+    if (!orderToDelete) return;
     try {
-      await fetch(`${API_URL}/orders/${id}`, { method: 'DELETE' });
+      await fetch(`${API_URL}/orders/${orderToDelete}`, { method: 'DELETE' });
+      setOrderToDelete(null);
       fetchOrders();
     } catch (e) { console.error(e); }
   };
@@ -512,6 +518,25 @@ export default function AdminView() {
 
       {showPhotoUpload && (
         <PhotoUploadModal onClose={() => setShowPhotoUpload(false)} onSuccess={fetchOrders} />
+      )}
+
+      {/* Delete Confirmation Modal */}
+      {orderToDelete && (
+        <div className="modal-overlay">
+          <div className="modal-box" style={{ maxWidth: 400, textAlign: 'center' }}>
+            <div style={{ background: 'rgba(239,68,68,0.1)', color: 'var(--error)', width: 56, height: 56, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 1rem' }}>
+              <Trash2 size={28} />
+            </div>
+            <h2 style={{ fontSize: '1.25rem', fontWeight: 800, marginBottom: '0.5rem' }}>¿Eliminar Orden?</h2>
+            <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem', marginBottom: '1.5rem', lineHeight: 1.5 }}>
+              Esta acción eliminará la orden de servicio permanentemente. ¿Deseas continuar?
+            </p>
+            <div style={{ display: 'flex', gap: '0.75rem' }}>
+              <button className="btn-secondary" style={{ flex: 1, justifyContent: 'center' }} onClick={() => setOrderToDelete(null)}>Cancelar</button>
+              <button className="btn-primary" style={{ flex: 1, justifyContent: 'center', background: 'var(--error)', borderColor: 'var(--error)', color: 'white' }} onClick={confirmDeleteOrder}>Sí, Eliminar</button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );
