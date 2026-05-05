@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useContext } from 'react';
 import { API_URL } from '../api';
 import OrderDetailsModal from './OrderDetailsModal';
+import PhotoUploadModal from './PhotoUploadModal';
 import { ThemeContext } from '../App';
-import { PlusCircle, BarChart3, TrendingUp, DollarSign, ClipboardList, X, Car, Sun, Moon } from 'lucide-react';
+import { PlusCircle, BarChart3, Camera, X, Car } from 'lucide-react';
 
 const fmt = (n) => (parseFloat(n) || 0).toLocaleString('es-CO', { minimumFractionDigits: 0 });
 
@@ -16,6 +17,7 @@ export default function AdminView() {
   const [stats, setStats] = useState({ avg: 0, total: 0, active: 0 });
   const [selectedOrder, setSelectedOrder] = useState(null);
   const [showNewOrder, setShowNewOrder] = useState(false);
+  const [showPhotoUpload, setShowPhotoUpload] = useState(false);
   const [form, setForm] = useState(emptyForm);
   const [photos, setPhotos] = useState([]);
   const [formStatus, setFormStatus] = useState({ text: '', type: '' });
@@ -98,6 +100,9 @@ export default function AdminView() {
         </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
             <button onClick={toggleTheme} className="theme-toggle" title={theme === 'dark' ? 'Cambiar a tema claro' : 'Cambiar a tema oscuro'} />
+            <button className="btn-secondary" style={{ gap: '0.5rem' }} onClick={() => setShowPhotoUpload(true)}>
+              <Camera size={16} /> Subir Foto
+            </button>
             <button className="btn-primary" style={{ gap: '0.5rem' }} onClick={() => setShowNewOrder(true)}>
               <PlusCircle size={16} /> Nueva Orden
             </button>
@@ -235,6 +240,10 @@ export default function AdminView() {
 
       {selectedOrder && (
         <OrderDetailsModal order={selectedOrder} onClose={() => { setSelectedOrder(null); fetchOrders(); }} />
+      )}
+
+      {showPhotoUpload && (
+        <PhotoUploadModal onClose={() => setShowPhotoUpload(false)} onSuccess={fetchOrders} />
       )}
     </div>
   );

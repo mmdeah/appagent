@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useContext } from 'react';
 import { API_URL } from '../api';
 import { ThemeContext } from '../App';
-import { Wrench, Car, ChevronRight, ClipboardList, ArrowLeft, CheckCircle, AlertTriangle, XCircle, PlusCircle, SendHorizonal } from 'lucide-react';
+import PhotoUploadModal from './PhotoUploadModal';
+import { Wrench, Car, ChevronRight, ClipboardList, ArrowLeft, PlusCircle, SendHorizonal, Camera } from 'lucide-react';
 
 const categories = {
   "Suspensión": ["Amortiguadores Del.", "Amortiguadores Tras.", "Bujes de Tijera", "Tijeras", "Lágrimas", "Soporte de Amortiguadores", "Bujes Barra Estabilizadora", "Soportes de Motor", "Rótulas"],
@@ -38,6 +39,7 @@ export default function TechnicianView() {
   const [precioDiagnostico, setPrecioDiagnostico] = useState('');
   const [statusMsg, setStatusMsg] = useState({ text: '', type: '' });
   const [loading, setLoading] = useState(true);
+  const [showPhotoUpload, setShowPhotoUpload] = useState(false);
 
   useEffect(() => {
     fetch(`${API_URL}/orders`)
@@ -104,7 +106,7 @@ export default function TechnicianView() {
   };
 
   if (!selectedOrder) {
-    return (
+    return (<>
       <div style={{ minHeight: '100vh', background: 'var(--bg)' }}>
         <div className="tech-header">
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
@@ -117,6 +119,9 @@ export default function TechnicianView() {
             </div>
           </div>
           <button onClick={toggleTheme} className="theme-toggle" title="Cambiar tema" />
+          <button className="btn-secondary" style={{ gap: '0.5rem' }} onClick={() => setShowPhotoUpload(true)}>
+            <Camera size={16} /> Subir Foto
+          </button>
         </div>
 
         <div style={{ padding: '2rem', maxWidth: 1100, margin: '0 auto' }}>
@@ -160,10 +165,14 @@ export default function TechnicianView() {
           )}
         </div>
       </div>
-    );
-  }
 
-  return (
+    {showPhotoUpload && (
+      <PhotoUploadModal onClose={() => setShowPhotoUpload(false)} onSuccess={() => {}} />
+    )}
+  </>);
+}
+
+  return (<>
     <div style={{ minHeight: '100vh', background: 'var(--bg)' }}>
       <div className="tech-header">
         <button className="btn-secondary" onClick={() => setSelectedOrder(null)}>
@@ -314,7 +323,12 @@ export default function TechnicianView() {
         <button className="btn-success" style={{ width: '100%', padding: '1rem', fontSize: '1.05rem', justifyContent: 'center' }} onClick={submitReport}>
           <SendHorizonal size={18} /> Subir Revisión
         </button>
+        </div>
       </div>
     </div>
-  );
+
+    {showPhotoUpload && (
+      <PhotoUploadModal onClose={() => setShowPhotoUpload(false)} onSuccess={() => {}} />
+    )}
+  </>);
 }

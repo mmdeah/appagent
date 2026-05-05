@@ -1,6 +1,6 @@
 import React, { useState, useContext } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Search, ArrowLeft, CheckCircle, Clock, Wrench, ChevronRight, XCircle } from 'lucide-react';
+import { Search, ArrowLeft, ChevronRight, Camera } from 'lucide-react';
 import { API_URL } from '../api';
 import { ThemeContext } from '../App';
 
@@ -18,6 +18,7 @@ export default function ClientView() {
   const [placa, setPlaca] = useState('');
   const [orders, setOrders] = useState([]);
   const [selectedOrder, setSelectedOrder] = useState(null);
+  const [lightboxSrc, setLightboxSrc] = useState(null);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
@@ -155,7 +156,7 @@ export default function ClientView() {
 
   const cfg = ESTADO_CONFIG[order.estado] || ESTADO_CONFIG['Recepción'];
 
-  return (
+  return (<>
     <div style={{ minHeight: '100vh', background: 'var(--bg)', padding: '1.5rem' }}>
       <div style={{ maxWidth: 720, margin: '0 auto' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
@@ -177,6 +178,20 @@ export default function ClientView() {
             </span>
           </div>
         </div>
+
+        {/* Fotos de recepción */}
+        {order.fotos?.length > 0 && (
+          <div className="card">
+            <p className="section-title"><Camera size={12} style={{ display: 'inline', marginRight: 4 }} />Fotos de Recepción</p>
+            <div className="img-grid" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(110px, 1fr))' }}>
+              {order.fotos.map((src, i) => (
+                <img key={i} src={src} className="img-thumb" alt={`foto-${i}`}
+                  onClick={() => setLightboxSrc(src)}
+                  title="Clic para ver en grande" />
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* Order info */}
         <div className="card">
@@ -279,5 +294,16 @@ export default function ClientView() {
         )}
       </div>
     </div>
-  );
+
+    {/* Lightbox */}
+    {lightboxSrc && (
+      <div className="lightbox-overlay" onClick={() => setLightboxSrc(null)}>
+        <button onClick={() => setLightboxSrc(null)}
+          style={{ position: 'fixed', top: '1rem', right: '1.5rem', background: 'rgba(0,0,0,0.7)', border: 'none', borderRadius: '50%', width: 38, height: 38, cursor: 'pointer', color: 'white', fontSize: 20, display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 10000 }}>
+          ×
+        </button>
+        <img src={lightboxSrc} alt="foto ampliada" onClick={e => e.stopPropagation()} />
+      </div>
+    )}
+  </>);
 }
