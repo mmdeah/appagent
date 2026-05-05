@@ -2,7 +2,7 @@ const jsonServer = require('json-server');
 const fs = require('fs');
 const path = require('path');
 const cors = require('cors');
-const { Resend } = require('resend');
+const nodemailer = require('nodemailer');
 
 const server = jsonServer.create();
 const middlewares = jsonServer.defaults();
@@ -29,7 +29,13 @@ server.use(middlewares);
 server.use(jsonServer.bodyParser);
 
 // Custom routes can be added here
-const resend = new Resend(process.env.RESEND_API_KEY || 're_XijuRmV3_3ddn1LuLhxM2znsp6VzgTKad');
+const transporter = nodemailer.createTransport({
+  service: 'gmail',
+  auth: {
+    user: 'davidperlaza16@gmail.com',
+    pass: 'vebd cese ezft nppf'
+  }
+});
 
 const generateEmailHtml = (title, message, placa) => {
   return `
@@ -97,13 +103,13 @@ server.post('/api/send-email', async (req, res) => {
   const html = generateEmailHtml(title, message, placa);
 
   try {
-    const data = await resend.emails.send({
-      from: 'Taller Automotriz <onboarding@resend.dev>',
-      to: [to],
+    await transporter.sendMail({
+      from: '"Taller Automotriz" <davidperlaza16@gmail.com>',
+      to,
       subject,
       html
     });
-    res.json(data);
+    res.json({ success: true });
   } catch (error) {
     console.error('Error enviando correo:', error);
     res.status(500).json({ error: error.message });
