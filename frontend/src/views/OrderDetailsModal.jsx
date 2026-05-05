@@ -442,7 +442,7 @@ export default function OrderDetailsModal({ order, onClose }) {
                                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
                                  <span style={{ fontWeight: 600, color: 'var(--warning)' }}>✓ Requiere</span>
                                  <div className="hide-on-print" style={{ display: 'flex', gap: '0.4rem' }}>
-                                    <input type="number" min="1" placeholder="Cant" value={it.cantidadRepuesto || 1} onChange={e => handleReportPrice(idx, 'cantidadRepuesto', parseInt(e.target.value)||1)} style={{ width: 55, fontSize: '0.8rem', padding: '0.4rem' }} />
+                                    <input type="number" step="any" min="0.1" placeholder="Cant" value={it.cantidadRepuesto || 1} onChange={e => handleReportPrice(idx, 'cantidadRepuesto', parseFloat(e.target.value.replace(',','.'))||1)} style={{ width: 55, fontSize: '0.8rem', padding: '0.4rem' }} />
                                     <input type="text" className="price-input" placeholder="$ Valor" value={it.valorRepuesto ? fmt(it.valorRepuesto) : ''} onChange={e => handleReportPrice(idx, 'valorRepuesto', e.target.value.replace(/\D/g, ''))} style={{ width: 90, fontSize: '0.8rem', padding: '0.4rem' }} />
                                  </div>
                                  <span className="show-on-print">
@@ -521,8 +521,8 @@ export default function OrderDetailsModal({ order, onClose }) {
                           <span className="show-on-print">{it.descripcion}</span>
                         </td>
                         <td style={{ textAlign: 'center' }}>
-                          <input className="hide-on-print" type="number" min="1" value={it.cantidad}
-                            onChange={e => { const q=[...quoteItems]; q[idx].cantidad=parseInt(e.target.value)||1; setQuoteItems(q); }}
+                          <input className="hide-on-print" type="number" step="any" min="0.1" value={it.cantidad}
+                            onChange={e => { const q=[...quoteItems]; q[idx].cantidad=parseFloat(e.target.value.replace(',','.'))||1; setQuoteItems(q); }}
                             style={{ width: 55, textAlign: 'center', fontSize: '0.85rem' }} />
                           <span className="show-on-print">{it.cantidad}</span>
                         </td>
