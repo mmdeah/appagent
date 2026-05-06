@@ -33,11 +33,7 @@ export default function ClientView() {
       const res = await fetch(`${API_URL}/orders?placa=${placa.trim().toUpperCase()}&_embed=reports&_embed=quotes`);
       const data = await res.json();
       if (data.length > 0) {
-        const filtered = data.map(o => ({
-          ...o,
-          reports: (o.reports || []).filter(r => r.visibleToClient)
-        }));
-        setOrders(filtered);
+        setOrders(data);
       } else {
         setError('No se encontraron órdenes para esta placa. Verifica e intenta de nuevo.');
         setOrders([]);
