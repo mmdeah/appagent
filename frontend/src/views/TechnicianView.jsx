@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useContext } from 'react';
-import { API_URL } from '../api';
+import { API_URL, getPicoYPlaca } from '../api';
 import { ThemeContext } from '../App';
 import PhotoUploadModal from './PhotoUploadModal';
 import { 
@@ -168,6 +168,11 @@ export default function TechnicianView() {
                       <div>
                         <div style={{ fontSize: '1.3rem', fontWeight: 900, color: 'var(--text)', lineHeight: 1 }}>{o.placa}</div>
                         <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)', fontWeight: 600 }}>{o.marca} {o.modelo}</div>
+                        {getPicoYPlaca(o.placa) && (
+                          <div style={{ fontSize: '0.65rem', color: '#f59e0b', fontWeight: 800, marginTop: '0.2rem', display: 'flex', alignItems: 'center', gap: '0.2rem' }}>
+                            <AlertTriangle size={10} /> {getPicoYPlaca(o.placa)}
+                          </div>
+                        )}
                       </div>
                       <div style={{ background: 'var(--primary)', color: 'white', padding: '0.3rem 0.6rem', borderRadius: 6, fontWeight: 900, fontSize: '0.9rem' }}>
                         {o.kilometraje ? `${fmt(o.kilometraje)} KM` : 'S/K'}
@@ -213,6 +218,11 @@ export default function TechnicianView() {
                         <div>
                           <div style={{ fontSize: '1.5rem', fontWeight: 900, color: 'var(--text)', lineHeight: 1 }}>{o.placa}</div>
                           <div style={{ fontSize: '0.9rem', color: 'var(--text-muted)', fontWeight: 700 }}>{o.marca} {o.modelo}</div>
+                          {getPicoYPlaca(o.placa) && (
+                            <div style={{ fontSize: '0.7rem', color: '#f59e0b', fontWeight: 800, marginTop: '0.2rem', display: 'flex', alignItems: 'center', gap: '0.2rem' }}>
+                              <AlertTriangle size={12} /> {getPicoYPlaca(o.placa)}
+                            </div>
+                          )}
                         </div>
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', alignItems: 'flex-end' }}>
                           <div style={{ background: '#3b82f6', color: 'white', padding: '0.4rem 0.8rem', borderRadius: 8, fontWeight: 900, fontSize: '1rem' }}>

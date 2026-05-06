@@ -11,3 +11,30 @@ if (envUrl.endsWith('/')) {
 }
 
 export const API_URL = envUrl;
+
+/**
+ * Retorna un mensaje si la placa tiene restricción de Pico y Placa hoy.
+ * Lunes (1): 1, 2
+ * Martes (2): 3, 4
+ * Miércoles (3): 5, 6
+ * Jueves (4): 7, 8
+ * Viernes (5): 9, 0
+ */
+export const getPicoYPlaca = (placa) => {
+  if (!placa) return null;
+  const digits = placa.match(/\d/g);
+  if (!digits) return null;
+  const lastDigit = parseInt(digits[digits.length - 1]);
+  
+  const day = new Date().getDay();
+  const restrictions = {
+    1: [1, 2],
+    2: [3, 4],
+    3: [5, 6],
+    4: [7, 8],
+    5: [9, 0],
+  };
+  
+  if (restrictions[day]?.includes(lastDigit)) return "Hoy tiene Pico y Placa";
+  return null;
+};

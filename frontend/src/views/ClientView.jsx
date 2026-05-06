@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Search, ArrowLeft, ChevronRight, Camera } from 'lucide-react';
-import { API_URL } from '../api';
+import { API_URL, getPicoYPlaca } from '../api';
 
 const fmt = (n) => (parseFloat(n) || 0).toLocaleString('es-CO', { minimumFractionDigits: 0 });
 
@@ -189,7 +189,14 @@ export default function ClientView() {
           <p className="section-title">Datos del Vehículo</p>
           <div className="info-grid">
             {[
-              ['Placa', order.placa],
+              ['Placa', (
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end' }}>
+                  <span style={{ fontWeight: 800 }}>{order.placa}</span>
+                  {getPicoYPlaca(order.placa) && (
+                    <span style={{ fontSize: '0.65rem', color: '#f59e0b', fontWeight: 800, marginTop: '0.2rem' }}>⚠️ {getPicoYPlaca(order.placa)}</span>
+                  )}
+                </div>
+              )],
               ['Marca', order.marca],
               ['Modelo', order.modelo],
               ['Año', order.anio],

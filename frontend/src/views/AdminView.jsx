@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useContext } from 'react';
-import { API_URL } from '../api';
+import { API_URL, getPicoYPlaca } from '../api';
 import OrderDetailsModal from './OrderDetailsModal';
 import PhotoUploadModal from './PhotoUploadModal';
 import { ThemeContext } from '../App';
@@ -380,6 +380,11 @@ export default function AdminView() {
                               )}
                             </div>
                             <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>{o.marca} {o.modelo}</div>
+                            {getPicoYPlaca(o.placa) && (
+                              <div style={{ fontSize: '0.65rem', color: '#f59e0b', fontWeight: 800, marginTop: '0.2rem', display: 'flex', alignItems: 'center', gap: '0.2rem' }}>
+                                <AlertTriangle size={10} /> {getPicoYPlaca(o.placa)}
+                              </div>
+                            )}
                           </div>
                           <span style={{ fontSize: '0.72rem', background: o.reports?.length > 0 ? 'rgba(16,185,129,0.15)' : 'rgba(245,158,11,0.15)', color: o.reports?.length > 0 ? '#34d399' : '#fbbf24', padding: '0.2rem 0.5rem', borderRadius: 999, fontWeight: 600, whiteSpace: 'nowrap' }}>
                             {o.reports?.length > 0 ? '✓ Revisado' : '⏳ Pdte'}
