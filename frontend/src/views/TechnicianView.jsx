@@ -164,9 +164,9 @@ export default function TechnicianView() {
           
           {/* Columna: REVISIONES */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', paddingBottom: '0.5rem', borderBottom: '2px solid var(--primary)' }}>
-              <ClipboardList size={24} color="var(--primary)" />
-              <h2 style={{ fontSize: '1.4rem', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Revisiones Pendientes</h2>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', paddingBottom: '0.5rem', borderBottom: '2px solid var(--primary)' }}>
+              <ClipboardList size={20} color="var(--primary)" />
+              <h2 style={{ fontSize: '1.2rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.04em' }}>Revisiones Pendientes</h2>
             </div>
 
             {loading ? (
@@ -179,12 +179,12 @@ export default function TechnicianView() {
               <div style={{ display: 'grid', gap: '1.25rem' }}>
                 {pendingOrders.map(o => (
                   <div key={o.id} className="card card-hover" style={{ cursor: 'pointer', padding: '1.5rem', borderLeft: '6px solid var(--primary)' }} onClick={() => setSelectedOrder(o)}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1rem' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '0.8rem' }}>
                       <div>
-                        <div style={{ fontSize: '2rem', fontWeight: 900, color: 'var(--text)', lineHeight: 1 }}>{o.placa}</div>
-                        <div style={{ fontSize: '1.1rem', color: 'var(--text-muted)', fontWeight: 600 }}>{o.marca} {o.modelo}</div>
+                        <div style={{ fontSize: '1.6rem', fontWeight: 900, color: 'var(--text)', lineHeight: 1 }}>{o.placa}</div>
+                        <div style={{ fontSize: '1rem', color: 'var(--text-muted)', fontWeight: 600 }}>{o.marca} {o.modelo}</div>
                       </div>
-                      <div style={{ background: 'var(--primary)', color: 'white', padding: '0.6rem 1.2rem', borderRadius: 10, fontWeight: 900, fontSize: '1.25rem', boxShadow: 'var(--shadow)' }}>
+                      <div style={{ background: 'var(--primary)', color: 'white', padding: '0.4rem 0.8rem', borderRadius: 8, fontWeight: 900, fontSize: '1.1rem' }}>
                         {o.kilometraje ? `${fmt(o.kilometraje)} KM` : 'S/K'}
                       </div>
                     </div>
@@ -212,9 +212,9 @@ export default function TechnicianView() {
 
           {/* Columna: TRABAJOS AUTORIZADOS */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', paddingBottom: '0.5rem', borderBottom: '2px solid var(--success)' }}>
-              <Wrench size={24} color="var(--success)" />
-              <h2 style={{ fontSize: '1.4rem', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Trabajos Autorizados</h2>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', paddingBottom: '0.5rem', borderBottom: '2px solid var(--success)' }}>
+              <Wrench size={20} color="var(--success)" />
+              <h2 style={{ fontSize: '1.2rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.04em' }}>Trabajos Autorizados</h2>
             </div>
 
             {loading ? (
@@ -229,20 +229,27 @@ export default function TechnicianView() {
                   const quote = o.quotes.find(q => q.autorizada);
                   return (
                     <div key={o.id} className="card" style={{ padding: '2rem', borderLeft: '10px solid var(--success)', boxShadow: 'var(--shadow-lg)' }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1.5rem' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1.25rem' }}>
                         <div>
-                          <div style={{ fontSize: '2.5rem', fontWeight: 950, color: 'var(--text)', lineHeight: 1 }}>{o.placa}</div>
-                          <div style={{ fontSize: '1.3rem', color: 'var(--text-muted)', fontWeight: 700 }}>{o.marca} {o.modelo}</div>
+                          <div style={{ fontSize: '2rem', fontWeight: 900, color: 'var(--text)', lineHeight: 1 }}>{o.placa}</div>
+                          <div style={{ fontSize: '1.1rem', color: 'var(--text-muted)', fontWeight: 700 }}>{o.marca} {o.modelo}</div>
                         </div>
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', alignItems: 'flex-end' }}>
-                          <div style={{ background: '#3b82f6', color: 'white', padding: '0.75rem 1.5rem', borderRadius: 12, fontWeight: 950, fontSize: '1.5rem', boxShadow: '0 4px 15px rgba(59,130,246,0.4)' }}>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem', alignItems: 'flex-end' }}>
+                          <div style={{ background: '#3b82f6', color: 'white', padding: '0.5rem 1rem', borderRadius: 10, fontWeight: 900, fontSize: '1.25rem' }}>
                             {o.kilometraje ? `${fmt(o.kilometraje)} KM` : 'S/K'}
                           </div>
-                          <button className="btn-success" onClick={() => finishWork(o.id)} style={{ padding: '1rem 1.5rem', fontSize: '1.1rem', fontWeight: 900, borderRadius: 12, width: '100%' }}>
-                            <SendHorizonal size={20} /> TERMINAR
+                          <button className="btn-success" onClick={() => finishWork(o.id)} style={{ padding: '0.75rem 1.25rem', fontSize: '1rem', fontWeight: 800, borderRadius: 10 }}>
+                            <SendHorizonal size={18} /> TERMINAR
                           </button>
                         </div>
                       </div>
+
+                      {o.servicios && (
+                        <div style={{ marginBottom: '1rem', padding: '0.8rem 1rem', background: 'rgba(99,102,241,0.1)', borderLeft: '4px solid var(--primary)', borderRadius: '4px 8px 8px 4px' }}>
+                          <div style={{ fontSize: '0.7rem', fontWeight: 800, color: 'var(--primary)', textTransform: 'uppercase', marginBottom: '0.2rem' }}>Servicios Solicitados:</div>
+                          <div style={{ fontSize: '1rem', fontWeight: 600 }}>{o.servicios}</div>
+                        </div>
+                      )}
 
                       {o.notas && (
                         <div style={{ marginBottom: '1.5rem', padding: '1.25rem', background: 'var(--danger)', color: 'white', borderRadius: 12, display: 'flex', gap: '1rem' }}>
