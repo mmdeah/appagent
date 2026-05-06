@@ -57,10 +57,13 @@ export default function TechnicianView() {
 
   const fetchConfig = async () => {
     try {
-      const res = await fetch(`${API_URL}/settings/revision_form`);
+      const res = await fetch(`${API_URL}/settings`);
       const data = await res.json();
-      setFormConfig(data.categories);
-    } catch (e) { console.error(e); }
+      const config = Array.isArray(data) ? data.find(s => s.id === 'revision_form') : data;
+      if (config && config.categories) {
+        setFormConfig(config.categories);
+      }
+    } catch (e) { console.error("Error cargando config técnico:", e); }
   };
 
   const fetchReports = async () => {
