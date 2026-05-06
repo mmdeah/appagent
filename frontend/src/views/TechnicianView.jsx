@@ -347,7 +347,8 @@ export default function TechnicianView() {
 
         <button className="btn-success" style={{ width: '100%', padding: '1rem', fontSize: '1rem', fontWeight: 900, marginTop: '1.5rem', borderRadius: 12, maxWidth: 900, margin: '1.5rem auto 0', display: 'block' }} onClick={submitReport}>SUBIR REVISIÓN</button>
         </div>
-      )}
+      </div>
+    )}
 
       {showPhotoUpload && <PhotoUploadModal onClose={() => setShowPhotoUpload(false)} onSuccess={() => {}} />}
 
