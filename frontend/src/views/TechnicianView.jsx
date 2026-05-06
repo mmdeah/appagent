@@ -46,11 +46,6 @@ export default function TechnicianView() {
       .catch(() => setLoading(false));
   };
 
-  useEffect(() => {
-    fetchOrders();
-    fetchConfig();
-  }, []);
-
   const fetchConfig = async () => {
     try {
       const res = await fetch(`${API_URL}/settings`);
@@ -61,6 +56,11 @@ export default function TechnicianView() {
       }
     } catch (e) { console.error("Error cargando config técnico:", e); }
   };
+
+  useEffect(() => {
+    fetchOrders();
+    fetchConfig();
+  }, []);
 
   const handleItemStateChange = (category, item, state) => {
     setReportData(prev => {
