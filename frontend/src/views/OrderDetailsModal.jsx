@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { API_URL } from '../api';
-import { MessageCircle, Printer, CheckCircle, X, Plus, Trash2, Camera } from 'lucide-react';
+import { MessageCircle, Printer, CheckCircle, X, Plus, Trash2, Camera, Edit2, Save } from 'lucide-react';
 
 const fmt = (n) => (parseFloat(n) || 0).toLocaleString('es-CO', { minimumFractionDigits: 0 });
 
@@ -15,11 +15,30 @@ export default function OrderDetailsModal({ order, onClose }) {
   const [lightboxSrc, setLightboxSrc] = useState(null);
   const [metodoPago, setMetodoPago] = useState('Efectivo');
   const [notasEntrega, setNotasEntrega] = useState(order.notasEntrega || '');
-  const PAYMENT_METHODS = ['Efectivo', 'Nequi', 'Bancolombia', 'Banco de Bogota', 'Tarjeta'];
+  const [isEditingInfo, setIsEditingInfo] = useState(false);
+  const [editedOrder, setEditedOrder] = useState({ ...order });
 
   const showStatus = (text, type = 'success') => {
     setStatusMsg({ text, type });
     setTimeout(() => setStatusMsg({ text: '', type: '' }), 3000);
+  };
+
+  const handleSaveInfo = async () => {
+    try {
+      const res = await fetch(`${API_URL}/orders/${order.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(editedOrder)
+      });
+      if (res.ok) {
+        showStatus('Información actualizada correctamente');
+        setIsEditingInfo(false);
+        // Recargar la página o actualizar el estado padre sería ideal, pero por ahora actualizamos el local
+        Object.assign(order, editedOrder);
+      }
+    } catch (err) {
+      showStatus('Error al actualizar la información', 'error');
+    }
   };
 
   const printWindow = (title, bodyHtml) => {
@@ -377,50 +396,107 @@ export default function OrderDetailsModal({ order, onClose }) {
 
           {/* ── INFO TAB ── */}
           {activeTab === 'info' && (
-            <div>
-              {/* Datos completos */}
+            <div style={{ position: 'relative' }}>
+              <button 
+                onClick={() => isEditingInfo ? handleSaveInfo() : setIsEditingInfo(true)}
+                className={isEditingInfo ? 'btn-success' : 'btn-secondary'}
+                style={{ position: 'absolute', top: '-3rem', right: 0, padding: '0.4rem 0.8rem', fontSize: '0.8rem' }}
+              >
+                {isEditingInfo ? <><Save size={14} /> Guardar Cambios</> : <><Edit2 size={14} /> Editar Información</>}
+              </button>
+
+              {isEditingInfo && (
+                <button 
+                  onClick={() => { setIsEditingInfo(false); setEditedOrder({ ...order }); }}
+                  className="btn-secondary"
+                  style={{ position: 'absolute', top: '-3rem', right: '11rem', padding: '0.4rem 0.8rem', fontSize: '0.8rem' }}
+                >
+                  Cancelar
+                </button>
+              )}
+
               <p className="section-title">Datos del Cliente</p>
               <div className="info-grid" style={{ marginBottom: '1.5rem' }}>
                 {[
-                  ['Cliente', order.cliente],
-                  ['Teléfono', order.telefono],
-                  ['Correo', order.correo || 'No registrado'],
-                  ['Fecha Ingreso', order.fecha ? new Date(order.fecha).toLocaleDateString('es-CO') : 'N/A'],
-                ].map(([l,v]) => (
-                  <div key={l} className="info-item">
-                    <div className="info-label">{l}</div>
-                    <div className="info-value">{v}</div>
+                  ['Cliente', 'cliente'],
+                  ['Teléfono', 'telefono'],
+                  ['Correo', 'correo'],
+                ].map(([label, field]) => (
+                  <div key={field} className="info-item">
+                    <div className="info-label">{label}</div>
+                    {isEditingInfo ? (
+                      <input 
+                        type="text" 
+                        value={editedOrder[field] || ''} 
+                        onChange={e => setEditedOrder({ ...editedOrder, [field]: e.target.value })}
+                        className="price-input"
+                        style={{ width: '100%', marginTop: '0.2rem' }}
+                      />
+                    ) : (
+                      <div className="info-value">{order[field] || 'N/A'}</div>
+                    )}
                   </div>
                 ))}
+                <div className="info-item">
+                  <div className="info-label">Fecha Ingreso</div>
+                  <div className="info-value">{order.fecha ? new Date(order.fecha).toLocaleDateString('es-CO') : 'N/A'}</div>
+                </div>
               </div>
 
               <p className="section-title">Datos del Vehículo</p>
               <div className="info-grid" style={{ marginBottom: '1.5rem' }}>
                 {[
-                  ['Placa', order.placa],
-                  ['Marca', order.marca],
-                  ['Modelo', order.modelo],
-                  ['Año', order.anio],
-                  ['Kilometraje', order.kilometraje ? `${fmt(order.kilometraje)} km` : 'N/A'],
-                  ['Estado', order.estado],
-                ].map(([l,v]) => (
-                  <div key={l} className="info-item">
-                    <div className="info-label">{l}</div>
-                    <div className="info-value">{v}</div>
+                  ['Placa', 'placa'],
+                  ['Marca', 'marca'],
+                  ['Modelo', 'modelo'],
+                  ['Año', 'anio'],
+                  ['Kilometraje', 'kilometraje'],
+                ].map(([label, field]) => (
+                  <div key={field} className="info-item">
+                    <div className="info-label">{label}</div>
+                    {isEditingInfo ? (
+                      <input 
+                        type="text" 
+                        value={editedOrder[field] || ''} 
+                        onChange={e => setEditedOrder({ ...editedOrder, [field]: e.target.value })}
+                        className="price-input"
+                        style={{ width: '100%', marginTop: '0.2rem' }}
+                      />
+                    ) : (
+                      <div className="info-value">{field === 'kilometraje' ? (order[field] ? `${fmt(order[field])} km` : 'N/A') : order[field]}</div>
+                    )}
                   </div>
                 ))}
-                {order.servicios && (
-                  <div className="info-item" style={{ gridColumn: '1 / -1' }}>
-                    <div className="info-label">Servicios a Realizar</div>
-                    <div className="info-value">{order.servicios}</div>
-                  </div>
-                )}
-                {order.notas && (
-                  <div className="info-item" style={{ gridColumn: '1 / -1' }}>
-                    <div className="info-label">Notas</div>
-                    <div className="info-value">{order.notas}</div>
-                  </div>
-                )}
+                <div className="info-item">
+                  <div className="info-label">Estado</div>
+                  <div className="info-value">{order.estado}</div>
+                </div>
+
+                <div className="info-item" style={{ gridColumn: '1 / -1' }}>
+                  <div className="info-label">Servicios a Realizar</div>
+                  {isEditingInfo ? (
+                    <textarea 
+                      value={editedOrder.servicios || ''} 
+                      onChange={e => setEditedOrder({ ...editedOrder, servicios: e.target.value })}
+                      style={{ width: '100%', background: 'var(--bg)', color: 'var(--text)', border: '1px solid var(--border)', borderRadius: 8, padding: '0.5rem', marginTop: '0.2rem', minHeight: '60px' }}
+                    />
+                  ) : (
+                    <div className="info-value">{order.servicios || 'Ninguno'}</div>
+                  )}
+                </div>
+
+                <div className="info-item" style={{ gridColumn: '1 / -1' }}>
+                  <div className="info-label">Notas / Observaciones</div>
+                  {isEditingInfo ? (
+                    <textarea 
+                      value={editedOrder.notas || ''} 
+                      onChange={e => setEditedOrder({ ...editedOrder, notas: e.target.value })}
+                      style={{ width: '100%', background: 'var(--bg)', color: 'var(--text)', border: '1px solid var(--border)', borderRadius: 8, padding: '0.5rem', marginTop: '0.2rem', minHeight: '60px' }}
+                    />
+                  ) : (
+                    <div className="info-value">{order.notas || 'Sin notas'}</div>
+                  )}
+                </div>
               </div>
 
               {/* Fotos de ingreso */}
