@@ -257,8 +257,9 @@ export default function TechnicianView() {
               </div>
             )}
           </div>
-        </>
-      ) : (
+        </div>
+      </>
+    ) : (
         <div style={{ paddingBottom: '2rem' }}>
           <div className="tech-header">
         <button className="btn-secondary" onClick={() => setSelectedOrder(null)} style={{ padding: '0.4rem 0.8rem', fontSize: '0.85rem' }}>
