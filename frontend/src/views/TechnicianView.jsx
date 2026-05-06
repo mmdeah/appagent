@@ -48,13 +48,40 @@ export default function TechnicianView() {
 
   const fetchConfig = async () => {
     try {
-      const res = await fetch(`${API_URL}/settings`);
-      const data = await res.json();
-      const config = Array.isArray(data) ? data.find(s => s.id === 'revision_form') : data;
+      // Intentar obtener la configuración directamente por ID
+      const res = await fetch(`${API_URL}/settings/revision_form`);
+      if (res.ok) {
+        const data = await res.json();
+        if (data && data.categories) {
+          setFormConfig(data.categories);
+          return;
+        }
+      }
+      
+      // Si falla, intentar obtener toda la colección y buscar
+      const resAll = await fetch(`${API_URL}/settings`);
+      const dataAll = await resAll.json();
+      const config = Array.isArray(dataAll) ? dataAll.find(s => s.id === 'revision_form') : dataAll;
       if (config && config.categories) {
         setFormConfig(config.categories);
       }
-    } catch (e) { console.error("Error cargando config técnico:", e); }
+    } catch (e) { 
+      console.error("Error cargando config técnico:", e);
+      // Fallback en caso de error total de red/API
+      if (!formConfig) {
+        setFormConfig({
+          "Suspensión": ["Amortiguadores Del.", "Amortiguadores Tras.", "Bujes de Tijera", "Tijeras", "Lágrimas", "Soporte de Amortiguadores", "Bujes Barra Estabilizadora", "Soportes de Motor", "Rótulas"],
+          "Frenos": ["Pastillas Del.", "Pastillas Tras.", "Discos Del.", "Discos Tras.", "Líquido de Frenos", "Freno de Mano", "Mangueras de Freno", "Bomba de Freno", "Cilindro de Freno", "Campanas Traseras", "Bandas Traseras"],
+          "Dirección": ["Caja de Dirección", "Terminales", "Axiales", "Bomba de Dirección", "Aceite Hidráulico", "Holgura Volante"],
+          "Transmisión": ["Puntas", "Cardán", "Embrague", "Empaque Caja de Cambios", "Guardapolvos"],
+          "Fugas": ["Fuga Aceite Motor", "Fuga Transmisión", "Fuga Dirección", "Fuga Refrigerante", "Fuga Combustible", "Fuga Frenos"],
+          "Batería / Eléctrico": ["Batería", "Alternador", "Motor de Arranque"],
+          "Chequeo Visual Motor": ["Correa Distribución", "Correa Accesorios", "Aceite Motor", "Cableado Visible", "Empaque tapavalvulas", "Empaque de Carter", "Reten Delantero Cigueñal", "Reten Trasero Cigueñal", "Tapacadena", "Sensor"],
+          "Niveles": ["Aceite Motor", "Líquido Frenos", "Líquido Dirección", "Refrigerante", "Agua Limpiaparabrisas"],
+          "Otros": ["Luces", "Limpiaparabrisas", "Pito", "Espejos", "Vidrios", "Tapicería", "Llantas (Estado)", "Llantas (Presión)"]
+        });
+      }
+    }
   };
 
   useEffect(() => {
