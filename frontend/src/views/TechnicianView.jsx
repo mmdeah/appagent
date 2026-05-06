@@ -40,12 +40,18 @@ export default function TechnicianView() {
   const [statusMsg, setStatusMsg] = useState({ text: '', type: '' });
   const [loading, setLoading] = useState(true);
   const [showPhotoUpload, setShowPhotoUpload] = useState(false);
+  const [activeTab, setActiveTab] = useState('revisiones');
 
-  useEffect(() => {
-    fetch(`${API_URL}/orders`)
+  const fetchOrders = () => {
+    setLoading(true);
+    fetch(`${API_URL}/orders?_embed=quotes`)
       .then(res => res.json())
       .then(data => { setOrders(data.filter(o => o.estado !== 'Entregado')); setLoading(false); })
       .catch(() => setLoading(false));
+  };
+
+  useEffect(() => {
+    fetchOrders();
   }, []);
 
   const handleItemStateChange = (category, item, state) => {
@@ -95,10 +101,23 @@ export default function TechnicianView() {
       });
       
       setStatusMsg({ text: '✓ Reporte subido exitosamente', type: 'success' });
-      setTimeout(() => { setSelectedOrder(null); setReportData({}); setScannerCodes([{ prefix: 'P', code: '', description: '' }]); setPrecioDiagnostico(''); setStatusMsg({ text: '', type: '' }); }, 2000);
+      setTimeout(() => { setSelectedOrder(null); setReportData({}); setScannerCodes([{ prefix: 'P', code: '', description: '' }]); setPrecioDiagnostico(''); setStatusMsg({ text: '', type: '' }); fetchOrders(); }, 2000);
     } catch (e) {
       setStatusMsg({ text: '✗ Error al subir el reporte', type: 'error' });
     }
+  };
+
+  const finishWork = async (orderId) => {
+    try {
+      await fetch(`${API_URL}/orders/${orderId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ estado: 'Calidad' })
+      });
+      fetchOrders();
+      setStatusMsg({ text: '✓ Trabajo terminado. Pasado a Calidad.', type: 'success' });
+      setTimeout(() => setStatusMsg({ text: '', type: '' }), 3000);
+    } catch (e) { console.error(e); }
   };
 
   const estadoBadge = (estado) => {
@@ -125,44 +144,87 @@ export default function TechnicianView() {
           </button>
         </div>
 
+        <div style={{ background: 'var(--bg-card)', borderBottom: '1px solid var(--border)', padding: '0 2rem', display: 'flex', gap: '1.5rem' }}>
+          <button onClick={() => setActiveTab('revisiones')} style={{ padding: '1rem 0', background: 'none', border: 'none', borderBottom: activeTab === 'revisiones' ? '3px solid #10b981' : '3px solid transparent', color: activeTab === 'revisiones' ? '#10b981' : 'var(--text-muted)', fontWeight: 700, cursor: 'pointer', fontSize: '0.9rem' }}>
+            Revisiones Pendientes
+          </button>
+          <button onClick={() => setActiveTab('trabajos')} style={{ padding: '1rem 0', background: 'none', border: 'none', borderBottom: activeTab === 'trabajos' ? '3px solid #10b981' : '3px solid transparent', color: activeTab === 'trabajos' ? '#10b981' : 'var(--text-muted)', fontWeight: 700, cursor: 'pointer', fontSize: '0.9rem' }}>
+            Trabajos Autorizados
+          </button>
+        </div>
+
         <div style={{ padding: '2rem', maxWidth: 1100, margin: '0 auto' }}>
           {loading ? (
-            <p style={{ color: 'var(--text-muted)', textAlign: 'center', paddingTop: '4rem' }}>Cargando órdenes...</p>
-          ) : orders.length === 0 ? (
-            <div style={{ textAlign: 'center', paddingTop: '4rem', color: 'var(--text-muted)' }}>
-              <ClipboardList size={48} style={{ opacity: 0.3, marginBottom: '1rem' }} />
-              <p>No hay órdenes de servicio actualmente.</p>
-            </div>
+            <p style={{ color: 'var(--text-muted)', textAlign: 'center', paddingTop: '4rem' }}>Cargando datos...</p>
           ) : (
-            <div className="tech-vehicle-grid">
-              {orders.map(o => (
-                <div key={o.id} className="card card-hover" style={{ cursor: 'pointer' }} onClick={() => setSelectedOrder(o)}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '0.75rem' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
-                      <div style={{ width: 38, height: 38, borderRadius: 9, background: 'rgba(99,102,241,0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                        <Car size={18} color="#818cf8" />
+            <>
+              {activeTab === 'revisiones' && (
+                orders.filter(o => o.estado !== 'Proceso').length === 0 ? (
+                  <div style={{ textAlign: 'center', paddingTop: '4rem', color: 'var(--text-muted)' }}>
+                    <ClipboardList size={48} style={{ opacity: 0.3, marginBottom: '1rem' }} />
+                    <p>No hay revisiones pendientes.</p>
+                  </div>
+                ) : (
+                  <div className="tech-vehicle-grid">
+                    {orders.filter(o => o.estado !== 'Proceso' && o.estado !== 'Calidad').map(o => (
+                      <div key={o.id} className="card card-hover" style={{ cursor: 'pointer' }} onClick={() => setSelectedOrder(o)}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '0.75rem' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+                            <div style={{ width: 38, height: 38, borderRadius: 9, background: 'rgba(99,102,241,0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                              <Car size={18} color="#818cf8" />
+                            </div>
+                            <div>
+                              <div style={{ fontWeight: 700, fontSize: '1.05rem' }}>{o.placa}</div>
+                              <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>{o.marca} {o.modelo}</div>
+                            </div>
+                          </div>
+                          <ChevronRight size={18} color="var(--text-muted)" />
+                        </div>
+                        {estadoBadge(o.estado)}
                       </div>
-                      <div>
-                        <div style={{ fontWeight: 700, fontSize: '1.05rem' }}>{o.placa}</div>
-                        <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>{o.marca} {o.modelo} {o.anio}</div>
-                      </div>
+                    ))}
+                  </div>
+                )
+              )}
+
+              {activeTab === 'trabajos' && (
+                <div style={{ display: 'grid', gap: '1.5rem' }}>
+                  {orders.filter(o => o.estado === 'Proceso' && o.quotes?.some(q => q.autorizada)).length === 0 ? (
+                    <div style={{ textAlign: 'center', paddingTop: '4rem', color: 'var(--text-muted)' }}>
+                      <ClipboardList size={48} style={{ opacity: 0.3, marginBottom: '1rem' }} />
+                      <p>No hay trabajos autorizados por el momento.</p>
                     </div>
-                    <ChevronRight size={18} color="var(--text-muted)" />
-                  </div>
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                    {estadoBadge(o.estado)}
-                    <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
-                      {new Date(o.fecha).toLocaleDateString('es-CO')}
-                    </span>
-                  </div>
-                  {o.servicios && (
-                    <p style={{ marginTop: '0.75rem', fontSize: '0.8rem', color: 'var(--text-muted)', borderTop: '1px solid var(--border)', paddingTop: '0.6rem', lineHeight: 1.5 }}>
-                      {o.servicios.length > 80 ? o.servicios.substring(0, 80) + '...' : o.servicios}
-                    </p>
+                  ) : (
+                    orders.filter(o => o.estado === 'Proceso' && o.quotes?.some(q => q.autorizada)).map(o => {
+                      const quote = o.quotes.find(q => q.autorizada);
+                      return (
+                        <div key={o.id} className="card" style={{ borderLeft: '4px solid #10b981', padding: '1.5rem' }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+                            <div>
+                              <h2 style={{ fontSize: '1.5rem', fontWeight: 800 }}>{o.placa}</h2>
+                              <p style={{ color: 'var(--text-muted)' }}>{o.marca} {o.modelo}</p>
+                            </div>
+                            <button className="btn-success" onClick={() => finishWork(o.id)}>
+                              <SendHorizonal size={16} /> Marcar como Terminado
+                            </button>
+                          </div>
+                          <div style={{ background: 'var(--bg)', borderRadius: 10, padding: '1rem' }}>
+                            <p style={{ fontWeight: 700, fontSize: '0.8rem', textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: '0.75rem' }}>Trabajo a Realizar:</p>
+                            <ul style={{ paddingLeft: '1.25rem', display: 'grid', gap: '0.5rem' }}>
+                              {quote.items.map((it, idx) => (
+                                <li key={idx} style={{ fontSize: '1rem', fontWeight: 500 }}>
+                                  {it.cantidad}x {it.descripcion}
+                                </li>
+                              ))}
+                            </ul>
+                          </div>
+                        </div>
+                      );
+                    })
                   )}
                 </div>
-              ))}
-            </div>
+              )}
+            </>
           )}
         </div>
       </div>

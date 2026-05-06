@@ -241,6 +241,33 @@ export default function OrderDetailsModal({ order, onClose }) {
     showStatus('Cotización guardada exitosamente');
   };
 
+  const authorizeQuote = async () => {
+    const payload = { 
+      orderId: order.id, 
+      items: quoteItems, 
+      fecha: new Date().toISOString(),
+      autorizada: true 
+    };
+    
+    if (order.quotes?.length > 0) {
+      await fetch(`${API_URL}/quotes/${order.quotes[0].id}`, {
+        method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload)
+      });
+    } else {
+      await fetch(`${API_URL}/quotes`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload)
+      });
+    }
+
+    await fetch(`${API_URL}/orders/${order.id}`, {
+      method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ estado: 'Proceso' })
+    });
+
+    showStatus('¡Cotización Autorizada! El técnico ya tiene el ticket.', 'success');
+    setTimeout(() => onClose(), 1500);
+  };
+
   const doDeliver = async () => {
     // Primero guardamos la cotización para asegurar que las estadísticas se actualicen
     await saveQuote();
@@ -588,8 +615,11 @@ export default function OrderDetailsModal({ order, onClose }) {
               </div>
 
               <div className="hide-on-print" style={{ display: 'flex', gap: '0.75rem' }}>
-                <button onClick={saveQuote} className="btn-primary">Guardar Cotización</button>
-                <button onClick={printQuote} className="btn-secondary"><Printer size={16} /> Imprimir / PDF</button>
+                <button onClick={saveQuote} className="btn-secondary">Guardar Borrador</button>
+                <button onClick={authorizeQuote} className="btn-primary" style={{ background: 'var(--success)', borderColor: 'var(--success)' }}>
+                  <CheckCircle size={16} /> Autorizar y Empezar Trabajo
+                </button>
+                <button onClick={printQuote} className="btn-secondary" style={{ marginLeft: 'auto' }}><Printer size={16} /> Imprimir / PDF</button>
               </div>
             </div>
           )}
