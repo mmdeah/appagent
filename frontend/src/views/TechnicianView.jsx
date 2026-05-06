@@ -124,29 +124,29 @@ export default function TechnicianView() {
     } catch (e) { console.error(e); }
   };
 
-  if (!selectedOrder) {
-    const pendingOrders = orders.filter(o => o.estado !== 'Proceso' && o.estado !== 'Calidad');
-    const authorizedOrders = orders.filter(o => o.estado === 'Proceso' && o.quotes?.some(q => q.autorizada));
+  const authorizedOrders = orders.filter(o => o.estado === 'Proceso' && o.quotes?.some(q => q.autorizada));
 
-    return (
-      <div style={{ minHeight: '100vh', background: 'var(--bg)', color: 'var(--text)' }}>
-        <div className="tech-header">
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
-            <div style={{ width: 36, height: 36, borderRadius: 9, background: 'var(--primary)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white' }}>
-              <Wrench size={18} />
+  return (
+    <div style={{ minHeight: '100vh', background: 'var(--bg)', color: 'var(--text)' }}>
+      {!selectedOrder ? (
+        <>
+          <div className="tech-header">
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+              <div style={{ width: 36, height: 36, borderRadius: 9, background: 'var(--primary)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white' }}>
+                <Wrench size={18} />
+              </div>
+              <div>
+                <h1 style={{ fontSize: '1rem', fontWeight: 700, margin: 0, lineHeight: 1 }}>Panel Técnico</h1>
+                <p style={{ fontSize: '0.7rem', color: 'var(--text-muted)', margin: 0 }}>{orders.length} vehículos</p>
+              </div>
             </div>
-            <div>
-              <h1 style={{ fontSize: '1rem', fontWeight: 700, margin: 0, lineHeight: 1 }}>Panel Técnico</h1>
-              <p style={{ fontSize: '0.7rem', color: 'var(--text-muted)', margin: 0 }}>{orders.length} vehículos</p>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.8rem' }}>
+              <button onClick={toggleTheme} className="theme-toggle" title="Cambiar tema" />
+              <button className="btn-secondary" style={{ padding: '0.4rem 0.8rem', fontSize: '0.8rem' }} onClick={() => setShowPhotoUpload(true)}>
+                <Camera size={14} /> Foto
+              </button>
             </div>
           </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.8rem' }}>
-            <button onClick={toggleTheme} className="theme-toggle" title="Cambiar tema" />
-            <button className="btn-secondary" style={{ padding: '0.4rem 0.8rem', fontSize: '0.8rem' }} onClick={() => setShowPhotoUpload(true)}>
-              <Camera size={14} /> Foto
-            </button>
-          </div>
-        </div>
 
         <div style={{ padding: '1.5rem', maxWidth: 1600, margin: '0 auto', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(400px, 1fr))', gap: '1.5rem' }}>
           
@@ -257,15 +257,10 @@ export default function TechnicianView() {
               </div>
             )}
           </div>
-        </div>
-      </div>
-    );
-  }
-
-  // VISTA DE REPORTE (FORMULARIO)
-  return (
-    <div style={{ minHeight: '100vh', background: 'var(--bg)', color: 'var(--text)' }}>
-      <div className="tech-header">
+        </>
+      ) : (
+        <div style={{ paddingBottom: '2rem' }}>
+          <div className="tech-header">
         <button className="btn-secondary" onClick={() => setSelectedOrder(null)} style={{ padding: '0.4rem 0.8rem', fontSize: '0.85rem' }}>
           <ArrowLeft size={16} /> Volver
         </button>
@@ -349,8 +344,9 @@ export default function TechnicianView() {
           <button className="btn-secondary" style={{ fontSize: '0.75rem', padding: '0.4rem' }} onClick={() => setScannerCodes([...scannerCodes, { prefix: 'P', code: '', description: '' }])}>+ DTC</button>
         </div>
 
-        <button className="btn-success" style={{ width: '100%', padding: '1rem', fontSize: '1rem', fontWeight: 900, marginTop: '1.5rem', borderRadius: 12 }} onClick={submitReport}>SUBIR REVISIÓN</button>
-      </div>
+        <button className="btn-success" style={{ width: '100%', padding: '1rem', fontSize: '1rem', fontWeight: 900, marginTop: '1.5rem', borderRadius: 12, maxWidth: 900, margin: '1.5rem auto 0', display: 'block' }} onClick={submitReport}>SUBIR REVISIÓN</button>
+        </div>
+      )}
 
       {showPhotoUpload && <PhotoUploadModal onClose={() => setShowPhotoUpload(false)} onSuccess={() => {}} />}
 
