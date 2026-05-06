@@ -16,18 +16,6 @@ import {
   History
 } from 'lucide-react';
 
-const categories = {
-  "Suspensión": ["Amortiguadores Del.", "Amortiguadores Tras.", "Bujes de Tijera", "Tijeras", "Lágrimas", "Soporte de Amortiguadores", "Bujes Barra Estabilizadora", "Soportes de Motor", "Rótulas"],
-  "Frenos": ["Pastillas Del.", "Pastillas Tras.", "Discos Del.", "Discos Tras.", "Líquido de Frenos", "Freno de Mano", "Mangueras de Freno", "Bomba de Freno", "Cilindro de Freno", "Campanas Traseras", "Bandas Traseras"],
-  "Dirección": ["Caja de Dirección", "Terminales", "Axiales", "Bomba de Dirección", "Aceite Hidráulico", "Holgura Volante"],
-  "Transmisión": ["Puntas", "Cardán", "Embrague", "Empaque Caja de Cambios", "Guardapolvos"],
-  "Fugas": ["Fuga Aceite Motor", "Fuga Transmisión", "Fuga Dirección", "Fuga Refrigerante", "Fuga Combustible", "Fuga Frenos"],
-  "Batería / Eléctrico": ["Batería", "Alternador", "Motor de Arranque"],
-  "Chequeo Visual Motor": ["Correa Distribución", "Correa Accesorios", "Aceite Motor", "Cableado Visible", "Empaque tapavalvulas", "Empaque de Carter", "Reten Delantero Cigueñal", "Reten Trasero Cigueñal", "Tapacadena", "Sensor"],
-  "Refrigeración": ["Refrigerante", "Tapa Radiador", "Mangueras", "Termostato", "Ventilador / Clutch", "Radiador (fugas/daño)", "Bomba de Agua", "Deposito Refrigerante"],
-  "Visual Exterior / Luces": ["Luces Delanteras", "Luces Traseras", "Direccionales", "Luz de Freno", "Llantas (desgaste)", "Cristales / Limpiadores"]
-};
-
 const fmt = (n) => {
   if (n === null || n === undefined || n === '') return '';
   const num = parseFloat(n.toString().replace(/\D/g, '')) || 0;
@@ -46,6 +34,7 @@ export default function TechnicianView() {
   const [showPhotoUpload, setShowPhotoUpload] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
   const [allReports, setAllReports] = useState([]);
+  const [formConfig, setFormConfig] = useState(null);
   const [showChecklist, setShowChecklist] = useState(null);
   const [checklist, setChecklist] = useState({ pruebaRuta: false, limpio: false, herramientas: false });
 
@@ -63,7 +52,16 @@ export default function TechnicianView() {
   useEffect(() => {
     fetchOrders();
     fetchReports();
+    fetchConfig();
   }, []);
+
+  const fetchConfig = async () => {
+    try {
+      const res = await fetch(`${API_URL}/settings/revision_form`);
+      const data = await res.json();
+      setFormConfig(data.categories);
+    } catch (e) { console.error(e); }
+  };
 
   const fetchReports = async () => {
     try {
@@ -363,7 +361,7 @@ export default function TechnicianView() {
           </div>
         )}
 
-        {Object.entries(categories).map(([category, items]) => (
+        {formConfig && Object.entries(formConfig).map(([category, items]) => (
           <div key={category} className="card" style={{ marginBottom: '1rem', padding: '1rem' }}>
             <h3 style={{ fontSize: '1rem', fontWeight: 800, textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: '1rem', borderBottom: '1px solid var(--border)', paddingBottom: '0.4rem' }}>{category}</h3>
             {items.map(item => {

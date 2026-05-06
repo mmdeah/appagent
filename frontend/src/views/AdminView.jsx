@@ -3,7 +3,7 @@ import { API_URL, getPicoYPlaca } from '../api';
 import OrderDetailsModal from './OrderDetailsModal';
 import PhotoUploadModal from './PhotoUploadModal';
 import { ThemeContext } from '../App';
-import { PlusCircle, BarChart3, Camera, X, Car, Trash2, Zap, LayoutDashboard, History, Receipt, CheckCircle, AlertTriangle } from 'lucide-react';
+import { PlusCircle, BarChart3, Camera, X, Car, Trash2, Zap, LayoutDashboard, History, Receipt, CheckCircle, AlertTriangle, ClipboardList, Save, Settings } from 'lucide-react';
 
 const fmt = (n) => (parseFloat(n) || 0).toLocaleString('es-CO', { minimumFractionDigits: 0 });
 
@@ -31,6 +31,8 @@ export default function AdminView() {
   const [todos, setTodos] = useState([]);
   const [newTodo, setNewTodo] = useState('');
   const [balancesByMethod, setBalancesByMethod] = useState({});
+  const [formConfig, setFormConfig] = useState(null);
+  const [newCategoryName, setNewCategoryName] = useState('');
 
   const fetchExpenses = async () => {
     try {
@@ -161,7 +163,30 @@ export default function AdminView() {
     }
   };
 
-  useEffect(() => { fetchOrders(); fetchExpenses(); fetchTodos(); }, []);
+  const fetchConfig = async () => {
+    try {
+      const res = await fetch(`${API_URL}/settings/revision_form`);
+      const data = await res.json();
+      setFormConfig(data.categories);
+    } catch (e) { console.error(e); }
+  };
+
+  const saveConfig = async (newConfig) => {
+    try {
+      await fetch(`${API_URL}/settings/revision_form`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ categories: newConfig })
+      });
+      setFormConfig(newConfig);
+      setFormStatus({ text: 'Configuración guardada exitosamente', type: 'success' });
+      setTimeout(() => setFormStatus({ text: '', type: '' }), 3000);
+    } catch (e) { 
+      setFormStatus({ text: 'Error al guardar la configuración', type: 'error' });
+    }
+  };
+
+  useEffect(() => { fetchOrders(); fetchExpenses(); fetchTodos(); fetchConfig(); }, []);
 
   const deleteOrder = (id) => {
     setOrderToDelete(id);
@@ -345,6 +370,7 @@ export default function AdminView() {
                 { id: 'Kanban', icon: <LayoutDashboard size={16} />, label: 'Kanban' },
                 { id: 'Historial', icon: <History size={16} />, label: 'Historial' },
                 { id: 'Gastos', icon: <Receipt size={16} />, label: 'Gastos' },
+                { id: 'Formulario', icon: <ClipboardList size={16} />, label: 'Formulario' },
                 { id: 'Docs Rápidos', icon: <Zap size={16} />, label: 'Docs Rápidos' }
               ].map(t => (
                 <button key={t.id} onClick={() => setActiveTab(t.id)}
@@ -449,6 +475,91 @@ export default function AdminView() {
                     ))}
                   </tbody>
                 </table>
+              </div>
+            )}
+
+            {activeTab === 'Formulario' && (
+              <div className="card" style={{ padding: '1.5rem' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem', flexWrap: 'wrap', gap: '1rem' }}>
+                  <div>
+                    <h2 style={{ fontSize: '1.4rem', fontWeight: 800 }}>Configuración del Formulario</h2>
+                    <p style={{ color: 'var(--text-muted)' }}>Edita las categorías e ítems que aparecen en la revisión preventiva para los técnicos</p>
+                  </div>
+                  <button className="btn-primary" onClick={() => saveConfig(formConfig)} style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+                    <Save size={18} /> Guardar Cambios
+                  </button>
+                </div>
+
+                {formStatus.text && <div className={`toast toast-${formStatus.type}`} style={{ marginBottom: '1.5rem' }}>{formStatus.text}</div>}
+
+                {!formConfig ? (
+                  <div style={{ textAlign: 'center', padding: '3rem' }}>Cargando configuración...</div>
+                ) : (
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: '1.5rem' }}>
+                    {Object.entries(formConfig).map(([cat, items]) => (
+                      <div key={cat} className="card" style={{ padding: '1.25rem', border: '1px solid var(--border)', background: 'rgba(255,255,255,0.02)' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', borderBottom: '1px solid var(--border)', paddingBottom: '0.5rem' }}>
+                          <h3 style={{ fontSize: '1.1rem', fontWeight: 800, color: 'var(--primary)', textTransform: 'uppercase' }}>{cat}</h3>
+                          <button onClick={() => {
+                            if(window.confirm(`¿Eliminar la categoría "${cat}" y todos sus ítems?`)) {
+                              const newCfg = { ...formConfig };
+                              delete newCfg[cat];
+                              setFormConfig(newCfg);
+                            }
+                          }} style={{ color: 'var(--error)', background: 'none', border: 'none', cursor: 'pointer' }} title="Eliminar categoría">
+                            <Trash2 size={16} />
+                          </button>
+                        </div>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
+                          {items.map((item, idx) => (
+                            <div key={idx} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0.4rem 0.6rem', background: 'rgba(255,255,255,0.03)', borderRadius: 6 }}>
+                              <span style={{ fontSize: '1rem' }}>{item}</span>
+                              <button onClick={() => {
+                                const newItems = items.filter((_, i) => i !== idx);
+                                setFormConfig({ ...formConfig, [cat]: newItems });
+                              }} style={{ opacity: 0.5, border: 'none', background: 'none', cursor: 'pointer', color: 'var(--text)' }}>
+                                <X size={14} />
+                              </button>
+                            </div>
+                          ))}
+                          <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.5rem' }}>
+                            <input 
+                              type="text" 
+                              placeholder="Nuevo ítem..." 
+                              onKeyDown={e => {
+                                if (e.key === 'Enter') {
+                                  const val = e.target.value.trim();
+                                  if (val) {
+                                    setFormConfig({ ...formConfig, [cat]: [...items, val] });
+                                    e.target.value = '';
+                                  }
+                                }
+                              }}
+                              style={{ flex: 1, fontSize: '0.9rem', padding: '0.4rem' }} 
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                    
+                    <div className="card" style={{ padding: '1.25rem', border: '2px dashed var(--border)', background: 'transparent', display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: '1rem' }}>
+                      <h3 style={{ fontSize: '1.1rem', fontWeight: 800, textAlign: 'center', color: 'var(--text-muted)' }}>Nueva Categoría</h3>
+                      <input 
+                        type="text" 
+                        placeholder="Ej: Iluminación o Interiores" 
+                        value={newCategoryName}
+                        onChange={e => setNewCategoryName(e.target.value)}
+                        style={{ padding: '0.6rem' }}
+                      />
+                      <button className="btn-secondary" style={{ fontWeight: 700 }} onClick={() => {
+                        if (newCategoryName.trim()) {
+                          setFormConfig({ ...formConfig, [newCategoryName.trim()]: [] });
+                          setNewCategoryName('');
+                        }
+                      }}>Añadir Categoría</button>
+                    </div>
+                  </div>
+                )}
               </div>
             )}
 
