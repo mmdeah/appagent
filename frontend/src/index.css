@@ -421,7 +421,37 @@ input[type="checkbox"]:checked::after {
 .hide-on-print { }
 .show-on-print { display: none; }
 
-@media print {
-  .hide-on-print { display: none !important; }
-  .show-on-print { display: inline !important; }
+/* ── Responsive ────────────────────────── */
+@media (max-width: 600px) {
+  .modal-box { padding: 1.25rem; }
+  .info-grid { grid-template-columns: 1fr; }
+  .data-table thead { display: none; }
+  .data-table tr { 
+    display: flex; 
+    flex-direction: column; 
+    padding: 1rem 1.5rem !important; 
+    border-bottom: 1px solid var(--border); 
+  }
+  .data-table td { 
+    border: none !important; 
+    padding: 0.2rem 0 !important; 
+    width: 100% !important; 
+    text-align: left !important; 
+    display: flex; 
+    justify-content: space-between; 
+    align-items: center;
+  }
+  .data-table td:first-child { 
+    font-size: 1rem !important; 
+    font-weight: 700 !important; 
+    color: var(--text);
+    margin-bottom: 0.4rem;
+  }
+  .data-table td:nth-child(2)::before { content: 'Cantidad:'; font-size: 0.8rem; color: var(--text-muted); }
+  .data-table td:last-child::before { content: 'Total:'; font-size: 0.8rem; color: var(--text-muted); }
+  
+  .totals-container-mobile {
+    width: 100% !important;
+    max-width: none !important;
+  }
 }

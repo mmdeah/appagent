@@ -22,7 +22,7 @@ export default function ClientView() {
   const navigate = useNavigate();
 
   useEffect(() => {
-    document.body.setAttribute('data-theme', 'light');
+    // Respetar tema global
   }, []);
 
   const searchOrders = async (e) => {
@@ -274,7 +274,7 @@ export default function ClientView() {
             </table>
 
             <div style={{ padding: '2rem 1.5rem', background: 'rgba(0,0,0,0.02)', borderTop: '1px solid var(--border)' }}>
-              <div style={{ maxWidth: 320, marginLeft: 'auto' }}>
+              <div className="totals-container-mobile" style={{ maxWidth: 320, marginLeft: 'auto' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.6rem', fontSize: '0.9rem' }}>
                   <span style={{ color: 'var(--text-muted)', fontWeight: 500 }}>Subtotal</span>
                   <span style={{ fontWeight: 600 }}>${fmt(totals.sub)}</span>
