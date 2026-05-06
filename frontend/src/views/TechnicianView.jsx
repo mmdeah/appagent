@@ -164,6 +164,12 @@ export default function TechnicianView() {
                         {o.kilometraje ? `${fmt(o.kilometraje)} KM` : 'S/K'}
                       </div>
                     </div>
+                    {o.servicios && (
+                      <div style={{ padding: '0.6rem 0.8rem', background: 'rgba(99,102,241,0.1)', borderLeft: '3px solid var(--primary)', borderRadius: 6, marginBottom: '0.5rem' }}>
+                        <div style={{ fontWeight: 900, fontSize: '0.65rem', textTransform: 'uppercase', color: 'var(--primary)' }}>Servicios:</div>
+                        <div style={{ fontSize: '0.9rem', fontWeight: 600 }}>{o.servicios}</div>
+                      </div>
+                    )}
                     {o.notas && (
                       <div style={{ padding: '0.6rem 0.8rem', background: 'var(--warning)', color: '#000', borderRadius: 6, display: 'flex', gap: '0.5rem' }}>
                         <AlertTriangle size={16} flexShrink={0} />
