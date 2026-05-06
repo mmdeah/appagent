@@ -12,8 +12,7 @@ import {
   SendHorizonal, 
   Camera,
   AlertTriangle,
-  Info,
-  History
+  Info
 } from 'lucide-react';
 
 const fmt = (n) => {
@@ -32,8 +31,6 @@ export default function TechnicianView() {
   const [statusMsg, setStatusMsg] = useState({ text: '', type: '' });
   const [loading, setLoading] = useState(true);
   const [showPhotoUpload, setShowPhotoUpload] = useState(false);
-  const [showHistory, setShowHistory] = useState(false);
-  const [allReports, setAllReports] = useState([]);
   const [formConfig, setFormConfig] = useState(null);
   const [showChecklist, setShowChecklist] = useState(null);
   const [checklist, setChecklist] = useState({ pruebaRuta: false, limpio: false, herramientas: false });
@@ -51,7 +48,6 @@ export default function TechnicianView() {
 
   useEffect(() => {
     fetchOrders();
-    fetchReports();
     fetchConfig();
   }, []);
 
@@ -64,14 +60,6 @@ export default function TechnicianView() {
         setFormConfig(config.categories);
       }
     } catch (e) { console.error("Error cargando config técnico:", e); }
-  };
-
-  const fetchReports = async () => {
-    try {
-      const res = await fetch(`${API_URL}/reports?_expand=order&_sort=fecha&_order=desc`);
-      const data = await res.json();
-      setAllReports(data);
-    } catch (e) { console.error(e); }
   };
 
   const handleItemStateChange = (category, item, state) => {
@@ -155,9 +143,6 @@ export default function TechnicianView() {
               </div>
             </div>
             <div className="tech-header-actions">
-              <button className="btn-secondary" style={{ padding: '0.4rem 0.8rem', fontSize: '1rem' }} onClick={() => setShowHistory(!showHistory)}>
-                <History size={16} /> {showHistory ? 'Cerrar' : 'Historial'}
-              </button>
               <button onClick={toggleTheme} className="theme-toggle" title="Cambiar tema" />
               <button className="btn-secondary" style={{ padding: '0.4rem 0.8rem', fontSize: '1rem' }} onClick={() => setShowPhotoUpload(true)}>
                 <Camera size={14} /> Foto
@@ -166,36 +151,7 @@ export default function TechnicianView() {
           </div>
 
         <div style={{ padding: '1rem', maxWidth: 1600, margin: '0 auto' }}>
-          {showHistory ? (
-            <div className="card" style={{ padding: '1.5rem' }}>
-              <h2 style={{ fontSize: '1.4rem', fontWeight: 800, marginBottom: '1.5rem', display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
-                <History size={24} color="var(--primary)" /> Historial de Revisiones Realizadas
-              </h2>
-              {allReports.length === 0 ? (
-                <div style={{ textAlign: 'center', padding: '3rem', color: 'var(--text-muted)' }}>No has subido reportes aún.</div>
-              ) : (
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: '1rem' }}>
-                  {allReports.map(r => (
-                    <div key={r.id} className="card" style={{ padding: '1rem', background: 'var(--surface2)', border: '1px solid var(--border)' }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
-                        <span style={{ fontWeight: 900, fontSize: '1.2rem' }}>{r.order?.placa || 'S/P'}</span>
-                        <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>{new Date(r.fecha).toLocaleDateString()}</span>
-                      </div>
-                      <div style={{ fontSize: '0.9rem', color: 'var(--text-muted)', marginBottom: '0.8rem' }}>{r.order?.marca} {r.order?.modelo}</div>
-                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.4rem' }}>
-                        {r.items.map((it, i) => (
-                          <span key={i} style={{ fontSize: '0.75rem', padding: '0.1rem 0.4rem', borderRadius: 4, background: it.state === 'Malo' ? 'rgba(239,68,68,0.1)' : it.state === 'Regular' ? 'rgba(245,158,11,0.1)' : 'rgba(16,185,129,0.1)', color: it.state === 'Malo' ? '#f87171' : it.state === 'Regular' ? '#fbbf24' : '#34d399' }}>
-                            {it.item}
-                          </span>
-                        ))}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          ) : (
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 320px), 1fr))', gap: '1.25rem' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 320px), 1fr))', gap: '1.25rem' }}>
 
           
           {/* REVISIONES */}
