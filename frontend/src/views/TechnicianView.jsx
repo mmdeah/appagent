@@ -273,9 +273,14 @@ export default function TechnicianView() {
                           <div style={{ background: '#3b82f6', color: 'white', padding: '0.4rem 0.8rem', borderRadius: 8, fontWeight: 900, fontSize: '1.1rem' }}>
                             {o.kilometraje ? `${fmt(o.kilometraje)} KM` : 'S/K'}
                           </div>
-                          <button className="btn-success" onClick={() => setShowChecklist(o.id)} style={{ padding: '0.4rem 0.8rem', fontSize: '0.95rem', fontWeight: 800, borderRadius: 8 }}>
-                            TERMINAR
-                          </button>
+                          <div style={{ display: 'flex', gap: '0.4rem' }}>
+                            <button className="btn-secondary" onClick={() => setSelectedOrder(o)} style={{ padding: '0.4rem 0.8rem', fontSize: '0.95rem', fontWeight: 800, borderRadius: 8 }}>
+                              + Reportar
+                            </button>
+                            <button className="btn-success" onClick={() => setShowChecklist(o.id)} style={{ padding: '0.4rem 0.8rem', fontSize: '0.95rem', fontWeight: 800, borderRadius: 8 }}>
+                              TERMINAR
+                            </button>
+                          </div>
                         </div>
                       </div>
 
