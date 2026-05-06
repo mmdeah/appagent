@@ -87,6 +87,27 @@ export default function OrderDetailsModal({ order, onClose }) {
     win.document.close();
   };
 
+  const renderChecklistHtml = (chk) => {
+    if (!chk) return '';
+    return `
+      <div class="section-header">Control de Calidad (Verificación Final)</div>
+      <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; margin-bottom: 20px;">
+        <div style="padding: 10px; border: 1px solid #e2e8f0; border-radius: 6px; text-align: center;">
+          <div style="font-size: 8px; color: #64748b; text-transform: uppercase; margin-bottom: 4px;">Prueba de Ruta</div>
+          <div style="font-weight: 700; color: #059669; font-size: 10px;">✓ REALIZADA</div>
+        </div>
+        <div style="padding: 10px; border: 1px solid #e2e8f0; border-radius: 6px; text-align: center;">
+          <div style="font-size: 8px; color: #64748b; text-transform: uppercase; margin-bottom: 4px;">Vehículo Limpio</div>
+          <div style="font-weight: 700; color: #059669; font-size: 10px;">✓ VERIFICADO</div>
+        </div>
+        <div style="padding: 10px; border: 1px solid #e2e8f0; border-radius: 6px; text-align: center;">
+          <div style="font-size: 8px; color: #64748b; text-transform: uppercase; margin-bottom: 4px;">Herramientas</div>
+          <div style="font-weight: 700; color: #059669; font-size: 10px;">✓ COMPLETADO</div>
+        </div>
+      </div>
+    `;
+  };
+
   const printInfo = () => {
     printWindow(`Orden ${order.placa}`, `
       <div class="header-title">Orden de Servicio</div>
@@ -116,6 +137,7 @@ export default function OrderDetailsModal({ order, onClose }) {
 
       ${order.servicios ? `<div class="section-header">Servicios Solicitados</div><p style="padding: 12px; background: #f8fafc; border-radius: 8px;">${order.servicios}</p>` : ''}
       ${order.notas ? `<div class="section-header">Notas Adicionales</div><p style="padding: 12px; background: #fffbeb; border-radius: 8px; color: #92400e;">${order.notas}</p>` : ''}
+      ${renderChecklistHtml(order.checklistFinal)}
     `);
   };
 
@@ -161,6 +183,7 @@ export default function OrderDetailsModal({ order, onClose }) {
 
       ${order.servicios ? `<div class="section-header">Servicios Solicitados</div><p style="padding: 10px; background: #f8fafc; border-radius: 6px; margin-bottom: 12px;">${order.servicios}</p>` : ''}
       ${order.notas ? `<div class="section-header">Notas y Observaciones</div><p style="padding: 10px; background: #fffbeb; border-radius: 6px; color: #92400e;">${order.notas}</p>` : ''}
+      ${renderChecklistHtml(order.checklistFinal)}
     `);
   };
 
@@ -237,6 +260,8 @@ export default function OrderDetailsModal({ order, onClose }) {
         <div class="section-header">Notas de Recepción</div>
         <p style="padding: 10px; border: 1px solid #e2e8f0; border-radius: 6px; color: #475569; font-size: 11px;">${order.notas}</p>
       ` : ''}
+
+      ${renderChecklistHtml(order.checklistFinal)}
 
       <div style="margin-top: 60px; border-top: 1px solid #e2e8f0; padding-top: 20px; font-size: 10px; color: #94a3b8; text-align: center;">
         Esta es una representación física de un documento digital. Generado por AppTaller2.
@@ -514,7 +539,28 @@ export default function OrderDetailsModal({ order, onClose }) {
                 </>
               )}
 
-              <div className="hide-on-print" style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap', marginTop: '1rem' }}>
+              {/* Checklist de salida */}
+              {order.checklistFinal && (
+                <div style={{ marginTop: '1.5rem', padding: '1.25rem', background: 'rgba(16,185,129,0.08)', border: '1px solid rgba(16,185,129,0.3)', borderRadius: 16 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '1rem' }}>
+                    <div style={{ width: 24, height: 24, borderRadius: '50%', background: 'var(--success)', color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.8rem' }}>✓</div>
+                    <span style={{ fontSize: '0.75rem', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--success)' }}>Control de Calidad Aprobado</span>
+                  </div>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '1rem' }}>
+                    {[
+                      ['pruebaRuta', 'Prueba de Ruta'],
+                      ['limpio', 'Limpieza'],
+                      ['herramientas', 'Herramientas']
+                    ].map(([k, l]) => (
+                      <div key={k} style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.85rem', fontWeight: 600 }}>
+                        <CheckCircle size={14} color="var(--success)" /> {l}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              <div className="hide-on-print" style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap', marginTop: '1.5rem' }}>
                 <a href={`https://wa.me/${order.telefono}?text=Hola%20${encodeURIComponent(order.cliente || '')},%20te%20escribimos%20del%20Taller%20Automotriz%20sobre%20tu%20veh%C3%ADculo%20${order.placa}`}
                   target="_blank" rel="noreferrer"
                   className="btn-success" style={{ textDecoration: 'none' }}>

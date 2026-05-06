@@ -43,6 +43,8 @@ export default function TechnicianView() {
   const [statusMsg, setStatusMsg] = useState({ text: '', type: '' });
   const [loading, setLoading] = useState(true);
   const [showPhotoUpload, setShowPhotoUpload] = useState(false);
+  const [showChecklist, setShowChecklist] = useState(null);
+  const [checklist, setChecklist] = useState({ pruebaRuta: false, limpio: false, herramientas: false });
 
   const fetchOrders = () => {
     setLoading(true);
@@ -103,15 +105,21 @@ export default function TechnicianView() {
     } catch (e) { setStatusMsg({ text: '✗ Error al subir el reporte', type: 'error' }); }
   };
 
-  const finishWork = async (orderId) => {
+  const confirmFinishWork = async () => {
+    const orderId = showChecklist;
     try {
       await fetch(`${API_URL}/orders/${orderId}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ estado: 'Calidad' })
+        body: JSON.stringify({ 
+          estado: 'Calidad',
+          checklistFinal: { ...checklist, fecha: new Date().toISOString() }
+        })
       });
+      setShowChecklist(null);
+      setChecklist({ pruebaRuta: false, limpio: false, herramientas: false });
       fetchOrders();
-      setStatusMsg({ text: '✓ Trabajo terminado. Pasado a Calidad.', type: 'success' });
+      setStatusMsg({ text: '✓ Trabajo terminado y verificado. Pasado a Calidad.', type: 'success' });
       setTimeout(() => setStatusMsg({ text: '', type: '' }), 3000);
     } catch (e) { console.error(e); }
   };
@@ -209,7 +217,7 @@ export default function TechnicianView() {
                           <div style={{ background: '#3b82f6', color: 'white', padding: '0.4rem 0.8rem', borderRadius: 8, fontWeight: 900, fontSize: '1rem' }}>
                             {o.kilometraje ? `${fmt(o.kilometraje)} KM` : 'S/K'}
                           </div>
-                          <button className="btn-success" onClick={() => finishWork(o.id)} style={{ padding: '0.4rem 0.8rem', fontSize: '0.85rem', fontWeight: 800, borderRadius: 8 }}>
+                          <button className="btn-success" onClick={() => setShowChecklist(o.id)} style={{ padding: '0.4rem 0.8rem', fontSize: '0.85rem', fontWeight: 800, borderRadius: 8 }}>
                             TERMINAR
                           </button>
                         </div>
@@ -345,6 +353,49 @@ export default function TechnicianView() {
       </div>
 
       {showPhotoUpload && <PhotoUploadModal onClose={() => setShowPhotoUpload(false)} onSuccess={() => {}} />}
+
+      {showChecklist && (
+        <div className="modal-overlay">
+          <div className="modal-box" style={{ maxWidth: 450, textAlign: 'center' }}>
+            <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>📋</div>
+            <h2 style={{ fontSize: '1.5rem', fontWeight: 900, marginBottom: '0.5rem' }}>Control de Salida</h2>
+            <p style={{ color: 'var(--text-muted)', marginBottom: '1.5rem' }}>Verifica los siguientes puntos antes de pasar a calidad:</p>
+            
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', textAlign: 'left', marginBottom: '2rem' }}>
+              {[
+                ['pruebaRuta', '¿Prueba de ruta realizada?'],
+                ['limpio', '¿Vehículo limpio?'],
+                ['herramientas', '¿Herramientas fuera del vehículo?']
+              ].map(([key, label]) => (
+                <label key={key} style={{ 
+                  display: 'flex', alignItems: 'center', gap: '1rem', 
+                  padding: '1rem', background: 'var(--surface2)', borderRadius: 12,
+                  cursor: 'pointer', border: checklist[key] ? '2px solid var(--success)' : '2px solid transparent'
+                }}>
+                  <input 
+                    type="checkbox" 
+                    checked={checklist[key]} 
+                    onChange={e => setChecklist({ ...checklist, [key]: e.target.checked })} 
+                  />
+                  <span style={{ fontWeight: 700, fontSize: '1rem' }}>{label}</span>
+                </label>
+              ))}
+            </div>
+
+            <div style={{ display: 'flex', gap: '1rem' }}>
+              <button className="btn-secondary" style={{ flex: 1 }} onClick={() => setShowChecklist(null)}>Cancelar</button>
+              <button 
+                className="btn-success" 
+                style={{ flex: 1 }} 
+                disabled={!checklist.pruebaRuta || !checklist.limpio || !checklist.herramientas}
+                onClick={confirmFinishWork}
+              >
+                CONFIRMAR TODO
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
