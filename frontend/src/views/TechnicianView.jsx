@@ -12,7 +12,8 @@ import {
   SendHorizonal, 
   Camera,
   AlertTriangle,
-  Info
+  Info,
+  History
 } from 'lucide-react';
 
 const categories = {
