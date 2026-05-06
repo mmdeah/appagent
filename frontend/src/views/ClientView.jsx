@@ -186,25 +186,30 @@ export default function ClientView() {
 
         {/* Order info */}
         <div className="card">
-          <p className="section-title">Tu Orden de Servicio</p>
+          <p className="section-title">Datos del Vehículo</p>
           <div className="info-grid">
             {[
               ['Placa', order.placa],
-              ['Fecha Ingreso', order.fecha ? new Date(order.fecha).toLocaleDateString('es-CO') : 'N/A'],
+              ['Marca', order.marca],
+              ['Modelo', order.modelo],
+              ['Año', order.anio],
               ['Kilometraje', order.kilometraje ? `${fmt(order.kilometraje)} km` : 'N/A'],
-              ['Estado Actual', order.estado],
+              ['Fecha Ingreso', order.fecha ? new Date(order.fecha).toLocaleDateString('es-CO') : 'N/A'],
+              ['Estado', order.estado],
             ].map(([l,v]) => (
               <div key={l} className="info-item">
                 <div className="info-label">{l}</div>
                 <div className="info-value">{v}</div>
               </div>
             ))}
-            {order.servicios && (
-              <div className="info-item" style={{ gridColumn: '1 / -1' }}>
-                <div className="info-label">Servicios Solicitados</div>
-                <div className="info-value">{order.servicios}</div>
-              </div>
-            )}
+            <div className="info-item" style={{ gridColumn: '1 / -1' }}>
+              <div className="info-label">Servicios a Realizar</div>
+              <div className="info-value">{order.servicios || 'Ninguno'}</div>
+            </div>
+            <div className="info-item" style={{ gridColumn: '1 / -1' }}>
+              <div className="info-label">Notas / Observaciones</div>
+              <div className="info-value">{order.notas || 'Sin observaciones'}</div>
+            </div>
           </div>
         </div>
 
