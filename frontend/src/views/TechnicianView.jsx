@@ -151,24 +151,30 @@ export default function TechnicianView() {
               ) : (
                 <div style={{ display: 'grid', gap: '1rem' }}>
                   {orders.filter(o => o.estado !== 'Proceso' && o.estado !== 'Calidad').map(o => (
-                    <div key={o.id} className="card card-hover" style={{ cursor: 'pointer' }} onClick={() => setSelectedOrder(o)}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-                          <div style={{ width: 40, height: 40, borderRadius: 10, background: 'rgba(99,102,241,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                            <Car size={20} color="#818cf8" />
-                          </div>
-                          <div>
-                            <div style={{ fontWeight: 800, fontSize: '1.1rem' }}>{o.placa}</div>
-                            <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>{o.marca} {o.modelo}</div>
-                            {o.kilometraje && <div style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--primary)', marginTop: '0.2rem' }}>KM: {fmt(o.kilometraje)}</div>}
-                            {o.notas && (
-                              <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '0.5rem', borderTop: '1px solid var(--border)', paddingTop: '0.4rem', fontStyle: 'italic' }}>
-                                "{o.notas}"
+                    <div key={o.id} className="card card-hover" style={{ cursor: 'pointer', padding: '1.5rem' }} onClick={() => setSelectedOrder(o)}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <div style={{ width: '100%' }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+                            <div>
+                              <div style={{ fontWeight: 900, fontSize: '1.6rem', color: 'white', lineHeight: 1 }}>{o.placa}</div>
+                              <div style={{ fontSize: '1rem', color: 'var(--text-muted)' }}>{o.marca} {o.modelo}</div>
+                            </div>
+                            {o.kilometraje && (
+                              <div style={{ background: 'var(--primary)', color: 'white', padding: '0.5rem 1rem', borderRadius: 10, fontWeight: 900, fontSize: '1.2rem', boxShadow: '0 4px 10px rgba(99,102,241,0.3)' }}>
+                                {fmt(o.kilometraje)} KM
                               </div>
                             )}
                           </div>
+                          {o.notas && (
+                            <div style={{ padding: '0.8rem', background: 'rgba(255,255,0,0.1)', border: '1px solid rgba(255,255,0,0.2)', borderRadius: 8, color: '#fbbf24' }}>
+                              <div style={{ fontWeight: 900, fontSize: '0.65rem', textTransform: 'uppercase', marginBottom: '0.3rem', display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
+                                ⚠️ NOTAS:
+                              </div>
+                              <div style={{ fontSize: '1rem', fontWeight: 600, lineHeight: 1.3 }}>{o.notas}</div>
+                            </div>
+                          )}
                         </div>
-                        <ChevronRight size={20} color="var(--text-muted)" />
+                        <ChevronRight size={28} color="var(--text-muted)" style={{ marginLeft: '1rem' }} />
                       </div>
                     </div>
                   ))}
@@ -188,31 +194,43 @@ export default function TechnicianView() {
                   <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem' }}>No hay trabajos autorizados actualmente.</p>
                 </div>
               ) : (
-                <div style={{ display: 'grid', gap: '1rem' }}>
+                <div style={{ display: 'grid', gap: '1.25rem' }}>
                   {orders.filter(o => o.estado === 'Proceso' && o.quotes?.some(q => q.autorizada)).map(o => {
                     const quote = o.quotes.find(q => q.autorizada);
                     return (
-                      <div key={o.id} className="card" style={{ borderLeft: '5px solid #10b981', padding: '1.5rem', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem' }}>
+                      <div key={o.id} className="card" style={{ borderLeft: '8px solid #10b981', padding: '1.75rem', boxShadow: '0 8px 24px rgba(0,0,0,0.2)' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1.5rem' }}>
                           <div>
-                            <h3 style={{ fontSize: '1.6rem', fontWeight: 900, lineHeight: 1, marginBottom: '0.2rem' }}>{o.placa}</h3>
-                            <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem' }}>{o.marca} {o.modelo} {o.kilometraje ? `· ${fmt(o.kilometraje)} KM` : ''}</p>
-                            {o.notas && (
-                              <div style={{ marginTop: '0.5rem', fontSize: '0.8rem', color: 'var(--text-muted)', background: 'rgba(255,255,255,0.02)', padding: '0.4rem 0.6rem', borderRadius: 6, borderLeft: '2px solid var(--border)' }}>
-                                <strong>Nota:</strong> {o.notas}
+                            <h3 style={{ fontSize: '2.5rem', fontWeight: 900, color: 'white', lineHeight: 1, marginBottom: '0.4rem' }}>{o.placa}</h3>
+                            <p style={{ color: 'var(--text-muted)', fontSize: '1.2rem' }}>{o.marca} {o.modelo}</p>
+                          </div>
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', alignItems: 'flex-end' }}>
+                            {o.kilometraje && (
+                              <div style={{ background: '#3b82f6', color: 'white', padding: '0.75rem 1.5rem', borderRadius: 12, fontWeight: 900, fontSize: '1.5rem', boxShadow: '0 4px 15px rgba(59,130,246,0.4)' }}>
+                                {fmt(o.kilometraje)} KM
                               </div>
                             )}
+                            <button className="btn-success" onClick={() => finishWork(o.id)} style={{ padding: '1rem 2rem', fontSize: '1.1rem', fontWeight: 900, borderRadius: 12 }}>
+                              <SendHorizonal size={20} /> TERMINAR TRABAJO
+                            </button>
                           </div>
-                          <button className="btn-success" onClick={() => finishWork(o.id)} style={{ padding: '0.6rem 1rem' }}>
-                            <SendHorizonal size={16} /> Terminar
-                          </button>
                         </div>
-                        <div style={{ background: 'rgba(255,255,255,0.03)', borderRadius: 12, padding: '1.25rem', border: '1px solid var(--border)' }}>
-                          <p style={{ fontWeight: 800, fontSize: '0.75rem', textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: '0.75rem', letterSpacing: '0.05em' }}>📋 Tareas a realizar:</p>
-                          <ul style={{ paddingLeft: '1.2rem', display: 'grid', gap: '0.6rem' }}>
+
+                        {o.notas && (
+                          <div style={{ marginBottom: '1.5rem', padding: '1.25rem', background: 'rgba(239,68,68,0.15)', border: '2px solid rgba(239,68,68,0.3)', borderRadius: 12, color: '#f87171' }}>
+                            <div style={{ fontWeight: 900, fontSize: '0.85rem', textTransform: 'uppercase', marginBottom: '0.6rem', display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+                              🚩 OBSERVACIONES CRÍTICAS:
+                            </div>
+                            <div style={{ fontSize: '1.25rem', fontWeight: 700, lineHeight: 1.4 }}>{o.notas}</div>
+                          </div>
+                        )}
+
+                        <div style={{ background: 'rgba(255,255,255,0.03)', borderRadius: 16, padding: '1.5rem', border: '1px solid var(--border)' }}>
+                          <p style={{ fontWeight: 800, fontSize: '0.8rem', textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: '1rem', letterSpacing: '0.05em' }}>📋 Tareas a realizar:</p>
+                          <ul style={{ paddingLeft: '1.5rem', display: 'grid', gap: '0.75rem' }}>
                             {quote.items.map((it, idx) => (
-                              <li key={idx} style={{ fontSize: '1rem', fontWeight: 600, color: 'var(--text)' }}>
-                                <span style={{ color: 'var(--success)', marginRight: '0.4rem' }}>•</span>
+                              <li key={idx} style={{ fontSize: '1.1rem', fontWeight: 600, color: 'white' }}>
+                                <span style={{ color: '#10b981', marginRight: '0.6rem' }}>•</span>
                                 {it.cantidad}x {it.descripcion}
                               </li>
                             ))}
