@@ -242,16 +242,20 @@ export default function ClientView() {
           </div>
         )}
 
-        {/* Quote */}
+        {/* Cotización / Precios */}
         {quote?.items?.length > 0 && (
-          <div className="card">
-            <p className="section-title">Cotización de Servicios</p>
-            <table className="data-table">
-              <thead>
+          <div className="card" style={{ padding: '0', overflow: 'hidden' }}>
+            <div style={{ padding: '1.5rem 1.5rem 0.5rem 1.5rem' }}>
+              <p className="section-title" style={{ marginBottom: '0.5rem' }}>Cotización de Servicios</p>
+              <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '1rem' }}>Detalle de repuestos y mano de obra autorizados</p>
+            </div>
+            
+            <table className="data-table" style={{ margin: 0 }}>
+              <thead style={{ background: 'rgba(99,102,241,0.05)' }}>
                 <tr>
-                  <th>Servicio / Repuesto</th>
-                  <th style={{ textAlign: 'center' }}>Cant.</th>
-                  <th style={{ textAlign: 'right' }}>Total</th>
+                  <th style={{ padding: '1rem 1.5rem', color: 'var(--primary)', fontSize: '0.75rem' }}>DESCRIPCIÓN</th>
+                  <th style={{ padding: '1rem 1.5rem', textAlign: 'center', color: 'var(--primary)', fontSize: '0.75rem', width: '80px' }}>CANT.</th>
+                  <th style={{ padding: '1rem 1.5rem', textAlign: 'right', color: 'var(--primary)', fontSize: '0.75rem', width: '120px' }}>TOTAL</th>
                 </tr>
               </thead>
               <tbody>
@@ -260,25 +264,32 @@ export default function ClientView() {
                   const t = it.aplicaIva ? lt * 1.19 : lt;
                   return (
                     <tr key={i}>
-                      <td>{it.descripcion || '—'}</td>
-                      <td style={{ textAlign: 'center' }}>{it.cantidad}</td>
-                      <td style={{ textAlign: 'right', fontWeight: 700 }} className="price">${fmt(t)}</td>
+                      <td style={{ padding: '1rem 1.5rem', fontSize: '0.95rem', fontWeight: 500 }}>{it.descripcion || '—'}</td>
+                      <td style={{ padding: '1rem 1.5rem', textAlign: 'center', fontSize: '0.9rem', color: 'var(--text-muted)' }}>{it.cantidad}</td>
+                      <td style={{ padding: '1rem 1.5rem', textAlign: 'right', fontWeight: 700, fontSize: '1rem' }}>${fmt(t)}</td>
                     </tr>
                   );
                 })}
               </tbody>
             </table>
-            <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '1rem' }}>
-              <div style={{ width: 260, background: 'rgba(255,255,255,0.03)', borderRadius: 10, padding: '1rem', border: '1px solid var(--border)' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: '0.4rem' }}>
-                  <span>Subtotal</span><span>${fmt(totals.sub)}</span>
+
+            <div style={{ padding: '2rem 1.5rem', background: 'rgba(0,0,0,0.02)', borderTop: '1px solid var(--border)' }}>
+              <div style={{ maxWidth: 320, marginLeft: 'auto' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.6rem', fontSize: '0.9rem' }}>
+                  <span style={{ color: 'var(--text-muted)', fontWeight: 500 }}>Subtotal</span>
+                  <span style={{ fontWeight: 600 }}>${fmt(totals.sub)}</span>
                 </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: '0.75rem' }}>
-                  <span>IVA</span><span>${fmt(totals.iva)}</span>
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '1rem', fontSize: '0.9rem' }}>
+                  <span style={{ color: 'var(--text-muted)', fontWeight: 500 }}>IVA (19%)</span>
+                  <span style={{ fontWeight: 600 }}>${fmt(totals.iva)}</span>
                 </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 800, fontSize: '1.1rem', color: 'var(--success)', borderTop: '1px solid var(--border)', paddingTop: '0.6rem' }}>
-                  <span>TOTAL</span><span>${fmt(totals.sub + totals.iva)}</span>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '1rem 0 0 0', borderTop: '2px solid var(--primary)' }}>
+                  <span style={{ fontWeight: 800, fontSize: '1.2rem', color: 'var(--text)' }}>TOTAL</span>
+                  <span style={{ fontWeight: 900, fontSize: '1.6rem', color: 'var(--primary)' }}>${fmt(totals.sub + totals.iva)}</span>
                 </div>
+                <p style={{ fontSize: '0.65rem', color: 'var(--text-muted)', textAlign: 'right', marginTop: '1rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                  Valores expresados en Pesos Colombianos (COP)
+                </p>
               </div>
             </div>
           </div>
