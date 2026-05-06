@@ -566,7 +566,10 @@ export default function OrderDetailsModal({ order, onClose }) {
                   className="btn-success" style={{ textDecoration: 'none' }}>
                   <MessageCircle size={16} /> WhatsApp
                 </a>
-                <button onClick={printInfo} className="btn-secondary"><Printer size={16} /> Imprimir</button>
+                <button onClick={printInfo} className="btn-secondary"><Printer size={16} /> Imprimir Orden</button>
+                <button onClick={printQuote} className="btn-success" style={{ background: '#3b82f6', borderColor: '#3b82f6' }}>
+                  <Printer size={16} /> Cuenta de Cobro / PDF
+                </button>
                 <button onClick={() => setShowConfirm(true)} className="btn-success" style={{ marginLeft: 'auto' }}>
                   <CheckCircle size={16} /> Entregar Vehículo
                 </button>
