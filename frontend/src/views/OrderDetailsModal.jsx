@@ -189,6 +189,7 @@ export default function OrderDetailsModal({ order, onClose }) {
 
   const printQuote = () => {
     const sub = totals.sub, iva = totals.iva, total = totals.total;
+    const mainTitle = (order.estado === 'Entregado' || order.estado === 'Docs Rápidos') ? 'CUENTA DE COBRO' : 'COTIZACIÓN';
     const rows = quoteItems.map((it, i) => {
       const lineTotal = it.precio * it.cantidad;
       const lineIva = it.aplicaIva ? lineTotal * 0.19 : 0;
@@ -203,8 +204,8 @@ export default function OrderDetailsModal({ order, onClose }) {
         </tr>
       `;
     }).join('');
-    printWindow(`Cotización ${order.placa}`, `
-      <div class="header-title">${order.estado === 'Entregado' ? 'Factura de Venta' : 'Cotización'}</div>
+    printWindow(`${mainTitle} ${order.placa}`, `
+      <div class="header-title">${mainTitle}</div>
       
       <div class="section-header">Información de la Orden</div>
       <div style="margin-bottom: 24px">
