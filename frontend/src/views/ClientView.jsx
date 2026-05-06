@@ -55,11 +55,11 @@ export default function ClientView() {
           <div style={{ textAlign: 'center', marginBottom: '2rem' }}>
             <div style={{ fontSize: '2.5rem', marginBottom: '0.5rem' }}>🔍</div>
             <h1 style={{ fontWeight: 800, fontSize: '1.5rem', marginBottom: '0.25rem' }}>Consulta tu Vehículo</h1>
-            <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem' }}>Ingresa tu placa para ver el estado de tu orden de servicio</p>
+            <p style={{ color: 'var(--text-muted)', fontSize: '1rem' }}>Ingresa tu placa para ver el estado de tu orden de servicio</p>
           </div>
 
           <form onSubmit={searchOrders}>
-            <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '0.4rem' }}>
+            <label style={{ display: 'block', fontSize: '0.9rem', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '0.4rem' }}>
               Número de Placa
             </label>
             <div style={{ position: 'relative', marginBottom: '1rem' }}>
@@ -96,7 +96,7 @@ export default function ClientView() {
 
           <div style={{ textAlign: 'center', marginBottom: '1.75rem' }}>
             <div style={{ fontWeight: 800, fontSize: '2rem', letterSpacing: '0.05em' }}>{placa}</div>
-            <div style={{ color: 'var(--text-muted)', fontSize: '0.9rem' }}>
+            <div style={{ color: 'var(--text-muted)', fontSize: '1rem' }}>
               {orders.length} orden{orders.length !== 1 ? 'es' : ''} encontrada{orders.length !== 1 ? 's' : ''}
             </div>
           </div>
@@ -121,7 +121,7 @@ export default function ClientView() {
                       <span style={{ fontWeight: 700, fontSize: '1rem' }}>{o.marca} {o.modelo} {o.anio}</span>
                       <span style={{ background: cfg.bg, color: cfg.color, borderRadius: 999, padding: '0.15rem 0.65rem', fontSize: '0.72rem', fontWeight: 700 }}>{cfg.label}</span>
                     </div>
-                    <div style={{ fontSize: '0.82rem', color: 'var(--text-muted)' }}>
+                    <div style={{ fontSize: '0.92rem', color: 'var(--text-muted)' }}>
                       Ingreso: {fecha} · {o.servicios ? (o.servicios.length > 55 ? o.servicios.slice(0,55)+'...' : o.servicios) : 'Sin descripción'}
                     </div>
                   </div>
@@ -162,9 +162,9 @@ export default function ClientView() {
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '0.5rem' }}>
             <div>
               <div style={{ fontWeight: 800, fontSize: '1.6rem', letterSpacing: '0.03em' }}>{order.placa}</div>
-              <div style={{ color: 'var(--text-muted)', fontSize: '0.9rem' }}>{order.marca} {order.modelo} {order.anio}</div>
+              <div style={{ color: 'var(--text-muted)', fontSize: '1rem' }}>{order.marca} {order.modelo} {order.anio}</div>
             </div>
-            <span style={{ background: cfg.bg, color: cfg.color, borderRadius: 999, padding: '0.3rem 1rem', fontSize: '0.82rem', fontWeight: 700 }}>
+            <span style={{ background: cfg.bg, color: cfg.color, borderRadius: 999, padding: '0.3rem 1rem', fontSize: '0.92rem', fontWeight: 700 }}>
               {cfg.icon} {cfg.label}
             </span>
           </div>
@@ -193,7 +193,7 @@ export default function ClientView() {
                 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end' }}>
                   <span style={{ fontWeight: 800 }}>{order.placa}</span>
                   {getPicoYPlaca(order.placa) && (
-                    <span style={{ fontSize: '0.65rem', color: '#f59e0b', fontWeight: 800, marginTop: '0.2rem' }}>⚠️ {getPicoYPlaca(order.placa)}</span>
+                    <span style={{ fontSize: '0.75rem', color: '#f59e0b', fontWeight: 800, marginTop: '0.2rem' }}>⚠️ {getPicoYPlaca(order.placa)}</span>
                   )}
                 </div>
               )],
@@ -224,29 +224,29 @@ export default function ClientView() {
         {report && (
           <div className="card">
             <p className="section-title">Reporte de Inspección</p>
-            <p style={{ fontSize: '0.82rem', color: 'var(--text-muted)', marginBottom: '1rem' }}>Diagnóstico general de tu vehículo (sin incluir precios)</p>
+            <p style={{ fontSize: '0.92rem', color: 'var(--text-muted)', marginBottom: '1rem' }}>Diagnóstico general de tu vehículo (sin incluir precios)</p>
             {report.items?.filter(it => it.state !== 'Bueno').length > 0 ? (
               <div style={{ display: 'grid', gap: '0.4rem' }}>
                 {report.items.filter(it => it.state !== 'Bueno').map((it, i) => (
                   <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0.5rem 0.75rem', background: 'rgba(255,255,255,0.03)', borderRadius: 8 }}>
                     <div>
-                      <span style={{ fontWeight: 500, fontSize: '0.9rem' }}>{it.item}</span>
-                      <span style={{ marginLeft: '0.5rem', fontSize: '0.75rem', color: 'var(--text-muted)' }}>{it.category}</span>
+                      <span style={{ fontWeight: 500, fontSize: '1rem' }}>{it.item}</span>
+                      <span style={{ marginLeft: '0.5rem', fontSize: '0.85rem', color: 'var(--text-muted)' }}>{it.category}</span>
                     </div>
-                    <span style={{ color: stateColor[it.state], fontWeight: 600, fontSize: '0.82rem' }}>{it.state}</span>
+                    <span style={{ color: stateColor[it.state], fontWeight: 600, fontSize: '0.92rem' }}>{it.state}</span>
                   </div>
                 ))}
               </div>
             ) : (
-              <p style={{ color: 'var(--success)', fontSize: '0.9rem' }}>✓ Todo en buen estado según la revisión.</p>
+              <p style={{ color: 'var(--success)', fontSize: '1rem' }}>✓ Todo en buen estado según la revisión.</p>
             )}
             {report.scannerCodes?.filter(c => c.code).length > 0 && (
               <div style={{ marginTop: '1rem' }}>
-                <p style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-muted)', marginBottom: '0.5rem' }}>CÓDIGOS DE ESCÁNER</p>
+                <p style={{ fontSize: '0.9rem', fontWeight: 600, color: 'var(--text-muted)', marginBottom: '0.5rem' }}>CÓDIGOS DE ESCÁNER</p>
                 {report.scannerCodes.filter(c => c.code).map((c, i) => (
                   <div key={i} style={{ display: 'flex', gap: '0.75rem', padding: '0.4rem 0.75rem', background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.2)', borderRadius: 6, marginBottom: '0.4rem' }}>
                     <span style={{ fontFamily: 'monospace', fontWeight: 700, color: '#f87171' }}>{c.prefix}{c.code}</span>
-                    <span style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>{c.description}</span>
+                    <span style={{ color: 'var(--text-muted)', fontSize: '0.95rem' }}>{c.description}</span>
                   </div>
                 ))}
               </div>
@@ -259,15 +259,15 @@ export default function ClientView() {
           <div className="card" style={{ padding: '0', overflow: 'hidden' }}>
             <div style={{ padding: '1.5rem 1.5rem 0.5rem 1.5rem' }}>
               <p className="section-title" style={{ marginBottom: '0.5rem' }}>Cotización de Servicios</p>
-              <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '1rem' }}>Detalle de repuestos y mano de obra autorizados</p>
+              <p style={{ fontSize: '0.9rem', color: 'var(--text-muted)', marginBottom: '1rem' }}>Detalle de repuestos y mano de obra autorizados</p>
             </div>
             
             <table className="data-table" style={{ margin: 0 }}>
               <thead style={{ background: 'rgba(99,102,241,0.05)' }}>
                 <tr>
-                  <th style={{ padding: '1rem 1.5rem', color: 'var(--primary)', fontSize: '0.75rem' }}>DESCRIPCIÓN</th>
-                  <th style={{ padding: '1rem 1.5rem', textAlign: 'center', color: 'var(--primary)', fontSize: '0.75rem', width: '80px' }}>CANT.</th>
-                  <th style={{ padding: '1rem 1.5rem', textAlign: 'right', color: 'var(--primary)', fontSize: '0.75rem', width: '120px' }}>TOTAL</th>
+                  <th style={{ padding: '1rem 1.5rem', color: 'var(--primary)', fontSize: '0.85rem' }}>DESCRIPCIÓN</th>
+                  <th style={{ padding: '1rem 1.5rem', textAlign: 'center', color: 'var(--primary)', fontSize: '0.85rem', width: '80px' }}>CANT.</th>
+                  <th style={{ padding: '1rem 1.5rem', textAlign: 'right', color: 'var(--primary)', fontSize: '0.85rem', width: '120px' }}>TOTAL</th>
                 </tr>
               </thead>
               <tbody>
@@ -277,7 +277,7 @@ export default function ClientView() {
                   return (
                     <tr key={i}>
                       <td style={{ padding: '1rem 1.5rem', fontSize: '0.95rem', fontWeight: 500 }}>{it.descripcion || '—'}</td>
-                      <td style={{ padding: '1rem 1.5rem', textAlign: 'center', fontSize: '0.9rem', color: 'var(--text-muted)' }}>{it.cantidad}</td>
+                      <td style={{ padding: '1rem 1.5rem', textAlign: 'center', fontSize: '1rem', color: 'var(--text-muted)' }}>{it.cantidad}</td>
                       <td style={{ padding: '1rem 1.5rem', textAlign: 'right', fontWeight: 700, fontSize: '1rem' }}>${fmt(t)}</td>
                     </tr>
                   );
@@ -287,11 +287,11 @@ export default function ClientView() {
 
             <div style={{ padding: '2rem 1.5rem', background: 'rgba(0,0,0,0.02)', borderTop: '1px solid var(--border)' }}>
               <div className="totals-container-mobile" style={{ maxWidth: 320, marginLeft: 'auto' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.6rem', fontSize: '0.9rem' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.6rem', fontSize: '1rem' }}>
                   <span style={{ color: 'var(--text-muted)', fontWeight: 500 }}>Subtotal</span>
                   <span style={{ fontWeight: 600 }}>${fmt(totals.sub)}</span>
                 </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '1rem', fontSize: '0.9rem' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '1rem', fontSize: '1rem' }}>
                   <span style={{ color: 'var(--text-muted)', fontWeight: 500 }}>IVA (19%)</span>
                   <span style={{ fontWeight: 600 }}>${fmt(totals.iva)}</span>
                 </div>
@@ -299,7 +299,7 @@ export default function ClientView() {
                   <span style={{ fontWeight: 800, fontSize: '1.2rem', color: 'var(--text)' }}>TOTAL</span>
                   <span style={{ fontWeight: 900, fontSize: '1.6rem', color: 'var(--primary)' }}>${fmt(totals.sub + totals.iva)}</span>
                 </div>
-                <p style={{ fontSize: '0.65rem', color: 'var(--text-muted)', textAlign: 'right', marginTop: '1rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', textAlign: 'right', marginTop: '1rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
                   Valores expresados en Pesos Colombianos (COP)
                 </p>
               </div>

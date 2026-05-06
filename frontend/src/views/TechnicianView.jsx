@@ -138,12 +138,12 @@ export default function TechnicianView() {
               </div>
               <div>
                 <h1 style={{ fontSize: '1rem', fontWeight: 700, margin: 0, lineHeight: 1 }}>Panel Técnico</h1>
-                <p style={{ fontSize: '0.7rem', color: 'var(--text-muted)', margin: 0 }}>{orders.length} vehículos</p>
+                <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', margin: 0 }}>{orders.length} vehículos</p>
               </div>
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.8rem' }}>
               <button onClick={toggleTheme} className="theme-toggle" title="Cambiar tema" />
-              <button className="btn-secondary" style={{ padding: '0.4rem 0.8rem', fontSize: '0.8rem' }} onClick={() => setShowPhotoUpload(true)}>
+              <button className="btn-secondary" style={{ padding: '0.4rem 0.8rem', fontSize: '0.9rem' }} onClick={() => setShowPhotoUpload(true)}>
                 <Camera size={14} /> Foto
               </button>
             </div>
@@ -167,29 +167,29 @@ export default function TechnicianView() {
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
                       <div>
                         <div style={{ fontSize: '1.3rem', fontWeight: 900, color: 'var(--text)', lineHeight: 1 }}>{o.placa}</div>
-                        <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)', fontWeight: 600 }}>{o.marca} {o.modelo}</div>
+                        <div style={{ fontSize: '0.95rem', color: 'var(--text-muted)', fontWeight: 600 }}>{o.marca} {o.modelo}</div>
                         {getPicoYPlaca(o.placa) && (
-                          <div style={{ fontSize: '0.65rem', color: '#f59e0b', fontWeight: 800, marginTop: '0.2rem', display: 'flex', alignItems: 'center', gap: '0.2rem' }}>
+                          <div style={{ fontSize: '0.75rem', color: '#f59e0b', fontWeight: 800, marginTop: '0.2rem', display: 'flex', alignItems: 'center', gap: '0.2rem' }}>
                             <AlertTriangle size={10} /> {getPicoYPlaca(o.placa)}
                           </div>
                         )}
                       </div>
-                      <div style={{ background: 'var(--primary)', color: 'white', padding: '0.3rem 0.6rem', borderRadius: 6, fontWeight: 900, fontSize: '0.9rem' }}>
+                      <div style={{ background: 'var(--primary)', color: 'white', padding: '0.3rem 0.6rem', borderRadius: 6, fontWeight: 900, fontSize: '1rem' }}>
                         {o.kilometraje ? `${fmt(o.kilometraje)} KM` : 'S/K'}
                       </div>
                     </div>
                     {o.servicios && (
                       <div style={{ padding: '0.6rem 0.8rem', background: 'rgba(99,102,241,0.1)', borderLeft: '3px solid var(--primary)', borderRadius: 6, marginBottom: '0.5rem' }}>
-                        <div style={{ fontWeight: 900, fontSize: '0.65rem', textTransform: 'uppercase', color: 'var(--primary)' }}>Servicios:</div>
-                        <div style={{ fontSize: '0.9rem', fontWeight: 600 }}>{o.servicios}</div>
+                        <div style={{ fontWeight: 900, fontSize: '0.75rem', textTransform: 'uppercase', color: 'var(--primary)' }}>Servicios:</div>
+                        <div style={{ fontSize: '1rem', fontWeight: 600 }}>{o.servicios}</div>
                       </div>
                     )}
                     {o.notas && (
                       <div style={{ padding: '0.6rem 0.8rem', background: 'var(--warning)', color: '#000', borderRadius: 6, display: 'flex', gap: '0.5rem' }}>
                         <AlertTriangle size={16} flexShrink={0} />
                         <div>
-                          <div style={{ fontWeight: 900, fontSize: '0.65rem', textTransform: 'uppercase' }}>Notas:</div>
-                          <div style={{ fontSize: '0.9rem', fontWeight: 600, lineHeight: 1.2 }}>{o.notas}</div>
+                          <div style={{ fontWeight: 900, fontSize: '0.75rem', textTransform: 'uppercase' }}>Notas:</div>
+                          <div style={{ fontSize: '1rem', fontWeight: 600, lineHeight: 1.2 }}>{o.notas}</div>
                         </div>
                       </div>
                     )}
@@ -217,9 +217,9 @@ export default function TechnicianView() {
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1rem' }}>
                         <div>
                           <div style={{ fontSize: '1.5rem', fontWeight: 900, color: 'var(--text)', lineHeight: 1 }}>{o.placa}</div>
-                          <div style={{ fontSize: '0.9rem', color: 'var(--text-muted)', fontWeight: 700 }}>{o.marca} {o.modelo}</div>
+                          <div style={{ fontSize: '1rem', color: 'var(--text-muted)', fontWeight: 700 }}>{o.marca} {o.modelo}</div>
                           {getPicoYPlaca(o.placa) && (
-                            <div style={{ fontSize: '0.7rem', color: '#f59e0b', fontWeight: 800, marginTop: '0.2rem', display: 'flex', alignItems: 'center', gap: '0.2rem' }}>
+                            <div style={{ fontSize: '0.8rem', color: '#f59e0b', fontWeight: 800, marginTop: '0.2rem', display: 'flex', alignItems: 'center', gap: '0.2rem' }}>
                               <AlertTriangle size={12} /> {getPicoYPlaca(o.placa)}
                             </div>
                           )}
@@ -228,7 +228,7 @@ export default function TechnicianView() {
                           <div style={{ background: '#3b82f6', color: 'white', padding: '0.4rem 0.8rem', borderRadius: 8, fontWeight: 900, fontSize: '1rem' }}>
                             {o.kilometraje ? `${fmt(o.kilometraje)} KM` : 'S/K'}
                           </div>
-                          <button className="btn-success" onClick={() => setShowChecklist(o.id)} style={{ padding: '0.4rem 0.8rem', fontSize: '0.85rem', fontWeight: 800, borderRadius: 8 }}>
+                          <button className="btn-success" onClick={() => setShowChecklist(o.id)} style={{ padding: '0.4rem 0.8rem', fontSize: '0.95rem', fontWeight: 800, borderRadius: 8 }}>
                             TERMINAR
                           </button>
                         </div>
@@ -236,8 +236,8 @@ export default function TechnicianView() {
 
                       {o.servicios && (
                         <div style={{ marginBottom: '0.75rem', padding: '0.6rem 0.8rem', background: 'rgba(99,102,241,0.1)', borderLeft: '3px solid var(--primary)', borderRadius: '4px' }}>
-                          <div style={{ fontSize: '0.65rem', fontWeight: 800, color: 'var(--primary)', textTransform: 'uppercase' }}>Servicios:</div>
-                          <div style={{ fontSize: '0.9rem', fontWeight: 600 }}>{o.servicios}</div>
+                          <div style={{ fontSize: '0.75rem', fontWeight: 800, color: 'var(--primary)', textTransform: 'uppercase' }}>Servicios:</div>
+                          <div style={{ fontSize: '1rem', fontWeight: 600 }}>{o.servicios}</div>
                         </div>
                       )}
 
@@ -245,14 +245,14 @@ export default function TechnicianView() {
                         <div style={{ marginBottom: '0.75rem', padding: '0.6rem 0.8rem', background: 'var(--danger)', color: 'white', borderRadius: 8, display: 'flex', gap: '0.5rem' }}>
                           <Info size={16} flexShrink={0} />
                           <div>
-                            <div style={{ fontWeight: 900, fontSize: '0.65rem', textTransform: 'uppercase' }}>Nota:</div>
+                            <div style={{ fontWeight: 900, fontSize: '0.75rem', textTransform: 'uppercase' }}>Nota:</div>
                             <div style={{ fontSize: '0.95rem', fontWeight: 700, lineHeight: 1.2 }}>{o.notas}</div>
                           </div>
                         </div>
                       )}
 
                       <div style={{ background: 'var(--surface2)', borderRadius: 10, padding: '1rem', border: '1px solid var(--border)' }}>
-                        <div style={{ fontWeight: 800, fontSize: '0.7rem', textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: '0.5rem' }}>📋 Tareas:</div>
+                        <div style={{ fontWeight: 800, fontSize: '0.8rem', textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: '0.5rem' }}>📋 Tareas:</div>
                         <ul style={{ paddingLeft: '1.25rem', display: 'grid', gap: '0.4rem' }}>
                           {quote.items.map((it, idx) => (
                             <li key={idx} style={{ fontSize: '0.95rem', fontWeight: 600, color: 'var(--text)' }}>
@@ -273,14 +273,14 @@ export default function TechnicianView() {
     ) : (
         <div style={{ paddingBottom: '2rem' }}>
           <div className="tech-header">
-        <button className="btn-secondary" onClick={() => setSelectedOrder(null)} style={{ padding: '0.4rem 0.8rem', fontSize: '0.85rem' }}>
+        <button className="btn-secondary" onClick={() => setSelectedOrder(null)} style={{ padding: '0.4rem 0.8rem', fontSize: '0.95rem' }}>
           <ArrowLeft size={16} /> Volver
         </button>
         <div style={{ textAlign: 'center' }}>
           <div style={{ fontWeight: 900, fontSize: '1.1rem', lineHeight: 1 }}>{selectedOrder.placa}</div>
-          <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>{selectedOrder.marca} {selectedOrder.modelo}</div>
+          <div style={{ fontSize: '0.9rem', color: 'var(--text-muted)' }}>{selectedOrder.marca} {selectedOrder.modelo}</div>
         </div>
-        <button className="btn-success" onClick={submitReport} style={{ padding: '0.4rem 0.8rem', fontSize: '0.85rem' }}>
+        <button className="btn-success" onClick={submitReport} style={{ padding: '0.4rem 0.8rem', fontSize: '0.95rem' }}>
           <SendHorizonal size={16} /> Enviar
         </button>
       </div>
@@ -291,28 +291,28 @@ export default function TechnicianView() {
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '0.75rem', marginBottom: '1.5rem' }}>
           {selectedOrder.kilometraje && (
             <div className="card" style={{ padding: '0.75rem', borderLeft: '4px solid #3b82f6', marginBottom: 0 }}>
-              <div style={{ fontSize: '0.65rem', fontWeight: 800, color: '#3b82f6', textTransform: 'uppercase' }}>KM</div>
+              <div style={{ fontSize: '0.75rem', fontWeight: 800, color: '#3b82f6', textTransform: 'uppercase' }}>KM</div>
               <div style={{ fontSize: '1.2rem', fontWeight: 900 }}>{fmt(selectedOrder.kilometraje)}</div>
             </div>
           )}
           {selectedOrder.notas && (
             <div className="card" style={{ padding: '0.75rem', borderLeft: '4px solid var(--warning)', marginBottom: 0 }}>
-              <div style={{ fontSize: '0.65rem', fontWeight: 800, color: 'var(--warning)', textTransform: 'uppercase' }}>Notas</div>
-              <div style={{ fontSize: '0.9rem', fontWeight: 600 }}>{selectedOrder.notas}</div>
+              <div style={{ fontSize: '0.75rem', fontWeight: 800, color: 'var(--warning)', textTransform: 'uppercase' }}>Notas</div>
+              <div style={{ fontSize: '1rem', fontWeight: 600 }}>{selectedOrder.notas}</div>
             </div>
           )}
         </div>
 
         {selectedOrder.servicios && (
           <div className="card" style={{ borderLeft: '4px solid var(--primary)', padding: '1rem' }}>
-            <div style={{ fontSize: '0.65rem', fontWeight: 800, color: 'var(--primary)', textTransform: 'uppercase', marginBottom: '0.4rem' }}>Servicios Solicitados</div>
+            <div style={{ fontSize: '0.75rem', fontWeight: 800, color: 'var(--primary)', textTransform: 'uppercase', marginBottom: '0.4rem' }}>Servicios Solicitados</div>
             <div style={{ fontSize: '1rem', fontWeight: 600 }}>{selectedOrder.servicios}</div>
           </div>
         )}
 
         {Object.entries(categories).map(([category, items]) => (
           <div key={category} className="card" style={{ marginBottom: '1rem', padding: '1rem' }}>
-            <h3 style={{ fontSize: '0.8rem', fontWeight: 800, textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: '1rem', borderBottom: '1px solid var(--border)', paddingBottom: '0.4rem' }}>{category}</h3>
+            <h3 style={{ fontSize: '0.9rem', fontWeight: 800, textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: '1rem', borderBottom: '1px solid var(--border)', paddingBottom: '0.4rem' }}>{category}</h3>
             {items.map(item => {
               const key = `${category}-${item}`;
               const data = reportData[key];
@@ -322,7 +322,7 @@ export default function TechnicianView() {
               return (
                 <div key={item} style={{ marginBottom: '0.75rem', paddingBottom: '0.75rem', borderBottom: '1px solid rgba(255,255,255,0.03)' }}>
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.5rem', flexWrap: 'wrap' }}>
-                    <span style={{ fontSize: '0.9rem', fontWeight: 600 }}>{item}</span>
+                    <span style={{ fontSize: '1rem', fontWeight: 600 }}>{item}</span>
                     <div style={{ display: 'flex', gap: '0.3rem' }}>
                       <button type="button" className={isGood ? 'state-btn good' : 'state-btn'} style={{ padding: '0.3rem 0.6rem', fontSize: '0.75rem' }} onClick={() => handleItemStateChange(category, item, 'Bueno')}>Bueno</button>
                       <button type="button" className={isWarn ? 'state-btn warn' : 'state-btn'} style={{ padding: '0.3rem 0.6rem', fontSize: '0.75rem' }} onClick={() => handleItemStateChange(category, item, 'Regular')}>Regular</button>
@@ -333,8 +333,8 @@ export default function TechnicianView() {
                     <div style={{ marginTop: '0.75rem', padding: '0.75rem', background: 'var(--bg)', borderRadius: 10, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
                       <label style={{ fontSize: '0.75rem', fontWeight: 700 }}>Mano de Obra ($):<input type="text" className="price-input" value={data?.manoObra ? fmt(data.manoObra) : ''} onChange={e => handleDetail(category, item, 'manoObra', e.target.value.replace(/\D/g, ''))} /></label>
                       <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', justifyContent: 'center' }}>
-                        <label style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.8rem', fontWeight: 600 }}><input type="checkbox" checked={data?.requiereRepuesto || false} onChange={e => handleDetail(category, item, 'requiereRepuesto', e.target.checked)} />Repuesto</label>
-                        <label style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.8rem', fontWeight: 600 }}><input type="checkbox" checked={data?.recibeReparacion || false} onChange={e => handleDetail(category, item, 'recibeReparacion', e.target.checked)} />Reparación</label>
+                        <label style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.9rem', fontWeight: 600 }}><input type="checkbox" checked={data?.requiereRepuesto || false} onChange={e => handleDetail(category, item, 'requiereRepuesto', e.target.checked)} />Repuesto</label>
+                        <label style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.9rem', fontWeight: 600 }}><input type="checkbox" checked={data?.recibeReparacion || false} onChange={e => handleDetail(category, item, 'recibeReparacion', e.target.checked)} />Reparación</label>
                       </div>
                     </div>
                   )}
@@ -345,7 +345,7 @@ export default function TechnicianView() {
         ))}
 
         <div className="card" style={{ padding: '1rem' }}>
-          <h3 className="section-title" style={{ fontSize: '0.7rem' }}>Escáner DTC</h3>
+          <h3 className="section-title" style={{ fontSize: '0.8rem' }}>Escáner DTC</h3>
           {scannerCodes.map((code, index) => (
             <div key={index} style={{ display: 'flex', gap: '0.4rem', marginBottom: '0.6rem' }}>
               <select value={code.prefix} style={{ width: 50, padding: '0.3rem' }} onChange={e => { const n = [...scannerCodes]; n[index].prefix = e.target.value; setScannerCodes(n); }}>{['P','B','C','U'].map(l => <option key={l} value={l}>{l}</option>)}</select>

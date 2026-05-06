@@ -271,7 +271,7 @@ export default function AdminView() {
           </div>
           <div>
             <div style={{ fontWeight: 700, lineHeight: 1 }}>Panel Admin</div>
-            <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>Taller Automotriz</div>
+            <div style={{ fontSize: '0.82rem', color: 'var(--text-muted)' }}>Taller Automotriz</div>
           </div>
         </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
@@ -315,22 +315,22 @@ export default function AdminView() {
           <div style={{ flexShrink: 0, minWidth: 220 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.4rem' }}>
               <PlusCircle size={16} color="var(--primary)" />
-              <h2 style={{ fontSize: '0.9rem', fontWeight: 800 }}>Tareas Pendientes</h2>
+              <h2 style={{ fontSize: '1rem', fontWeight: 800 }}>Tareas Pendientes</h2>
             </div>
             <form onSubmit={addTodo} style={{ display: 'flex', gap: '0.4rem' }}>
-              <input type="text" placeholder="Nueva tarea..." value={newTodo} onChange={e => setNewTodo(e.target.value)} style={{ flex: 1, fontSize: '0.8rem', padding: '0.4rem 0.6rem' }} />
+              <input type="text" placeholder="Nueva tarea..." value={newTodo} onChange={e => setNewTodo(e.target.value)} style={{ flex: 1, fontSize: '0.9rem', padding: '0.4rem 0.6rem' }} />
               <button type="submit" className="btn-primary" style={{ padding: '0.4rem' }}><PlusCircle size={16} /></button>
             </form>
           </div>
           
           <div style={{ display: 'flex', gap: '0.75rem', overflowX: 'auto', paddingBottom: '0.25rem', flex: 1, scrollbarWidth: 'none' }}>
             {todos.filter(t => !t.completed).length === 0 && (
-              <span style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>No hay pendientes importantes hoy.</span>
+              <span style={{ color: 'var(--text-muted)', fontSize: '0.95rem' }}>No hay pendientes importantes hoy.</span>
             )}
             {todos.filter(t => !t.completed).map(t => (
               <div key={t.id} style={{ flexShrink: 0, padding: '0.5rem 0.85rem', background: 'var(--bg)', borderRadius: 10, display: 'flex', alignItems: 'center', gap: '0.6rem', border: '1px solid var(--border)', transition: 'all 0.2s' }}>
                 <input type="checkbox" checked={t.completed} onChange={() => toggleTodo(t)} style={{ cursor: 'pointer' }} />
-                <span style={{ fontSize: '0.82rem', fontWeight: 500, whiteSpace: 'nowrap' }}>{t.text}</span>
+                <span style={{ fontSize: '0.92rem', fontWeight: 500, whiteSpace: 'nowrap' }}>{t.text}</span>
                 <button onClick={() => deleteTodo(t.id)} style={{ background: 'none', border: 'none', color: 'var(--error)', cursor: 'pointer', padding: 0, opacity: 0.4 }}>
                   <X size={12} />
                 </button>
@@ -348,7 +348,7 @@ export default function AdminView() {
                 { id: 'Docs Rápidos', icon: <Zap size={16} />, label: 'Docs Rápidos' }
               ].map(t => (
                 <button key={t.id} onClick={() => setActiveTab(t.id)}
-                  style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', padding: '0.5rem 1rem', background: activeTab === t.id ? 'var(--primary)' : 'transparent', color: activeTab === t.id ? 'white' : 'var(--text-muted)', border: 'none', borderRadius: 'var(--radius-sm)', cursor: 'pointer', fontWeight: 600, fontSize: '0.9rem', transition: 'all 0.2s', whiteSpace: 'nowrap' }}>
+                  style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', padding: '0.5rem 1rem', background: activeTab === t.id ? 'var(--primary)' : 'transparent', color: activeTab === t.id ? 'white' : 'var(--text-muted)', border: 'none', borderRadius: 'var(--radius-sm)', cursor: 'pointer', fontWeight: 600, fontSize: '1rem', transition: 'all 0.2s', whiteSpace: 'nowrap' }}>
                   {t.icon} {t.label}
                 </button>
               ))}
@@ -362,9 +362,9 @@ export default function AdminView() {
                     <div className="kanban-header">
                       <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                         <span style={{ width: 10, height: 10, borderRadius: '50%', background: colColor[col], display: 'inline-block' }}></span>
-                        <span style={{ fontWeight: 600, fontSize: '0.9rem' }}>{col}</span>
+                        <span style={{ fontWeight: 600, fontSize: '1rem' }}>{col}</span>
                       </div>
-                      <span style={{ background: colBg[col], color: colColor[col], borderRadius: 999, padding: '0.15rem 0.6rem', fontSize: '0.75rem', fontWeight: 700 }}>
+                      <span style={{ background: colBg[col], color: colColor[col], borderRadius: 999, padding: '0.15rem 0.6rem', fontSize: '0.85rem', fontWeight: 700 }}>
                         {orders.filter(o => o.estado === col).length}
                       </span>
                     </div>
@@ -379,25 +379,25 @@ export default function AdminView() {
                                 <span title="Trabajo Autorizado" style={{ color: '#10b981', display: 'flex' }}><CheckCircle size={14} /></span>
                               )}
                             </div>
-                            <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>{o.marca} {o.modelo}</div>
+                            <div style={{ fontSize: '0.88rem', color: 'var(--text-muted)' }}>{o.marca} {o.modelo}</div>
                             {getPicoYPlaca(o.placa) && (
-                              <div style={{ fontSize: '0.65rem', color: '#f59e0b', fontWeight: 800, marginTop: '0.2rem', display: 'flex', alignItems: 'center', gap: '0.2rem' }}>
+                              <div style={{ fontSize: '0.75rem', color: '#f59e0b', fontWeight: 800, marginTop: '0.2rem', display: 'flex', alignItems: 'center', gap: '0.2rem' }}>
                                 <AlertTriangle size={10} /> {getPicoYPlaca(o.placa)}
                               </div>
                             )}
                           </div>
-                          <span style={{ fontSize: '0.72rem', background: o.reports?.length > 0 ? 'rgba(16,185,129,0.15)' : 'rgba(245,158,11,0.15)', color: o.reports?.length > 0 ? '#34d399' : '#fbbf24', padding: '0.2rem 0.5rem', borderRadius: 999, fontWeight: 600, whiteSpace: 'nowrap' }}>
+                          <span style={{ fontSize: '0.82rem', background: o.reports?.length > 0 ? 'rgba(16,185,129,0.15)' : 'rgba(245,158,11,0.15)', color: o.reports?.length > 0 ? '#34d399' : '#fbbf24', padding: '0.2rem 0.5rem', borderRadius: 999, fontWeight: 600, whiteSpace: 'nowrap' }}>
                             {o.reports?.length > 0 ? '✓ Revisado' : '⏳ Pdte'}
                           </span>
                         </div>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '0.5rem' }}>
-                          <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>{o.cliente}</span>
+                          <span style={{ fontSize: '0.82rem', color: 'var(--text-muted)' }}>{o.cliente}</span>
                           <div style={{ display: 'flex', gap: '0.4rem', alignItems: 'center' }}>
                             <select
                               value={o.estado}
                               onClick={e => e.stopPropagation()}
                               onChange={e => { e.stopPropagation(); moveOrder(o.id, e.target.value); }}
-                              style={{ fontSize: '0.75rem', padding: '0.2rem 0.4rem', width: 'auto', borderRadius: 6 }}>
+                              style={{ fontSize: '0.85rem', padding: '0.2rem 0.4rem', width: 'auto', borderRadius: 6 }}>
                               {COLUMNS.map(c => <option key={c} value={c}>{c}</option>)}
                               <option value="Entregado">Entregar ✅</option>
                             </select>
@@ -409,7 +409,7 @@ export default function AdminView() {
                       </div>
                     ))}
                     {orders.filter(o => o.estado === col).length === 0 && (
-                      <div style={{ textAlign: 'center', padding: '2rem 0', color: 'var(--text-muted)', fontSize: '0.82rem' }}>Sin órdenes</div>
+                      <div style={{ textAlign: 'center', padding: '2rem 0', color: 'var(--text-muted)', fontSize: '0.92rem' }}>Sin órdenes</div>
                     )}
                   </div>
                 ))}
@@ -441,8 +441,8 @@ export default function AdminView() {
                         <td><span className="badge badge-blue" style={{ background: 'rgba(99,102,241,0.1)', color: 'var(--primary)', border: 'none' }}>{o.metodoPago || 'Efectivo'}</span></td>
                         <td>
                           <div style={{ display: 'flex', gap: '0.5rem' }}>
-                            <button className="btn-secondary" style={{ padding: '0.4rem 0.6rem', fontSize: '0.8rem' }} onClick={() => setSelectedOrder(o)}>Ver Detalle</button>
-                            <button className="btn-secondary" style={{ padding: '0.4rem 0.6rem', fontSize: '0.8rem', color: 'var(--error)' }} onClick={() => deleteOrder(o.id)}><Trash2 size={14} /></button>
+                            <button className="btn-secondary" style={{ padding: '0.4rem 0.6rem', fontSize: '0.9rem' }} onClick={() => setSelectedOrder(o)}>Ver Detalle</button>
+                            <button className="btn-secondary" style={{ padding: '0.4rem 0.6rem', fontSize: '0.9rem', color: 'var(--error)' }} onClick={() => deleteOrder(o.id)}><Trash2 size={14} /></button>
                           </div>
                         </td>
                       </tr>
@@ -459,19 +459,19 @@ export default function AdminView() {
                     <h2 style={{ fontSize: '1.1rem', marginBottom: '1rem', fontWeight: 700 }}>Registrar Gasto</h2>
                     <form onSubmit={handleExpenseSubmit}>
                       <div style={{ marginBottom: '1rem' }}>
-                        <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-muted)', marginBottom: '0.4rem' }}>Fecha</label>
+                        <label style={{ display: 'block', fontSize: '0.9rem', fontWeight: 600, color: 'var(--text-muted)', marginBottom: '0.4rem' }}>Fecha</label>
                         <input type="date" required value={expenseForm.fecha} onChange={e => setExpenseForm({...expenseForm, fecha: e.target.value})} style={{ width: '100%' }} />
                       </div>
                       <div style={{ marginBottom: '1rem' }}>
-                        <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-muted)', marginBottom: '0.4rem' }}>Concepto</label>
+                        <label style={{ display: 'block', fontSize: '0.9rem', fontWeight: 600, color: 'var(--text-muted)', marginBottom: '0.4rem' }}>Concepto</label>
                         <input type="text" required placeholder="Ej. Compra de repuestos" value={expenseForm.concepto} onChange={e => setExpenseForm({...expenseForm, concepto: e.target.value})} style={{ width: '100%' }} />
                       </div>
                       <div style={{ marginBottom: '1rem' }}>
-                        <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-muted)', marginBottom: '0.4rem' }}>Monto ($)</label>
+                        <label style={{ display: 'block', fontSize: '0.9rem', fontWeight: 600, color: 'var(--text-muted)', marginBottom: '0.4rem' }}>Monto ($)</label>
                         <input type="number" required placeholder="0" value={expenseForm.monto} onChange={e => setExpenseForm({...expenseForm, monto: e.target.value})} style={{ width: '100%' }} />
                       </div>
                       <div style={{ marginBottom: '1.5rem' }}>
-                        <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-muted)', marginBottom: '0.4rem' }}>Método de Pago</label>
+                        <label style={{ display: 'block', fontSize: '0.9rem', fontWeight: 600, color: 'var(--text-muted)', marginBottom: '0.4rem' }}>Método de Pago</label>
                         <select value={expenseForm.metodoPago} onChange={e => setExpenseForm({...expenseForm, metodoPago: e.target.value})} style={{ width: '100%' }}>
                           {PAYMENT_METHODS.map(m => <option key={m} value={m}>{m}</option>)}
                         </select>
@@ -487,8 +487,8 @@ export default function AdminView() {
                         const balance = balancesByMethod[m] || 0;
                         return (
                           <div key={m} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0.6rem 0.8rem', background: 'var(--bg)', borderRadius: 'var(--radius-sm)', borderLeft: `4px solid ${balance >= 0 ? 'var(--success)' : 'var(--error)'}` }}>
-                            <span style={{ fontSize: '0.8rem', fontWeight: 700 }}>{m}</span>
-                            <span style={{ fontSize: '0.9rem', fontWeight: 800, color: balance >= 0 ? 'var(--success)' : 'var(--error)' }}>${fmt(balance)}</span>
+                            <span style={{ fontSize: '0.9rem', fontWeight: 700 }}>{m}</span>
+                            <span style={{ fontSize: '1rem', fontWeight: 800, color: balance >= 0 ? 'var(--success)' : 'var(--error)' }}>${fmt(balance)}</span>
                           </div>
                         );
                       })}
@@ -511,7 +511,7 @@ export default function AdminView() {
                         <tr key={g.id}>
                           <td>{new Date(g.fecha).toLocaleDateString('es-CO')}</td>
                           <td>{g.concepto}</td>
-                          <td><span style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-muted)' }}>{g.metodoPago}</span></td>
+                          <td><span style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-muted)' }}>{g.metodoPago}</span></td>
                           <td style={{ textAlign: 'right', fontWeight: 700, color: 'var(--error)' }}>${fmt(g.monto)}</td>
                         </tr>
                       ))}
@@ -528,24 +528,24 @@ export default function AdminView() {
                     <Zap size={24} />
                   </div>
                   <h2 style={{ fontSize: '1.2rem', fontWeight: 700 }}>Generador de Orden Exprés</h2>
-                  <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem', marginTop: '0.5rem' }}>Crea una orden rápida para cotizar o facturar inmediatamente.</p>
+                  <p style={{ color: 'var(--text-muted)', fontSize: '0.95rem', marginTop: '0.5rem' }}>Crea una orden rápida para cotizar o facturar inmediatamente.</p>
                 </div>
                 <form onSubmit={handleQuickOrder}>
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1rem' }}>
                     <div>
-                      <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-muted)', marginBottom: '0.4rem' }}>Placa</label>
+                      <label style={{ display: 'block', fontSize: '0.9rem', fontWeight: 600, color: 'var(--text-muted)', marginBottom: '0.4rem' }}>Placa</label>
                       <input required placeholder="AAA123" value={quickOrderForm.placa} onChange={e => setQuickOrderForm({...quickOrderForm, placa: e.target.value.toUpperCase()})} style={{ width: '100%' }} />
                     </div>
                     <div>
-                      <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-muted)', marginBottom: '0.4rem' }}>Cliente</label>
+                      <label style={{ display: 'block', fontSize: '0.9rem', fontWeight: 600, color: 'var(--text-muted)', marginBottom: '0.4rem' }}>Cliente</label>
                       <input required placeholder="Nombre" value={quickOrderForm.cliente} onChange={e => setQuickOrderForm({...quickOrderForm, cliente: e.target.value})} style={{ width: '100%' }} />
                     </div>
                     <div>
-                      <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-muted)', marginBottom: '0.4rem' }}>Marca</label>
+                      <label style={{ display: 'block', fontSize: '0.9rem', fontWeight: 600, color: 'var(--text-muted)', marginBottom: '0.4rem' }}>Marca</label>
                       <input required placeholder="Ej. Toyota" value={quickOrderForm.marca} onChange={e => setQuickOrderForm({...quickOrderForm, marca: e.target.value})} style={{ width: '100%' }} />
                     </div>
                     <div>
-                      <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-muted)', marginBottom: '0.4rem' }}>Modelo / Año</label>
+                      <label style={{ display: 'block', fontSize: '0.9rem', fontWeight: 600, color: 'var(--text-muted)', marginBottom: '0.4rem' }}>Modelo / Año</label>
                       <div style={{ display: 'flex', gap: '0.5rem' }}>
                         <input required placeholder="Corolla" value={quickOrderForm.modelo} onChange={e => setQuickOrderForm({...quickOrderForm, modelo: e.target.value})} style={{ flex: 2 }} />
                         <input placeholder="Año" type="number" value={quickOrderForm.anio} onChange={e => setQuickOrderForm({...quickOrderForm, anio: e.target.value})} style={{ flex: 1 }} />
@@ -553,7 +553,7 @@ export default function AdminView() {
                     </div>
                   </div>
                   <div style={{ marginBottom: '1.5rem' }}>
-                    <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-muted)', marginBottom: '0.4rem' }}>Servicios / Observaciones (opcional)</label>
+                    <label style={{ display: 'block', fontSize: '0.9rem', fontWeight: 600, color: 'var(--text-muted)', marginBottom: '0.4rem' }}>Servicios / Observaciones (opcional)</label>
                     <textarea placeholder="Detalle rápido de la revisión o servicio..." value={quickOrderForm.servicios} onChange={e => setQuickOrderForm({...quickOrderForm, servicios: e.target.value})} style={{ width: '100%', minHeight: 60 }}></textarea>
                   </div>
                   <button type="submit" className="btn-primary" style={{ width: '100%', justifyContent: 'center', padding: '1rem', fontSize: '1rem' }}>Crear y Facturar / Cotizar</button>
@@ -617,7 +617,7 @@ export default function AdminView() {
 
               {/* Mejora #2: Fotos de ingreso */}
               <p className="section-title">Fotos de Ingreso</p>
-              <label style={{ display: 'block', border: '2px dashed var(--border)', borderRadius: 'var(--radius-sm)', padding: '1rem', textAlign: 'center', cursor: 'pointer', marginBottom: '0.75rem', color: 'var(--text-muted)', fontSize: '0.85rem', transition: 'border-color 0.2s' }}>
+              <label style={{ display: 'block', border: '2px dashed var(--border)', borderRadius: 'var(--radius-sm)', padding: '1rem', textAlign: 'center', cursor: 'pointer', marginBottom: '0.75rem', color: 'var(--text-muted)', fontSize: '0.95rem', transition: 'border-color 0.2s' }}>
                 📷 Haz clic para seleccionar fotos (o arrastra aquí)
                 <input type="file" accept="image/*" multiple style={{ display: 'none' }} onChange={handlePhotos} />
               </label>
@@ -660,7 +660,7 @@ export default function AdminView() {
               <Trash2 size={28} />
             </div>
             <h2 style={{ fontSize: '1.25rem', fontWeight: 800, marginBottom: '0.5rem' }}>¿Eliminar Orden?</h2>
-            <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem', marginBottom: '1.5rem', lineHeight: 1.5 }}>
+            <p style={{ color: 'var(--text-muted)', fontSize: '1rem', marginBottom: '1.5rem', lineHeight: 1.5 }}>
               Esta acción eliminará la orden de servicio permanentemente. ¿Deseas continuar?
             </p>
             <div style={{ display: 'flex', gap: '0.75rem' }}>

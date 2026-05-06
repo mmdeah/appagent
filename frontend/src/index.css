@@ -75,6 +75,7 @@ body {
   background-color: var(--bg);
   color: var(--text);
   line-height: 1.6;
+  font-size: 1.05rem;
   -webkit-font-smoothing: antialiased;
 }
 
@@ -86,8 +87,8 @@ body {
   color: white;
   border: none;
   padding: 0.65rem 1.5rem;
-  font-size: 0.95rem;
-  font-weight: 600;
+  font-size: 1.05rem;
+  font-weight: 700;
   border-radius: var(--radius-sm);
   cursor: pointer;
   transition: all var(--transition);
@@ -104,8 +105,8 @@ body {
   color: var(--text);
   border: 1px solid var(--border);
   padding: 0.65rem 1.2rem;
-  font-size: 0.9rem;
-  font-weight: 500;
+  font-size: 1rem;
+  font-weight: 600;
   border-radius: var(--radius-sm);
   cursor: pointer;
   transition: all var(--transition);
@@ -119,7 +120,7 @@ body {
 .btn-success {
   background: linear-gradient(135deg, #059669, #10b981);
   color: white; border: none;
-  padding: 0.65rem 1.5rem; font-size: 0.95rem; font-weight: 600;
+  padding: 0.65rem 1.5rem; font-size: 1.05rem; font-weight: 700;
   border-radius: var(--radius-sm); cursor: pointer;
   transition: all var(--transition);
   display: inline-flex; align-items: center; gap: 0.4rem;
@@ -129,7 +130,7 @@ body {
 .btn-danger {
   background: linear-gradient(135deg, #dc2626, #ef4444);
   color: white; border: none;
-  padding: 0.65rem 1.5rem; font-size: 0.95rem; font-weight: 600;
+  padding: 0.65rem 1.5rem; font-size: 1.05rem; font-weight: 700;
   border-radius: var(--radius-sm); cursor: pointer;
   transition: all var(--transition);
   display: inline-flex; align-items: center; gap: 0.4rem;
@@ -153,8 +154,8 @@ input, textarea, select {
   border: 1.5px solid var(--border);
   color: var(--text);
   border-radius: var(--radius-sm);
-  padding: 0.6rem 0.85rem;
-  font-size: 0.9rem;
+  padding: 0.75rem 1rem;
+  font-size: 1rem;
   font-family: inherit;
   width: 100%;
   transition: border-color var(--transition), box-shadow var(--transition);
