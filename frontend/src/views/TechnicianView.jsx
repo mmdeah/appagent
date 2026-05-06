@@ -2,7 +2,18 @@ import React, { useState, useEffect, useContext } from 'react';
 import { API_URL } from '../api';
 import { ThemeContext } from '../App';
 import PhotoUploadModal from './PhotoUploadModal';
-import { Wrench, Car, ChevronRight, ClipboardList, ArrowLeft, PlusCircle, SendHorizonal, Camera } from 'lucide-react';
+import { 
+  Wrench, 
+  Car, 
+  ChevronRight, 
+  ClipboardList, 
+  ArrowLeft, 
+  PlusCircle, 
+  SendHorizonal, 
+  Camera,
+  AlertTriangle,
+  Info
+} from 'lucide-react';
 
 const categories = {
   "Suspensión": ["Amortiguadores Del.", "Amortiguadores Tras.", "Bujes de Tijera", "Tijeras", "Lágrimas", "Soporte de Amortiguadores", "Bujes Barra Estabilizadora", "Soportes de Motor", "Rótulas"],
@@ -16,8 +27,10 @@ const categories = {
   "Visual Exterior / Luces": ["Luces Delanteras", "Luces Traseras", "Direccionales", "Luz de Freno", "Llantas (desgaste)", "Cristales / Limpiadores"]
 };
 
+// Formateador de números seguro
 const fmt = (n) => {
-  const num = parseFloat(n) || 0;
+  if (n === null || n === undefined || n === '') return '';
+  const num = parseFloat(n.toString().replace(/\D/g, '')) || 0;
   return num.toLocaleString('es-CO', { minimumFractionDigits: 0 });
 };
 
@@ -36,7 +49,10 @@ export default function TechnicianView() {
     setLoading(true);
     fetch(`${API_URL}/orders?_embed=quotes`)
       .then(res => res.json())
-      .then(data => { setOrders(data.filter(o => o.estado !== 'Entregado')); setLoading(false); })
+      .then(data => { 
+        setOrders(data.filter(o => o.estado !== 'Entregado')); 
+        setLoading(false); 
+      })
       .catch(() => setLoading(false));
   };
 
@@ -91,7 +107,14 @@ export default function TechnicianView() {
       });
       
       setStatusMsg({ text: '✓ Reporte subido exitosamente', type: 'success' });
-      setTimeout(() => { setSelectedOrder(null); setReportData({}); setScannerCodes([{ prefix: 'P', code: '', description: '' }]); setPrecioDiagnostico(''); setStatusMsg({ text: '', type: '' }); fetchOrders(); }, 2000);
+      setTimeout(() => { 
+        setSelectedOrder(null); 
+        setReportData({}); 
+        setScannerCodes([{ prefix: 'P', code: '', description: '' }]); 
+        setPrecioDiagnostico(''); 
+        setStatusMsg({ text: '', type: '' }); 
+        fetchOrders(); 
+      }, 2000);
     } catch (e) {
       setStatusMsg({ text: '✗ Error al subir el reporte', type: 'error' });
     }
@@ -110,302 +133,287 @@ export default function TechnicianView() {
     } catch (e) { console.error(e); }
   };
 
-  const estadoBadge = (estado) => {
-    const map = { 'Recepción': 'badge-blue', 'Proceso': 'badge-yellow', 'Calidad': 'badge-green', 'Entregado': 'badge-red' };
-    return <span className={`badge ${map[estado] || 'badge-blue'}`}>{estado}</span>;
-  };
-
+  // VISTA PRINCIPAL (GRID 50/50)
   if (!selectedOrder) {
+    const pendingOrders = orders.filter(o => o.estado !== 'Proceso' && o.estado !== 'Calidad');
+    const authorizedOrders = orders.filter(o => o.estado === 'Proceso' && o.quotes?.some(q => q.autorizada));
+
     return (
-      <>
-        <div style={{ minHeight: '100vh', background: 'var(--bg)' }}>
-          <div className="tech-header">
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
-              <div style={{ width: 36, height: 36, borderRadius: 9, background: 'linear-gradient(135deg, #059669, #10b981)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                <Wrench size={18} color="white" />
-              </div>
-              <div>
-                <div style={{ fontWeight: 700, lineHeight: 1 }}>Panel Técnico</div>
-                <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>{orders.length} vehículo{orders.length !== 1 ? 's' : ''}</div>
-              </div>
+      <div style={{ minHeight: '100vh', background: 'var(--bg)', color: 'var(--text)' }}>
+        {/* Header */}
+        <div className="tech-header" style={{ boxShadow: '0 2px 10px rgba(0,0,0,0.1)' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.8rem' }}>
+            <div style={{ width: 42, height: 42, borderRadius: 12, background: 'var(--primary)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white' }}>
+              <Wrench size={22} />
             </div>
+            <div>
+              <h1 style={{ fontSize: '1.2rem', fontWeight: 800, margin: 0, lineHeight: 1 }}>Panel Técnico</h1>
+              <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', margin: 0 }}>{orders.length} vehículos en taller</p>
+            </div>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
             <button onClick={toggleTheme} className="theme-toggle" title="Cambiar tema" />
-            <button className="btn-secondary" style={{ gap: '0.5rem' }} onClick={() => setShowPhotoUpload(true)}>
-              <Camera size={16} /> Subir Foto
+            <button className="btn-secondary" style={{ padding: '0.5rem 1rem' }} onClick={() => setShowPhotoUpload(true)}>
+              <Camera size={18} /> <span className="hide-on-mobile">Subir Foto</span>
             </button>
           </div>
+        </div>
 
-          <div style={{ padding: '2rem', maxWidth: 1600, margin: '0 auto', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(400px, 1fr))', gap: '2rem' }}>
-            
-            {/* Columna Izquierda: REVISIONES */}
-            <div>
-              <h2 style={{ fontSize: '1.25rem', fontWeight: 800, marginBottom: '1.5rem', display: 'flex', alignItems: 'center', gap: '0.6rem', color: 'var(--text)' }}>
-                <ClipboardList size={20} color="#818cf8" /> Revisiones Pendientes
-              </h2>
-              {loading ? (
-                <p style={{ color: 'var(--text-muted)' }}>Cargando...</p>
-              ) : orders.filter(o => o.estado !== 'Proceso' && o.estado !== 'Calidad').length === 0 ? (
-                <div style={{ textAlign: 'center', padding: '3rem', background: 'var(--bg-card)', borderRadius: 'var(--radius-sm)', border: '1px dashed var(--border)' }}>
-                  <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem' }}>No hay vehículos pendientes de revisión.</p>
-                </div>
-              ) : (
-                <div style={{ display: 'grid', gap: '1rem' }}>
-                  {orders.filter(o => o.estado !== 'Proceso' && o.estado !== 'Calidad').map(o => (
-                    <div key={o.id} className="card card-hover" style={{ cursor: 'pointer', padding: '1.5rem' }} onClick={() => setSelectedOrder(o)}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                        <div style={{ width: '100%' }}>
-                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
-                            <div>
-                              <div style={{ fontWeight: 900, fontSize: '1.6rem', color: 'white', lineHeight: 1 }}>{o.placa}</div>
-                              <div style={{ fontSize: '1rem', color: 'var(--text-muted)' }}>{o.marca} {o.modelo}</div>
-                            </div>
-                            {o.kilometraje && (
-                              <div style={{ background: 'var(--primary)', color: 'white', padding: '0.5rem 1rem', borderRadius: 10, fontWeight: 900, fontSize: '1.2rem', boxShadow: '0 4px 10px rgba(99,102,241,0.3)' }}>
-                                {fmt(o.kilometraje)} KM
-                              </div>
-                            )}
-                          </div>
-                          {o.notas && (
-                            <div style={{ padding: '0.8rem', background: 'rgba(255,255,0,0.1)', border: '1px solid rgba(255,255,0,0.2)', borderRadius: 8, color: '#fbbf24' }}>
-                              <div style={{ fontWeight: 900, fontSize: '0.65rem', textTransform: 'uppercase', marginBottom: '0.3rem', display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
-                                ⚠️ NOTAS:
-                              </div>
-                              <div style={{ fontSize: '1rem', fontWeight: 600, lineHeight: 1.3 }}>{o.notas}</div>
-                            </div>
-                          )}
-                        </div>
-                        <ChevronRight size={28} color="var(--text-muted)" style={{ marginLeft: '1rem' }} />
+        {/* Content Grid */}
+        <div style={{ padding: '2rem', maxWidth: 1600, margin: '0 auto', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(450px, 1fr))', gap: '2.5rem' }}>
+          
+          {/* Columna: REVISIONES */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', paddingBottom: '0.5rem', borderBottom: '2px solid var(--primary)' }}>
+              <ClipboardList size={24} color="var(--primary)" />
+              <h2 style={{ fontSize: '1.4rem', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Revisiones Pendientes</h2>
+            </div>
+
+            {loading ? (
+              <div style={{ textAlign: 'center', padding: '4rem' }}>Cargando datos...</div>
+            ) : pendingOrders.length === 0 ? (
+              <div className="card" style={{ textAlign: 'center', padding: '4rem', opacity: 0.6, borderStyle: 'dashed' }}>
+                <p>No hay vehículos esperando revisión.</p>
+              </div>
+            ) : (
+              <div style={{ display: 'grid', gap: '1.25rem' }}>
+                {pendingOrders.map(o => (
+                  <div key={o.id} className="card card-hover" style={{ cursor: 'pointer', padding: '1.5rem', borderLeft: '6px solid var(--primary)' }} onClick={() => setSelectedOrder(o)}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1rem' }}>
+                      <div>
+                        <div style={{ fontSize: '2rem', fontWeight: 900, color: 'var(--text)', lineHeight: 1 }}>{o.placa}</div>
+                        <div style={{ fontSize: '1.1rem', color: 'var(--text-muted)', fontWeight: 600 }}>{o.marca} {o.modelo}</div>
+                      </div>
+                      <div style={{ background: 'var(--primary)', color: 'white', padding: '0.6rem 1.2rem', borderRadius: 10, fontWeight: 900, fontSize: '1.25rem', boxShadow: 'var(--shadow)' }}>
+                        {o.kilometraje ? `${fmt(o.kilometraje)} KM` : 'S/K'}
                       </div>
                     </div>
-                  ))}
-                </div>
-              )}
-            </div>
-
-            {/* Columna Derecha: TRABAJOS AUTORIZADOS */}
-            <div>
-              <h2 style={{ fontSize: '1.25rem', fontWeight: 800, marginBottom: '1.5rem', display: 'flex', alignItems: 'center', gap: '0.6rem', color: 'var(--text)' }}>
-                <Wrench size={20} color="#10b981" /> Trabajos Autorizados
-              </h2>
-              {loading ? (
-                <p style={{ color: 'var(--text-muted)' }}>Cargando...</p>
-              ) : orders.filter(o => o.estado === 'Proceso' && o.quotes?.some(q => q.autorizada)).length === 0 ? (
-                <div style={{ textAlign: 'center', padding: '3rem', background: 'var(--bg-card)', borderRadius: 'var(--radius-sm)', border: '1px dashed var(--border)' }}>
-                  <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem' }}>No hay trabajos autorizados actualmente.</p>
-                </div>
-              ) : (
-                <div style={{ display: 'grid', gap: '1.25rem' }}>
-                  {orders.filter(o => o.estado === 'Proceso' && o.quotes?.some(q => q.autorizada)).map(o => {
-                    const quote = o.quotes.find(q => q.autorizada);
-                    return (
-                      <div key={o.id} className="card" style={{ borderLeft: '8px solid #10b981', padding: '1.75rem', boxShadow: '0 8px 24px rgba(0,0,0,0.2)' }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1.5rem' }}>
-                          <div>
-                            <h3 style={{ fontSize: '2.5rem', fontWeight: 900, color: 'white', lineHeight: 1, marginBottom: '0.4rem' }}>{o.placa}</h3>
-                            <p style={{ color: 'var(--text-muted)', fontSize: '1.2rem' }}>{o.marca} {o.modelo}</p>
-                          </div>
-                          <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', alignItems: 'flex-end' }}>
-                            {o.kilometraje && (
-                              <div style={{ background: '#3b82f6', color: 'white', padding: '0.75rem 1.5rem', borderRadius: 12, fontWeight: 900, fontSize: '1.5rem', boxShadow: '0 4px 15px rgba(59,130,246,0.4)' }}>
-                                {fmt(o.kilometraje)} KM
-                              </div>
-                            )}
-                            <button className="btn-success" onClick={() => finishWork(o.id)} style={{ padding: '1rem 2rem', fontSize: '1.1rem', fontWeight: 900, borderRadius: 12 }}>
-                              <SendHorizonal size={20} /> TERMINAR TRABAJO
-                            </button>
-                          </div>
-                        </div>
-
-                        {o.notas && (
-                          <div style={{ marginBottom: '1.5rem', padding: '1.25rem', background: 'rgba(239,68,68,0.15)', border: '2px solid rgba(239,68,68,0.3)', borderRadius: 12, color: '#f87171' }}>
-                            <div style={{ fontWeight: 900, fontSize: '0.85rem', textTransform: 'uppercase', marginBottom: '0.6rem', display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
-                              🚩 OBSERVACIONES CRÍTICAS:
-                            </div>
-                            <div style={{ fontSize: '1.25rem', fontWeight: 700, lineHeight: 1.4 }}>{o.notas}</div>
-                          </div>
-                        )}
-
-                        <div style={{ background: 'rgba(255,255,255,0.03)', borderRadius: 16, padding: '1.5rem', border: '1px solid var(--border)' }}>
-                          <p style={{ fontWeight: 800, fontSize: '0.8rem', textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: '1rem', letterSpacing: '0.05em' }}>📋 Tareas a realizar:</p>
-                          <ul style={{ paddingLeft: '1.5rem', display: 'grid', gap: '0.75rem' }}>
-                            {quote.items.map((it, idx) => (
-                              <li key={idx} style={{ fontSize: '1.1rem', fontWeight: 600, color: 'white' }}>
-                                <span style={{ color: '#10b981', marginRight: '0.6rem' }}>•</span>
-                                {it.cantidad}x {it.descripcion}
-                              </li>
-                            ))}
-                          </ul>
+                    
+                    {o.notas && (
+                      <div style={{ padding: '1rem', background: 'var(--warning)', color: '#000', borderRadius: 8, marginTop: '1rem', display: 'flex', gap: '0.75rem' }}>
+                        <AlertTriangle size={20} flexShrink={0} />
+                        <div>
+                          <div style={{ fontWeight: 900, fontSize: '0.75rem', textTransform: 'uppercase', marginBottom: '0.2rem' }}>Notas de Recepción:</div>
+                          <div style={{ fontSize: '1.05rem', fontWeight: 600, lineHeight: 1.3 }}>{o.notas}</div>
                         </div>
                       </div>
-                    );
-                  })}
-                </div>
-              )}
+                    )}
+
+                    <div style={{ marginTop: '1rem', display: 'flex', justifyContent: 'flex-end' }}>
+                      <span style={{ fontSize: '0.85rem', fontWeight: 800, color: 'var(--primary)', display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
+                        TOCAR PARA INICIAR REVISIÓN <ChevronRight size={16} />
+                      </span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Columna: TRABAJOS AUTORIZADOS */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', paddingBottom: '0.5rem', borderBottom: '2px solid var(--success)' }}>
+              <Wrench size={24} color="var(--success)" />
+              <h2 style={{ fontSize: '1.4rem', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Trabajos Autorizados</h2>
             </div>
+
+            {loading ? (
+              <div style={{ textAlign: 'center', padding: '4rem' }}>Cargando datos...</div>
+            ) : authorizedOrders.length === 0 ? (
+              <div className="card" style={{ textAlign: 'center', padding: '4rem', opacity: 0.6, borderStyle: 'dashed' }}>
+                <p>No hay trabajos autorizados actualmente.</p>
+              </div>
+            ) : (
+              <div style={{ display: 'grid', gap: '1.5rem' }}>
+                {authorizedOrders.map(o => {
+                  const quote = o.quotes.find(q => q.autorizada);
+                  return (
+                    <div key={o.id} className="card" style={{ padding: '2rem', borderLeft: '10px solid var(--success)', boxShadow: 'var(--shadow-lg)' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1.5rem' }}>
+                        <div>
+                          <div style={{ fontSize: '2.5rem', fontWeight: 950, color: 'var(--text)', lineHeight: 1 }}>{o.placa}</div>
+                          <div style={{ fontSize: '1.3rem', color: 'var(--text-muted)', fontWeight: 700 }}>{o.marca} {o.modelo}</div>
+                        </div>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', alignItems: 'flex-end' }}>
+                          <div style={{ background: '#3b82f6', color: 'white', padding: '0.75rem 1.5rem', borderRadius: 12, fontWeight: 950, fontSize: '1.5rem', boxShadow: '0 4px 15px rgba(59,130,246,0.4)' }}>
+                            {o.kilometraje ? `${fmt(o.kilometraje)} KM` : 'S/K'}
+                          </div>
+                          <button className="btn-success" onClick={() => finishWork(o.id)} style={{ padding: '1rem 1.5rem', fontSize: '1.1rem', fontWeight: 900, borderRadius: 12, width: '100%' }}>
+                            <SendHorizonal size={20} /> TERMINAR
+                          </button>
+                        </div>
+                      </div>
+
+                      {o.notas && (
+                        <div style={{ marginBottom: '1.5rem', padding: '1.25rem', background: 'var(--danger)', color: 'white', borderRadius: 12, display: 'flex', gap: '1rem' }}>
+                          <Info size={24} flexShrink={0} />
+                          <div>
+                            <div style={{ fontWeight: 900, fontSize: '0.85rem', textTransform: 'uppercase', marginBottom: '0.3rem' }}>🚩 Observación Crítica:</div>
+                            <div style={{ fontSize: '1.2rem', fontWeight: 700, lineHeight: 1.4 }}>{o.notas}</div>
+                          </div>
+                        </div>
+                      )}
+
+                      <div style={{ background: 'var(--surface2)', borderRadius: 16, padding: '1.5rem', border: '1px solid var(--border)' }}>
+                        <div style={{ fontWeight: 900, fontSize: '0.85rem', textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: '1rem', letterSpacing: '0.05em', borderBottom: '1px solid var(--border)', paddingBottom: '0.5rem' }}>
+                          📋 Tareas a Realizar
+                        </div>
+                        <ul style={{ paddingLeft: '1.5rem', display: 'grid', gap: '0.8rem' }}>
+                          {quote.items.map((it, idx) => (
+                            <li key={idx} style={{ fontSize: '1.2rem', fontWeight: 700, color: 'var(--text)' }}>
+                              <span style={{ color: 'var(--success)', marginRight: '0.75rem' }}>•</span>
+                              {it.cantidad}x {it.descripcion}
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
           </div>
         </div>
 
         {showPhotoUpload && (
           <PhotoUploadModal onClose={() => setShowPhotoUpload(false)} onSuccess={() => {}} />
         )}
-      </>
+      </div>
     );
   }
 
+  // VISTA DE REPORTE (FORMULARIO)
   return (
-    <>
-      <div style={{ minHeight: '100vh', background: 'var(--bg)' }}>
-        <div className="tech-header">
-          <button className="btn-secondary" onClick={() => setSelectedOrder(null)}>
-            <ArrowLeft size={16} /> Volver
-          </button>
-          <div style={{ textAlign: 'center' }}>
-            <div style={{ fontWeight: 700 }}>Revisión: {selectedOrder.placa}</div>
-            <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>
-              {selectedOrder.marca} {selectedOrder.modelo} {selectedOrder.anio}
-              {selectedOrder.kilometraje ? ` · ${fmt(selectedOrder.kilometraje)} km` : ''}
+    <div style={{ minHeight: '100vh', background: 'var(--bg)', color: 'var(--text)' }}>
+      {/* Header Formulario */}
+      <div className="tech-header">
+        <button className="btn-secondary" onClick={() => setSelectedOrder(null)}>
+          <ArrowLeft size={18} /> <span className="hide-on-mobile">Volver</span>
+        </button>
+        <div style={{ textAlign: 'center' }}>
+          <div style={{ fontWeight: 900, fontSize: '1.2rem', lineHeight: 1 }}>{selectedOrder.placa}</div>
+          <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>{selectedOrder.marca} {selectedOrder.modelo}</div>
+        </div>
+        <button className="btn-success" onClick={submitReport} style={{ gap: '0.5rem' }}>
+          <SendHorizonal size={18} /> <span className="hide-on-mobile">Enviar Reporte</span>
+        </button>
+      </div>
+
+      <div style={{ maxWidth: 850, margin: '0 auto', padding: '2rem' }}>
+        {statusMsg.text && (
+          <div className={`toast toast-${statusMsg.type}`} style={{ marginBottom: '2rem' }}>{statusMsg.text}</div>
+        )}
+
+        {/* Info Contextual en el Formulario */}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '1rem', marginBottom: '2rem' }}>
+          {selectedOrder.kilometraje && (
+            <div className="card" style={{ padding: '1rem', borderLeft: '4px solid #3b82f6', marginBottom: 0 }}>
+              <div style={{ fontSize: '0.75rem', fontWeight: 800, color: '#3b82f6', textTransform: 'uppercase' }}>Kilometraje</div>
+              <div style={{ fontSize: '1.5rem', fontWeight: 900 }}>{fmt(selectedOrder.kilometraje)} KM</div>
             </div>
-          </div>
-          <button className="btn-success" onClick={submitReport} style={{ gap: '0.5rem' }}>
-            <SendHorizonal size={16} /> Enviar
-          </button>
+          )}
+          {selectedOrder.notas && (
+            <div className="card" style={{ padding: '1rem', borderLeft: '4px solid var(--warning)', marginBottom: 0, background: 'rgba(245,158,11,0.05)' }}>
+              <div style={{ fontSize: '0.75rem', fontWeight: 800, color: 'var(--warning)', textTransform: 'uppercase' }}>Notas Importantes</div>
+              <div style={{ fontSize: '1rem', fontWeight: 600 }}>{selectedOrder.notas}</div>
+            </div>
+          )}
         </div>
 
-        <div style={{ maxWidth: 800, margin: '0 auto', padding: '1.5rem' }}>
-          {statusMsg.text && (
-            <div className={`toast toast-${statusMsg.type}`}>{statusMsg.text}</div>
-          )}
+        {/* Servicios Solicitados */}
+        {selectedOrder.servicios && (
+          <div className="card" style={{ borderLeft: '4px solid var(--primary)', background: 'rgba(99,102,241,0.05)' }}>
+            <div style={{ fontSize: '0.75rem', fontWeight: 800, color: 'var(--primary)', textTransform: 'uppercase', marginBottom: '0.5rem' }}>Servicios Solicitados</div>
+            <div style={{ fontSize: '1.1rem', fontWeight: 600 }}>{selectedOrder.servicios}</div>
+          </div>
+        )}
 
-          {(selectedOrder.servicios || selectedOrder.notas) && (
-            <div className="card" style={{ marginBottom: '1.5rem', borderLeft: '4px solid var(--primary)', padding: '1rem 1.5rem' }}>
-              {selectedOrder.servicios && (
-                <div style={{ marginBottom: selectedOrder.notas ? '0.75rem' : '0' }}>
-                  <div style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--primary)', textTransform: 'uppercase', marginBottom: '0.2rem' }}>Servicios a Realizar</div>
-                  <div style={{ fontSize: '0.9rem' }}>{selectedOrder.servicios}</div>
-                </div>
-              )}
-              {selectedOrder.notas && (
-                <div>
-                  <div style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--primary)', textTransform: 'uppercase', marginBottom: '0.2rem' }}>Notas de Orden</div>
-                  <div style={{ fontSize: '0.9rem' }}>{selectedOrder.notas}</div>
-                </div>
-              )}
-            </div>
-          )}
-
-          {Object.entries(categories).map(([category, items]) => (
-            <div key={category} className="card" style={{ marginBottom: '1rem' }}>
-              <p className="section-title">{category}</p>
-              {items.map(item => {
-                const key = `${category}-${item}`;
-                const data = reportData[key];
-                const isGood = data?.state === 'Bueno';
-                const isWarn = data?.state === 'Regular';
-                const isBad = data?.state === 'Malo';
-                return (
-                  <div key={item}>
-                    <div className="item-row">
-                      <span style={{ fontSize: '0.9rem', fontWeight: 500 }}>{item}</span>
-                      <div style={{ display: 'flex', gap: '0.4rem' }}>
-                        <button type="button"
-                          className={isGood ? 'state-btn good' : 'state-btn'}
-                          onClick={() => handleItemStateChange(category, item, 'Bueno')}>✓ Bueno</button>
-                        <button type="button"
-                          className={isWarn ? 'state-btn warn' : 'state-btn'}
-                          onClick={() => handleItemStateChange(category, item, 'Regular')}>— Regular</button>
-                        <button type="button"
-                          className={isBad ? 'state-btn bad' : 'state-btn'}
-                          onClick={() => handleItemStateChange(category, item, 'Malo')}>✗ Malo</button>
-                      </div>
+        {/* Categorías de Inspección */}
+        {Object.entries(categories).map(([category, items]) => (
+          <div key={category} className="card" style={{ marginBottom: '1.5rem' }}>
+            <h3 style={{ fontSize: '0.9rem', fontWeight: 800, textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: '1.25rem', borderBottom: '1px solid var(--border)', paddingBottom: '0.5rem' }}>
+              {category}
+            </h3>
+            {items.map(item => {
+              const key = `${category}-${item}`;
+              const data = reportData[key];
+              const isGood = data?.state === 'Bueno';
+              const isWarn = data?.state === 'Regular';
+              const isBad = data?.state === 'Malo';
+              return (
+                <div key={item} style={{ marginBottom: '1rem', paddingBottom: '1rem', borderBottom: '1px solid rgba(255,255,255,0.03)' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '1rem', flexWrap: 'wrap' }}>
+                    <span style={{ fontSize: '1rem', fontWeight: 600, flex: 1 }}>{item}</span>
+                    <div style={{ display: 'flex', gap: '0.5rem' }}>
+                      <button type="button" className={isGood ? 'state-btn good' : 'state-btn'} onClick={() => handleItemStateChange(category, item, 'Bueno')}>Bueno</button>
+                      <button type="button" className={isWarn ? 'state-btn warn' : 'state-btn'} onClick={() => handleItemStateChange(category, item, 'Regular')}>Regular</button>
+                      <button type="button" className={isBad ? 'state-btn bad' : 'state-btn'} onClick={() => handleItemStateChange(category, item, 'Malo')}>Malo</button>
                     </div>
-
-                    {(isWarn || isBad) && (
-                      <div className="item-details">
-                        <label style={{ fontSize: '0.82rem', color: 'var(--text-muted)' }}>
-                          Mano de Obra ($):
-                          <input type="text" className="price-input" placeholder="0" value={data?.manoObra ? fmt(data.manoObra) : ''}
-                            onChange={e => handleDetail(category, item, 'manoObra', e.target.value.replace(/\D/g, ''))}
-                            style={{ marginTop: '0.3rem' }} />
-                        </label>
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                          <label style={{ fontSize: '0.82rem', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '0.4rem', cursor: 'pointer' }}>
-                            <input type="checkbox"
-                              checked={data?.requiereRepuesto || false}
-                              onChange={e => handleDetail(category, item, 'requiereRepuesto', e.target.checked)} />
-                            Requiere Repuesto
-                          </label>
-                          <label style={{ fontSize: '0.82rem', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '0.4rem', cursor: 'pointer' }}>
-                            <input type="checkbox"
-                              checked={data?.recibeReparacion || false}
-                              onChange={e => handleDetail(category, item, 'recibeReparacion', e.target.checked)} />
-                            Recibe Reparación
-                          </label>
-                        </div>
-                        {data?.recibeReparacion && (
-                          <label style={{ fontSize: '0.82rem', color: 'var(--text-muted)', gridColumn: '1 / -1' }}>
-                            Valor Reparación ($) — dejar vacío si Admin lo define:
-                            <input type="text" className="price-input" placeholder="Pendiente (Admin)" value={data?.valorReparacion ? fmt(data.valorReparacion) : ''}
-                              onChange={e => handleDetail(category, item, 'valorReparacion', e.target.value.replace(/\D/g, ''))}
-                              style={{ marginTop: '0.3rem' }} />
-                          </label>
-                        )}
-                      </div>
-                    )}
                   </div>
-                );
-              })}
+
+                  {(isWarn || isBad) && (
+                    <div style={{ marginTop: '1rem', padding: '1rem', background: 'var(--bg)', borderRadius: 12, display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem' }}>
+                      <label style={{ fontSize: '0.85rem', fontWeight: 700 }}>
+                        Mano de Obra Estimada ($):
+                        <input type="text" className="price-input" placeholder="0" value={data?.manoObra ? fmt(data.manoObra) : ''}
+                          onChange={e => handleDetail(category, item, 'manoObra', e.target.value.replace(/\D/g, ''))}
+                          style={{ marginTop: '0.4rem' }} />
+                      </label>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem', justifyContent: 'center' }}>
+                        <label style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', cursor: 'pointer', fontSize: '0.9rem', fontWeight: 600 }}>
+                          <input type="checkbox" checked={data?.requiereRepuesto || false} onChange={e => handleDetail(category, item, 'requiereRepuesto', e.target.checked)} />
+                          Requiere Repuesto
+                        </label>
+                        <label style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', cursor: 'pointer', fontSize: '0.9rem', fontWeight: 600 }}>
+                          <input type="checkbox" checked={data?.recibeReparacion || false} onChange={e => handleDetail(category, item, 'recibeReparacion', e.target.checked)} />
+                          Recibe Reparación
+                        </label>
+                      </div>
+                      {data?.recibeReparacion && (
+                        <label style={{ fontSize: '0.85rem', fontWeight: 700, gridColumn: '1 / -1' }}>
+                          Valor Reparación ($):
+                          <input type="text" className="price-input" placeholder="Pendiente Admin" value={data?.valorReparacion ? fmt(data.valorReparacion) : ''}
+                            onChange={e => handleDetail(category, item, 'valorReparacion', e.target.value.replace(/\D/g, ''))}
+                            style={{ marginTop: '0.4rem' }} />
+                        </label>
+                      )}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        ))}
+
+        {/* Escáner DTC */}
+        <div className="card">
+          <h3 className="section-title">Escáner / Códigos de Falla</h3>
+          {scannerCodes.map((code, index) => (
+            <div key={index} style={{ display: 'flex', gap: '0.5rem', marginBottom: '1rem', alignItems: 'center', flexWrap: 'wrap' }}>
+              <select value={code.prefix} style={{ width: 70 }} onChange={e => { const n = [...scannerCodes]; n[index].prefix = e.target.value; setScannerCodes(n); }}>
+                {['P','B','C','U'].map(l => <option key={l} value={l}>{l}</option>)}
+              </select>
+              <input type="text" maxLength={4} placeholder="0000" style={{ width: 100, fontWeight: 800, textAlign: 'center' }}
+                value={code.code}
+                onChange={e => { const v = e.target.value.replace(/\D/g,''); const n=[...scannerCodes]; n[index].code=v; setScannerCodes(n); }} />
+              <input type="text" placeholder="Descripción de la falla" style={{ flex: 1, minWidth: 200 }}
+                value={code.description}
+                onChange={e => { const n=[...scannerCodes]; n[index].description=e.target.value; setScannerCodes(n); }} />
             </div>
           ))}
-
-          <div className="card">
-            <p className="section-title">Escáner / Electrónico</p>
-            {scannerCodes.map((code, index) => (
-              <div key={index} style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.75rem', alignItems: 'center', flexWrap: 'wrap' }}>
-                <select value={code.prefix} style={{ width: 'auto', flex: '0 0 auto' }}
-                  onChange={e => { const n = [...scannerCodes]; n[index].prefix = e.target.value; setScannerCodes(n); }}>
-                  {['P','B','C','U'].map(l => <option key={l} value={l}>{l}</option>)}
-                </select>
-                <input type="text" maxLength={4} placeholder="0000" style={{ width: 80, fontFamily: 'monospace', flex: '0 0 auto' }}
-                  value={code.code}
-                  onChange={e => { const v = e.target.value.replace(/\D/g,''); const n=[...scannerCodes]; n[index].code=v; setScannerCodes(n); }} />
-                <input type="text" placeholder="Descripción de la falla" style={{ flex: 1, minWidth: 180 }}
-                  value={code.description}
-                  onChange={e => { const n=[...scannerCodes]; n[index].description=e.target.value; setScannerCodes(n); }} />
-              </div>
-            ))}
-            <button className="btn-secondary" style={{ fontSize: '0.82rem' }}
-              onClick={() => setScannerCodes([...scannerCodes, { prefix: 'P', code: '', description: '' }])}>
-              <PlusCircle size={14} /> Añadir código DTC
-            </button>
-
-            {scannerCodes.some(c => c.code.trim().length > 0) && (
-              <div style={{ marginTop: '1.25rem', padding: '1rem', background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.25)', borderRadius: 'var(--radius-sm)' }}>
-                <div style={{ fontSize: '0.78rem', fontWeight: 700, color: 'var(--warning)', textTransform: 'uppercase', marginBottom: '0.4rem' }}>💡 Servicio: Diagnóstico Código de Avería</div>
-                <label style={{ fontSize: '0.82rem', color: 'var(--text-muted)' }}>
-                  Precio del servicio de diagnóstico ($):
-                  <input type="text" className="price-input"
-                    placeholder="Ej. 80.000"
-                    value={precioDiagnostico}
-                    onChange={e => setPrecioDiagnostico(e.target.value.replace(/\D/g,'') ? parseInt(e.target.value.replace(/\D/g,'')).toLocaleString('es-CO') : '')}
-                    style={{ marginTop: '0.4rem' }} />
-                </label>
-              </div>
-            )}
-          </div>
-
-          {statusMsg.text && (
-            <div className={`toast toast-${statusMsg.type}`}>{statusMsg.text}</div>
-          )}
-
-          <button className="btn-success" style={{ width: '100%', padding: '1rem', fontSize: '1.05rem', justifyContent: 'center' }} onClick={submitReport}>
-            <SendHorizonal size={18} /> Subir Revisión
+          <button className="btn-secondary" onClick={() => setScannerCodes([...scannerCodes, { prefix: 'P', code: '', description: '' }])}>
+            <PlusCircle size={16} /> Añadir DTC
           </button>
         </div>
+
+        <button className="btn-success" style={{ width: '100%', padding: '1.5rem', fontSize: '1.2rem', fontWeight: 900, marginTop: '2rem', borderRadius: 16 }} onClick={submitReport}>
+          SUBIR REPORTE DE REVISIÓN
+        </button>
       </div>
 
       {showPhotoUpload && (
         <PhotoUploadModal onClose={() => setShowPhotoUpload(false)} onSuccess={() => {}} />
       )}
-    </>
+    </div>
   );
 }
