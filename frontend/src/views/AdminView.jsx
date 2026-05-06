@@ -3,7 +3,7 @@ import { API_URL } from '../api';
 import OrderDetailsModal from './OrderDetailsModal';
 import PhotoUploadModal from './PhotoUploadModal';
 import { ThemeContext } from '../App';
-import { PlusCircle, BarChart3, Camera, X, Car, Trash2, Zap, LayoutDashboard, History, Receipt } from 'lucide-react';
+import { PlusCircle, BarChart3, Camera, X, Car, Trash2, Zap, LayoutDashboard, History, Receipt, CheckCircle } from 'lucide-react';
 
 const fmt = (n) => (parseFloat(n) || 0).toLocaleString('es-CO', { minimumFractionDigits: 0 });
 
@@ -373,7 +373,12 @@ export default function AdminView() {
                       <div key={o.id} className="kanban-card" onClick={() => setSelectedOrder(o)}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '0.5rem' }}>
                           <div>
-                            <div style={{ fontWeight: 700, fontSize: '1rem' }}>{o.placa}</div>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                              <div style={{ fontWeight: 700, fontSize: '1rem' }}>{o.placa}</div>
+                              {o.quotes?.some(q => q.autorizada) && (
+                                <span title="Trabajo Autorizado" style={{ color: '#10b981', display: 'flex' }}><CheckCircle size={14} /></span>
+                              )}
+                            </div>
                             <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>{o.marca} {o.modelo}</div>
                           </div>
                           <span style={{ fontSize: '0.72rem', background: o.reports?.length > 0 ? 'rgba(16,185,129,0.15)' : 'rgba(245,158,11,0.15)', color: o.reports?.length > 0 ? '#34d399' : '#fbbf24', padding: '0.2rem 0.5rem', borderRadius: 999, fontWeight: 600, whiteSpace: 'nowrap' }}>
