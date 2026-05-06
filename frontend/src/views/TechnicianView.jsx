@@ -144,88 +144,85 @@ export default function TechnicianView() {
           </button>
         </div>
 
-        <div style={{ background: 'var(--bg-card)', borderBottom: '1px solid var(--border)', padding: '0 2rem', display: 'flex', gap: '1.5rem' }}>
-          <button onClick={() => setActiveTab('revisiones')} style={{ padding: '1rem 0', background: 'none', border: 'none', borderBottom: activeTab === 'revisiones' ? '3px solid #10b981' : '3px solid transparent', color: activeTab === 'revisiones' ? '#10b981' : 'var(--text-muted)', fontWeight: 700, cursor: 'pointer', fontSize: '0.9rem' }}>
-            Revisiones Pendientes
-          </button>
-          <button onClick={() => setActiveTab('trabajos')} style={{ padding: '1rem 0', background: 'none', border: 'none', borderBottom: activeTab === 'trabajos' ? '3px solid #10b981' : '3px solid transparent', color: activeTab === 'trabajos' ? '#10b981' : 'var(--text-muted)', fontWeight: 700, cursor: 'pointer', fontSize: '0.9rem' }}>
-            Trabajos Autorizados
-          </button>
-        </div>
-
-        <div style={{ padding: '2rem', maxWidth: 1100, margin: '0 auto' }}>
-          {loading ? (
-            <p style={{ color: 'var(--text-muted)', textAlign: 'center', paddingTop: '4rem' }}>Cargando datos...</p>
-          ) : (
-            <>
-              {activeTab === 'revisiones' && (
-                orders.filter(o => o.estado !== 'Proceso').length === 0 ? (
-                  <div style={{ textAlign: 'center', paddingTop: '4rem', color: 'var(--text-muted)' }}>
-                    <ClipboardList size={48} style={{ opacity: 0.3, marginBottom: '1rem' }} />
-                    <p>No hay revisiones pendientes.</p>
-                  </div>
-                ) : (
-                  <div className="tech-vehicle-grid">
-                    {orders.filter(o => o.estado !== 'Proceso' && o.estado !== 'Calidad').map(o => (
-                      <div key={o.id} className="card card-hover" style={{ cursor: 'pointer' }} onClick={() => setSelectedOrder(o)}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '0.75rem' }}>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
-                            <div style={{ width: 38, height: 38, borderRadius: 9, background: 'rgba(99,102,241,0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                              <Car size={18} color="#818cf8" />
-                            </div>
-                            <div>
-                              <div style={{ fontWeight: 700, fontSize: '1.05rem' }}>{o.placa}</div>
-                              <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>{o.marca} {o.modelo}</div>
-                            </div>
-                          </div>
-                          <ChevronRight size={18} color="var(--text-muted)" />
+        <div style={{ padding: '2rem', maxWidth: 1600, margin: '0 auto', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(400px, 1fr))', gap: '2rem' }}>
+          
+          {/* Columna Izquierda: REVISIONES */}
+          <div>
+            <h2 style={{ fontSize: '1.25rem', fontWeight: 800, marginBottom: '1.5rem', display: 'flex', alignItems: 'center', gap: '0.6rem', color: 'var(--text)' }}>
+              <ClipboardList size={20} color="#818cf8" /> Revisiones Pendientes
+            </h2>
+            {loading ? (
+              <p style={{ color: 'var(--text-muted)' }}>Cargando...</p>
+            ) : orders.filter(o => o.estado !== 'Proceso' && o.estado !== 'Calidad').length === 0 ? (
+              <div style={{ textAlign: 'center', padding: '3rem', background: 'var(--bg-card)', borderRadius: 'var(--radius-sm)', border: '1px dashed var(--border)' }}>
+                <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem' }}>No hay vehículos pendientes de revisión.</p>
+              </div>
+            ) : (
+              <div style={{ display: 'grid', gap: '1rem' }}>
+                {orders.filter(o => o.estado !== 'Proceso' && o.estado !== 'Calidad').map(o => (
+                  <div key={o.id} className="card card-hover" style={{ cursor: 'pointer' }} onClick={() => setSelectedOrder(o)}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                        <div style={{ width: 40, height: 40, borderRadius: 10, background: 'rgba(99,102,241,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                          <Car size={20} color="#818cf8" />
                         </div>
-                        {estadoBadge(o.estado)}
+                        <div>
+                          <div style={{ fontWeight: 800, fontSize: '1.1rem' }}>{o.placa}</div>
+                          <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>{o.marca} {o.modelo}</div>
+                        </div>
                       </div>
-                    ))}
-                  </div>
-                )
-              )}
-
-              {activeTab === 'trabajos' && (
-                <div style={{ display: 'grid', gap: '1.5rem' }}>
-                  {orders.filter(o => o.estado === 'Proceso' && o.quotes?.some(q => q.autorizada)).length === 0 ? (
-                    <div style={{ textAlign: 'center', paddingTop: '4rem', color: 'var(--text-muted)' }}>
-                      <ClipboardList size={48} style={{ opacity: 0.3, marginBottom: '1rem' }} />
-                      <p>No hay trabajos autorizados por el momento.</p>
+                      <ChevronRight size={20} color="var(--text-muted)" />
                     </div>
-                  ) : (
-                    orders.filter(o => o.estado === 'Proceso' && o.quotes?.some(q => q.autorizada)).map(o => {
-                      const quote = o.quotes.find(q => q.autorizada);
-                      return (
-                        <div key={o.id} className="card" style={{ borderLeft: '4px solid #10b981', padding: '1.5rem' }}>
-                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
-                            <div>
-                              <h2 style={{ fontSize: '1.5rem', fontWeight: 800 }}>{o.placa}</h2>
-                              <p style={{ color: 'var(--text-muted)' }}>{o.marca} {o.modelo}</p>
-                            </div>
-                            <button className="btn-success" onClick={() => finishWork(o.id)}>
-                              <SendHorizonal size={16} /> Marcar como Terminado
-                            </button>
-                          </div>
-                          <div style={{ background: 'var(--bg)', borderRadius: 10, padding: '1rem' }}>
-                            <p style={{ fontWeight: 700, fontSize: '0.8rem', textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: '0.75rem' }}>Trabajo a Realizar:</p>
-                            <ul style={{ paddingLeft: '1.25rem', display: 'grid', gap: '0.5rem' }}>
-                              {quote.items.map((it, idx) => (
-                                <li key={idx} style={{ fontSize: '1rem', fontWeight: 500 }}>
-                                  {it.cantidad}x {it.descripcion}
-                                </li>
-                              ))}
-                            </ul>
-                          </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Columna Derecha: TRABAJOS AUTORIZADOS */}
+          <div>
+            <h2 style={{ fontSize: '1.25rem', fontWeight: 800, marginBottom: '1.5rem', display: 'flex', alignItems: 'center', gap: '0.6rem', color: 'var(--text)' }}>
+              <Wrench size={20} color="#10b981" /> Trabajos Autorizados
+            </h2>
+            {loading ? (
+              <p style={{ color: 'var(--text-muted)' }}>Cargando...</p>
+            ) : orders.filter(o => o.estado === 'Proceso' && o.quotes?.some(q => q.autorizada)).length === 0 ? (
+              <div style={{ textAlign: 'center', padding: '3rem', background: 'var(--bg-card)', borderRadius: 'var(--radius-sm)', border: '1px dashed var(--border)' }}>
+                <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem' }}>No hay trabajos autorizados actualmente.</p>
+              </div>
+            ) : (
+              <div style={{ display: 'grid', gap: '1rem' }}>
+                {orders.filter(o => o.estado === 'Proceso' && o.quotes?.some(q => q.autorizada)).map(o => {
+                  const quote = o.quotes.find(q => q.autorizada);
+                  return (
+                    <div key={o.id} className="card" style={{ borderLeft: '5px solid #10b981', padding: '1.5rem', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem' }}>
+                        <div>
+                          <h3 style={{ fontSize: '1.6rem', fontWeight: 900, lineHeight: 1, marginBottom: '0.2rem' }}>{o.placa}</h3>
+                          <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem' }}>{o.marca} {o.modelo}</p>
                         </div>
-                      );
-                    })
-                  )}
-                </div>
-              )}
-            </>
-          )}
+                        <button className="btn-success" onClick={() => finishWork(o.id)} style={{ padding: '0.6rem 1rem' }}>
+                          <SendHorizonal size={16} /> Terminar
+                        </button>
+                      </div>
+                      <div style={{ background: 'rgba(255,255,255,0.03)', borderRadius: 12, padding: '1.25rem', border: '1px solid var(--border)' }}>
+                        <p style={{ fontWeight: 800, fontSize: '0.75rem', textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: '0.75rem', letterSpacing: '0.05em' }}>📋 Tareas a realizar:</p>
+                        <ul style={{ paddingLeft: '1.2rem', display: 'grid', gap: '0.6rem' }}>
+                          {quote.items.map((it, idx) => (
+                            <li key={idx} style={{ fontSize: '1rem', fontWeight: 600, color: 'var(--text)' }}>
+                              <span style={{ color: 'var(--success)', marginRight: '0.4rem' }}>•</span>
+                              {it.cantidad}x {it.descripcion}
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        </div>
         </div>
       </div>
 
