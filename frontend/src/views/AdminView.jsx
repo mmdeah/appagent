@@ -3,7 +3,7 @@ import { API_URL, getPicoYPlaca } from '../api';
 import OrderDetailsModal from './OrderDetailsModal';
 import PhotoUploadModal from './PhotoUploadModal';
 import { ThemeContext } from '../App';
-import { PlusCircle, BarChart3, Camera, X, Car, Trash2, Zap, LayoutDashboard, History, Receipt, CheckCircle } from 'lucide-react';
+import { PlusCircle, BarChart3, Camera, X, Car, Trash2, Zap, LayoutDashboard, History, Receipt, CheckCircle, AlertTriangle } from 'lucide-react';
 
 const fmt = (n) => (parseFloat(n) || 0).toLocaleString('es-CO', { minimumFractionDigits: 0 });
 
