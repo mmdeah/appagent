@@ -160,6 +160,12 @@ export default function TechnicianView() {
                           <div>
                             <div style={{ fontWeight: 800, fontSize: '1.1rem' }}>{o.placa}</div>
                             <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>{o.marca} {o.modelo}</div>
+                            {o.kilometraje && <div style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--primary)', marginTop: '0.2rem' }}>KM: {fmt(o.kilometraje)}</div>}
+                            {o.notas && (
+                              <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '0.5rem', borderTop: '1px solid var(--border)', paddingTop: '0.4rem', fontStyle: 'italic' }}>
+                                "{o.notas}"
+                              </div>
+                            )}
                           </div>
                         </div>
                         <ChevronRight size={20} color="var(--text-muted)" />
@@ -190,7 +196,12 @@ export default function TechnicianView() {
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem' }}>
                           <div>
                             <h3 style={{ fontSize: '1.6rem', fontWeight: 900, lineHeight: 1, marginBottom: '0.2rem' }}>{o.placa}</h3>
-                            <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem' }}>{o.marca} {o.modelo}</p>
+                            <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem' }}>{o.marca} {o.modelo} {o.kilometraje ? `· ${fmt(o.kilometraje)} KM` : ''}</p>
+                            {o.notas && (
+                              <div style={{ marginTop: '0.5rem', fontSize: '0.8rem', color: 'var(--text-muted)', background: 'rgba(255,255,255,0.02)', padding: '0.4rem 0.6rem', borderRadius: 6, borderLeft: '2px solid var(--border)' }}>
+                                <strong>Nota:</strong> {o.notas}
+                              </div>
+                            )}
                           </div>
                           <button className="btn-success" onClick={() => finishWork(o.id)} style={{ padding: '0.6rem 1rem' }}>
                             <SendHorizonal size={16} /> Terminar
