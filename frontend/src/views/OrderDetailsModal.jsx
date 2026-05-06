@@ -139,6 +139,9 @@ export default function OrderDetailsModal({ order, onClose }) {
         </thead>
         <tbody>${rows}</tbody>
       </table>
+
+      ${order.servicios ? `<div class="section-header">Servicios Solicitados</div><p style="padding: 10px; background: #f8fafc; border-radius: 6px; margin-bottom: 12px;">${order.servicios}</p>` : ''}
+      ${order.notas ? `<div class="section-header">Notas y Observaciones</div><p style="padding: 10px; background: #fffbeb; border-radius: 6px; color: #92400e;">${order.notas}</p>` : ''}
     `);
   };
 
@@ -206,6 +209,16 @@ export default function OrderDetailsModal({ order, onClose }) {
         </div>
       ` : ''}
       
+      ${order.servicios ? `
+        <div class="section-header">Servicios Solicitados</div>
+        <p style="padding: 10px; background: #f8fafc; border-radius: 6px; margin-bottom: 12px; font-size: 11px;">${order.servicios}</p>
+      ` : ''}
+      
+      ${order.notas ? `
+        <div class="section-header">Notas de Recepción</div>
+        <p style="padding: 10px; border: 1px solid #e2e8f0; border-radius: 6px; color: #475569; font-size: 11px;">${order.notas}</p>
+      ` : ''}
+
       <div style="margin-top: 60px; border-top: 1px solid #e2e8f0; padding-top: 20px; font-size: 10px; color: #94a3b8; text-align: center;">
         Esta es una representación física de un documento digital. Generado por AppTaller2.
       </div>
