@@ -124,6 +124,7 @@ export default function TechnicianView() {
     } catch (e) { console.error(e); }
   };
 
+  const pendingOrders = orders.filter(o => o.estado !== 'Proceso' && o.estado !== 'Calidad');
   const authorizedOrders = orders.filter(o => o.estado === 'Proceso' && o.quotes?.some(q => q.autorizada));
 
   return (
