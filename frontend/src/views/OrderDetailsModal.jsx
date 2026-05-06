@@ -699,13 +699,13 @@ export default function OrderDetailsModal({ order, onClose }) {
                         <td style={{ textAlign: 'center' }}>
                           <input className="hide-on-print" type="number" step="any" min="0.1" value={it.cantidad}
                             onChange={e => { const q=[...quoteItems]; q[idx].cantidad=parseFloat(e.target.value.replace(',','.'))||1; setQuoteItems(q); }}
-                            style={{ width: 55, textAlign: 'center', fontSize: '0.85rem' }} />
+                            style={{ width: 80, textAlign: 'center', fontSize: '0.9rem', padding: '0.2rem' }} />
                           <span className="show-on-print">{it.cantidad}</span>
                         </td>
                         <td style={{ textAlign: 'center' }}>
                           <input className="hide-on-print price-input" type="text" placeholder="0" value={it.precio ? fmt(it.precio) : ''}
                             onChange={e => { const q=[...quoteItems]; q[idx].precio=parseFloat(e.target.value.replace(/\D/g, ''))||0; setQuoteItems(q); }}
-                            style={{ width: 110, textAlign: 'right', fontSize: '0.85rem' }} />
+                            style={{ width: 140, textAlign: 'right', fontSize: '0.9rem', padding: '0.2rem' }} />
                           <span className="show-on-print">${fmt(it.precio)}</span>
                         </td>
                         <td style={{ textAlign: 'center' }}>
