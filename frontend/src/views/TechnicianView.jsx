@@ -21,6 +21,18 @@ const fmt = (n) => {
   return num.toLocaleString('es-CO', { minimumFractionDigits: 0 });
 };
 
+const REVISION_CATEGORIES = {
+  "Suspensión": ["Amortiguadores Del.", "Amortiguadores Tras.", "Bujes de Tijera", "Tijeras", "Lágrimas", "Soporte de Amortiguadores", "Bujes Barra Estabilizadora", "Soportes de Motor", "Rótulas"],
+  "Frenos": ["Pastillas Del.", "Pastillas Tras.", "Discos Del.", "Discos Tras.", "Líquido de Frenos", "Freno de Mano", "Mangueras de Freno", "Bomba de Freno", "Cilindro de Freno", "Campanas Traseras", "Bandas Traseras"],
+  "Dirección": ["Caja de Dirección", "Terminales", "Axiales", "Bomba de Dirección", "Aceite Hidráulico", "Holgura Volante"],
+  "Transmisión": ["Puntas", "Cardán", "Embrague", "Empaque Caja de Cambios", "Guardapolvos"],
+  "Fugas": ["Fuga Aceite Motor", "Fuga Transmisión", "Fuga Dirección", "Fuga Refrigerante", "Fuga Combustible", "Fuga Frenos"],
+  "Batería / Eléctrico": ["Batería", "Alternador", "Motor de Arranque"],
+  "Chequeo Visual Motor": ["Correa Distribución", "Correa Accesorios", "Aceite Motor", "Cableado Visible", "Empaque tapavalvulas", "Empaque de Carter", "Reten Delantero Cigueñal", "Reten Trasero Cigueñal", "Tapacadena", "Sensor"],
+  "Niveles": ["Aceite Motor", "Líquido Frenos", "Líquido Dirección", "Refrigerante", "Agua Limpiaparabrisas"],
+  "Otros": ["Luces", "Limpiaparabrisas", "Pito", "Espejos", "Vidrios", "Tapicería", "Llantas (Estado)", "Llantas (Presión)"]
+};
+
 export default function TechnicianView() {
   const { theme, toggleTheme } = useContext(ThemeContext);
   const [orders, setOrders] = useState([]);
@@ -31,7 +43,6 @@ export default function TechnicianView() {
   const [statusMsg, setStatusMsg] = useState({ text: '', type: '' });
   const [loading, setLoading] = useState(true);
   const [showPhotoUpload, setShowPhotoUpload] = useState(false);
-  const [formConfig, setFormConfig] = useState(null);
   const [showChecklist, setShowChecklist] = useState(null);
   const [checklist, setChecklist] = useState({ pruebaRuta: false, limpio: false, herramientas: false });
 
@@ -46,47 +57,8 @@ export default function TechnicianView() {
       .catch(() => setLoading(false));
   };
 
-  const fetchConfig = async () => {
-    try {
-      // Intentar obtener la configuración directamente por ID
-      const res = await fetch(`${API_URL}/settings/revision_form`);
-      if (res.ok) {
-        const data = await res.json();
-        if (data && data.categories) {
-          setFormConfig(data.categories);
-          return;
-        }
-      }
-      
-      // Si falla, intentar obtener toda la colección y buscar
-      const resAll = await fetch(`${API_URL}/settings`);
-      const dataAll = await resAll.json();
-      const config = Array.isArray(dataAll) ? dataAll.find(s => s.id === 'revision_form') : dataAll;
-      if (config && config.categories) {
-        setFormConfig(config.categories);
-      }
-    } catch (e) { 
-      console.error("Error cargando config técnico:", e);
-      // Fallback en caso de error total de red/API
-      if (!formConfig) {
-        setFormConfig({
-          "Suspensión": ["Amortiguadores Del.", "Amortiguadores Tras.", "Bujes de Tijera", "Tijeras", "Lágrimas", "Soporte de Amortiguadores", "Bujes Barra Estabilizadora", "Soportes de Motor", "Rótulas"],
-          "Frenos": ["Pastillas Del.", "Pastillas Tras.", "Discos Del.", "Discos Tras.", "Líquido de Frenos", "Freno de Mano", "Mangueras de Freno", "Bomba de Freno", "Cilindro de Freno", "Campanas Traseras", "Bandas Traseras"],
-          "Dirección": ["Caja de Dirección", "Terminales", "Axiales", "Bomba de Dirección", "Aceite Hidráulico", "Holgura Volante"],
-          "Transmisión": ["Puntas", "Cardán", "Embrague", "Empaque Caja de Cambios", "Guardapolvos"],
-          "Fugas": ["Fuga Aceite Motor", "Fuga Transmisión", "Fuga Dirección", "Fuga Refrigerante", "Fuga Combustible", "Fuga Frenos"],
-          "Batería / Eléctrico": ["Batería", "Alternador", "Motor de Arranque"],
-          "Chequeo Visual Motor": ["Correa Distribución", "Correa Accesorios", "Aceite Motor", "Cableado Visible", "Empaque tapavalvulas", "Empaque de Carter", "Reten Delantero Cigueñal", "Reten Trasero Cigueñal", "Tapacadena", "Sensor"],
-          "Niveles": ["Aceite Motor", "Líquido Frenos", "Líquido Dirección", "Refrigerante", "Agua Limpiaparabrisas"],
-          "Otros": ["Luces", "Limpiaparabrisas", "Pito", "Espejos", "Vidrios", "Tapicería", "Llantas (Estado)", "Llantas (Presión)"]
-        });
-      }
-    }
-  };
-
   useEffect(() => {
     fetchOrders();
-    fetchConfig();
   }, []);
 
   const handleItemStateChange = (category, item, state) => {
@@ -346,7 +318,7 @@ export default function TechnicianView() {
           </div>
         )}
 
-        {formConfig && Object.entries(formConfig).map(([category, items]) => (
+        {Object.entries(REVISION_CATEGORIES).map(([category, items]) => (
           <div key={category} className="card" style={{ marginBottom: '1rem', padding: '1rem' }}>
             <h3 style={{ fontSize: '1rem', fontWeight: 800, textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: '1rem', borderBottom: '1px solid var(--border)', paddingBottom: '0.4rem' }}>{category}</h3>
             {items.map(item => {

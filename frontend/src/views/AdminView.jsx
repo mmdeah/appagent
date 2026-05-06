@@ -377,7 +377,6 @@ export default function AdminView() {
                 { id: 'Kanban', icon: <LayoutDashboard size={16} />, label: 'Kanban' },
                 { id: 'Historial', icon: <History size={16} />, label: 'Historial' },
                 { id: 'Gastos', icon: <Receipt size={16} />, label: 'Gastos' },
-                { id: 'Formulario', icon: <ClipboardList size={16} />, label: 'Formulario' },
                 { id: 'Docs Rápidos', icon: <Zap size={16} />, label: 'Docs Rápidos' }
               ].map(t => (
                 <button key={t.id} onClick={() => setActiveTab(t.id)}
