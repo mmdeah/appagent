@@ -41,6 +41,7 @@ export default function TechnicianView() {
   const [scannerCodes, setScannerCodes] = useState([{ prefix: 'P', code: '', description: '' }]);
   const [precioDiagnostico, setPrecioDiagnostico] = useState('');
   const [statusMsg, setStatusMsg] = useState({ text: '', type: '' });
+  const [visibleToClient, setVisibleToClient] = useState(false);
   const [loading, setLoading] = useState(true);
   const [showPhotoUpload, setShowPhotoUpload] = useState(false);
   const [showChecklist, setShowChecklist] = useState(null);
@@ -92,6 +93,7 @@ export default function TechnicianView() {
       items,
       scannerCodes: validCodes,
       precioDiagnostico: validCodes.length > 0 ? (parseFloat(precioDiagnostico.replace(/\D/g,'')) || 0) : 0,
+      visibleToClient,
       fecha: new Date().toISOString()
     };
     try {
@@ -149,7 +151,7 @@ export default function TechnicianView() {
             </div>
           </div>
 
-        <div style={{ padding: '1.5rem', maxWidth: 1600, margin: '0 auto', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(400px, 1fr))', gap: '1.5rem' }}>
+        <div style={{ padding: '1rem', maxWidth: 1600, margin: '0 auto', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 320px), 1fr))', gap: '1.25rem' }}>
           
           {/* REVISIONES */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
@@ -354,6 +356,18 @@ export default function TechnicianView() {
             </div>
           ))}
           <button className="btn-secondary" style={{ fontSize: '0.85rem', padding: '0.4rem' }} onClick={() => setScannerCodes([...scannerCodes, { prefix: 'P', code: '', description: '' }])}>+ DTC</button>
+        </div>
+
+        <div className="card" style={{ padding: '1rem', marginTop: '1rem', background: visibleToClient ? 'rgba(16,185,129,0.05)' : 'rgba(245,158,11,0.05)', border: `1px solid ${visibleToClient ? 'var(--success)' : 'var(--warning)'}` }}>
+          <label style={{ display: 'flex', alignItems: 'center', gap: '0.8rem', cursor: 'pointer' }}>
+            <input type="checkbox" checked={visibleToClient} onChange={e => setVisibleToClient(e.target.checked)} />
+            <div>
+              <div style={{ fontWeight: 800, fontSize: '1rem' }}>{visibleToClient ? '🔓 Reporte Público' : '🔒 Reporte Interno'}</div>
+              <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>
+                {visibleToClient ? 'El cliente podrá ver este reporte desde su panel.' : 'Solo el administrador y tú podrán ver este reporte.'}
+              </div>
+            </div>
+          </label>
         </div>
 
         <button className="btn-success" style={{ width: '100%', padding: '1rem', fontSize: '1.1rem', fontWeight: 900, marginTop: '1.5rem', borderRadius: 12, maxWidth: 900, margin: '1.5rem auto 0', display: 'block' }} onClick={submitReport}>SUBIR REVISIÓN</button>
