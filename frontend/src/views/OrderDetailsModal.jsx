@@ -396,24 +396,25 @@ export default function OrderDetailsModal({ order, onClose }) {
 
           {/* ── INFO TAB ── */}
           {activeTab === 'info' && (
-            <div style={{ position: 'relative' }}>
-              <button 
-                onClick={() => isEditingInfo ? handleSaveInfo() : setIsEditingInfo(true)}
-                className={isEditingInfo ? 'btn-success' : 'btn-secondary'}
-                style={{ position: 'absolute', top: '-3rem', right: 0, padding: '0.4rem 0.8rem', fontSize: '0.8rem' }}
-              >
-                {isEditingInfo ? <><Save size={14} /> Guardar Cambios</> : <><Edit2 size={14} /> Editar Información</>}
-              </button>
-
-              {isEditingInfo && (
+            <div>
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.5rem', marginBottom: '1rem' }} className="hide-on-print">
+                {isEditingInfo && (
+                  <button 
+                    onClick={() => { setIsEditingInfo(false); setEditedOrder({ ...order }); }}
+                    className="btn-secondary"
+                    style={{ padding: '0.4rem 0.8rem', fontSize: '0.8rem' }}
+                  >
+                    Cancelar
+                  </button>
+                )}
                 <button 
-                  onClick={() => { setIsEditingInfo(false); setEditedOrder({ ...order }); }}
-                  className="btn-secondary"
-                  style={{ position: 'absolute', top: '-3rem', right: '11rem', padding: '0.4rem 0.8rem', fontSize: '0.8rem' }}
+                  onClick={() => isEditingInfo ? handleSaveInfo() : setIsEditingInfo(true)}
+                  className={isEditingInfo ? 'btn-success' : 'btn-secondary'}
+                  style={{ padding: '0.4rem 0.8rem', fontSize: '0.8rem' }}
                 >
-                  Cancelar
+                  {isEditingInfo ? <><Save size={14} /> Guardar</> : <><Edit2 size={14} /> Editar</>}
                 </button>
-              )}
+              </div>
 
               <p className="section-title">Datos del Cliente</p>
               <div className="info-grid" style={{ marginBottom: '1.5rem' }}>
