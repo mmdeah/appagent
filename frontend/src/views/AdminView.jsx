@@ -3,7 +3,7 @@ import { API_URL, getPicoYPlaca } from '../api';
 import OrderDetailsModal from './OrderDetailsModal';
 import PhotoUploadModal from './PhotoUploadModal';
 import { ThemeContext } from '../App';
-import { PlusCircle, BarChart3, Camera, X, Car, Trash2, Zap, LayoutDashboard, History, Receipt, CheckCircle, AlertTriangle, ClipboardList, Save, Settings } from 'lucide-react';
+import { PlusCircle, BarChart3, Camera, X, Car, Trash2, Zap, LayoutDashboard, History, Receipt, CheckCircle, AlertTriangle, ClipboardList, Save, Settings, FileText, Plus } from 'lucide-react';
 
 const fmt = (n) => (parseFloat(n) || 0).toLocaleString('es-CO', { minimumFractionDigits: 0 });
 
@@ -33,6 +33,7 @@ export default function AdminView() {
   const [balancesByMethod, setBalancesByMethod] = useState({});
   const [formConfig, setFormConfig] = useState(null);
   const [newCategoryName, setNewCategoryName] = useState('');
+  const [reportGenerator, setReportGenerator] = useState({ placa: '', secciones: [{ categoria: '', descripcion: '' }] });
 
   const fetchExpenses = async () => {
     try {
@@ -385,7 +386,8 @@ export default function AdminView() {
                 { id: 'Kanban', icon: <LayoutDashboard size={16} />, label: 'Kanban' },
                 { id: 'Historial', icon: <History size={16} />, label: 'Historial' },
                 { id: 'Gastos', icon: <Receipt size={16} />, label: 'Gastos' },
-                { id: 'Docs Rápidos', icon: <Zap size={16} />, label: 'Docs Rápidos' }
+                { id: 'Docs Rápidos', icon: <Zap size={16} />, label: 'Docs Rápidos' },
+                { id: 'Informes', icon: <FileText size={16} />, label: 'Generar Informe' }
               ].map(t => (
                 <button key={t.id} onClick={() => setActiveTab(t.id)}
                   style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', padding: '0.5rem 1rem', background: activeTab === t.id ? 'var(--primary)' : 'transparent', color: activeTab === t.id ? 'white' : 'var(--text-muted)', border: 'none', borderRadius: 'var(--radius-sm)', cursor: 'pointer', fontWeight: 600, fontSize: '1rem', transition: 'all 0.2s', whiteSpace: 'nowrap' }}>
@@ -646,43 +648,165 @@ export default function AdminView() {
               </div>
             )}
 
-            {activeTab === 'Docs Rápidos' && (
-              <div className="card" style={{ padding: '1.5rem', maxWidth: 600, margin: '0 auto' }}>
-                <div style={{ textAlign: 'center', marginBottom: '1.5rem' }}>
-                  <div style={{ background: 'rgba(99,102,241,0.1)', color: 'var(--primary)', width: 48, height: 48, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 0.5rem' }}>
-                    <Zap size={24} />
+            {activeTab === 'Informes' && (
+              <div className="card" style={{ padding: '2rem', maxWidth: 800, margin: '0 auto' }}>
+                <div style={{ textAlign: 'center', marginBottom: '2rem' }}>
+                  <div style={{ background: 'rgba(99,102,241,0.1)', color: 'var(--primary)', width: 56, height: 56, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 1rem' }}>
+                    <FileText size={28} />
                   </div>
-                  <h2 style={{ fontSize: '1.2rem', fontWeight: 700 }}>Generador de Orden Exprés</h2>
-                  <p style={{ color: 'var(--text-muted)', fontSize: '0.95rem', marginTop: '0.5rem' }}>Crea una orden rápida para cotizar o facturar inmediatamente.</p>
+                  <h2 style={{ fontSize: '1.5rem', fontWeight: 800 }}>Generador de Informe Técnico</h2>
+                  <p style={{ color: 'var(--text-muted)' }}>Crea un reporte profesional detallado para el cliente.</p>
                 </div>
-                <form onSubmit={handleQuickOrder}>
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1rem' }}>
-                    <div>
-                      <label style={{ display: 'block', fontSize: '0.9rem', fontWeight: 600, color: 'var(--text-muted)', marginBottom: '0.4rem' }}>Placa</label>
-                      <input required placeholder="AAA123" value={quickOrderForm.placa} onChange={e => setQuickOrderForm({...quickOrderForm, placa: e.target.value.toUpperCase()})} style={{ width: '100%' }} />
-                    </div>
-                    <div>
-                      <label style={{ display: 'block', fontSize: '0.9rem', fontWeight: 600, color: 'var(--text-muted)', marginBottom: '0.4rem' }}>Cliente</label>
-                      <input required placeholder="Nombre" value={quickOrderForm.cliente} onChange={e => setQuickOrderForm({...quickOrderForm, cliente: e.target.value})} style={{ width: '100%' }} />
-                    </div>
-                    <div>
-                      <label style={{ display: 'block', fontSize: '0.9rem', fontWeight: 600, color: 'var(--text-muted)', marginBottom: '0.4rem' }}>Marca</label>
-                      <input required placeholder="Ej. Toyota" value={quickOrderForm.marca} onChange={e => setQuickOrderForm({...quickOrderForm, marca: e.target.value})} style={{ width: '100%' }} />
-                    </div>
-                    <div>
-                      <label style={{ display: 'block', fontSize: '0.9rem', fontWeight: 600, color: 'var(--text-muted)', marginBottom: '0.4rem' }}>Modelo / Año</label>
-                      <div style={{ display: 'flex', gap: '0.5rem' }}>
-                        <input required placeholder="Corolla" value={quickOrderForm.modelo} onChange={e => setQuickOrderForm({...quickOrderForm, modelo: e.target.value})} style={{ flex: 2 }} />
-                        <input placeholder="Año" type="number" value={quickOrderForm.anio} onChange={e => setQuickOrderForm({...quickOrderForm, anio: e.target.value})} style={{ flex: 1 }} />
+
+                <div style={{ marginBottom: '2rem' }}>
+                  <label style={{ display: 'block', fontWeight: 700, marginBottom: '0.5rem', fontSize: '0.9rem', color: 'var(--text-muted)', textTransform: 'uppercase' }}>1. Seleccionar Vehículo Activo</label>
+                  <select 
+                    value={reportGenerator.placa} 
+                    onChange={e => setReportGenerator({ ...reportGenerator, placa: e.target.value })}
+                    style={{ width: '100%', padding: '0.8rem', fontSize: '1.1rem', fontWeight: 700 }}
+                  >
+                    <option value="">-- Seleccionar Placa --</option>
+                    {orders.filter(o => o.estado !== 'Entregado').map(o => (
+                      <option key={o.id} value={o.placa}>{o.placa} - {o.marca} {o.modelo} ({o.cliente})</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div style={{ marginBottom: '2rem' }}>
+                  <label style={{ display: 'block', fontWeight: 700, marginBottom: '1rem', fontSize: '0.9rem', color: 'var(--text-muted)', textTransform: 'uppercase' }}>2. Detalles del Informe</label>
+                  
+                  {reportGenerator.secciones.map((sec, idx) => (
+                    <div key={idx} style={{ background: 'rgba(255,255,255,0.02)', padding: '1.25rem', borderRadius: 12, border: '1px solid var(--border)', marginBottom: '1rem', position: 'relative' }}>
+                      {idx > 0 && (
+                        <button 
+                          onClick={() => {
+                            const newSecs = reportGenerator.secciones.filter((_, i) => i !== idx);
+                            setReportGenerator({ ...reportGenerator, secciones: newSecs });
+                          }}
+                          style={{ position: 'absolute', top: '0.5rem', right: '0.5rem', background: 'none', border: 'none', color: 'var(--error)', cursor: 'pointer', opacity: 0.5 }}
+                        >
+                          <X size={16} />
+                        </button>
+                      )}
+                      
+                      <div style={{ marginBottom: '1rem' }}>
+                        <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 700, marginBottom: '0.4rem' }}>Categoría / Sistema</label>
+                        <select 
+                          value={sec.categoria} 
+                          onChange={e => {
+                            const newSecs = [...reportGenerator.secciones];
+                            newSecs[idx].categoria = e.target.value;
+                            setReportGenerator({ ...reportGenerator, secciones: newSecs });
+                          }}
+                          style={{ width: '100%' }}
+                        >
+                          <option value="">-- Seleccionar Categoría --</option>
+                          {formConfig && Object.keys(formConfig).map(cat => (
+                            <option key={cat} value={cat}>{cat}</option>
+                          ))}
+                          <option value="Otro">Otro (Especificar en descripción)</option>
+                        </select>
+                      </div>
+
+                      <div>
+                        <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 700, marginBottom: '0.4rem' }}>Hallazgos y Recomendaciones</label>
+                        <textarea 
+                          placeholder="Escribe aquí el detalle técnico..."
+                          value={sec.descripcion}
+                          onChange={e => {
+                            const newSecs = [...reportGenerator.secciones];
+                            newSecs[idx].descripcion = e.target.value;
+                            setReportGenerator({ ...reportGenerator, secciones: newSecs });
+                          }}
+                          style={{ width: '100%', minHeight: 100 }}
+                        />
                       </div>
                     </div>
-                  </div>
-                  <div style={{ marginBottom: '1.5rem' }}>
-                    <label style={{ display: 'block', fontSize: '0.9rem', fontWeight: 600, color: 'var(--text-muted)', marginBottom: '0.4rem' }}>Servicios / Observaciones (opcional)</label>
-                    <textarea placeholder="Detalle rápido de la revisión o servicio..." value={quickOrderForm.servicios} onChange={e => setQuickOrderForm({...quickOrderForm, servicios: e.target.value})} style={{ width: '100%', minHeight: 60 }}></textarea>
-                  </div>
-                  <button type="submit" className="btn-primary" style={{ width: '100%', justifyContent: 'center', padding: '1rem', fontSize: '1rem' }}>Crear y Facturar / Cotizar</button>
-                </form>
+                  ))}
+
+                  <button 
+                    className="btn-secondary" 
+                    style={{ width: '100%', borderStyle: 'dashed', background: 'transparent' }}
+                    onClick={() => setReportGenerator({ 
+                      ...reportGenerator, 
+                      secciones: [...reportGenerator.secciones, { categoria: '', descripcion: '' }] 
+                    })}
+                  >
+                    <Plus size={16} /> Añadir otra categoría al informe
+                  </button>
+                </div>
+
+                <button 
+                  className="btn-primary" 
+                  disabled={!reportGenerator.placa || reportGenerator.secciones.some(s => !s.descripcion)}
+                  style={{ width: '100%', padding: '1.25rem', fontSize: '1.1rem', fontWeight: 800, gap: '0.75rem' }}
+                  onClick={() => {
+                    const order = orders.find(o => o.placa === reportGenerator.placa);
+                    if (!order) return;
+                    
+                    const win = window.open('', '_blank');
+                    win.document.write(`
+                      <html>
+                        <head>
+                          <title>Informe Técnico - ${order.placa}</title>
+                          <style>
+                            body { font-family: 'Inter', sans-serif; padding: 40px; color: #1e293b; line-height: 1.6; }
+                            .header { display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 2px solid #2563eb; padding-bottom: 20px; margin-bottom: 30px; }
+                            .logo { color: #2563eb; font-weight: 800; font-size: 24px; text-transform: uppercase; }
+                            .title { font-size: 20px; font-weight: 700; text-transform: uppercase; margin-bottom: 20px; text-align: center; color: #334155; }
+                            .info-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 30px; background: #f8fafc; padding: 20px; borderRadius: 8px; }
+                            .info-item { font-size: 13px; }
+                            .info-label { font-weight: 700; color: #64748b; text-transform: uppercase; font-size: 11px; }
+                            .section { margin-bottom: 25px; page-break-inside: avoid; }
+                            .section-title { background: #2563eb; color: white; padding: 6px 12px; font-weight: 800; font-size: 12px; text-transform: uppercase; margin-bottom: 10px; border-radius: 4px; }
+                            .section-content { padding: 0 10px; font-size: 14px; white-space: pre-wrap; }
+                            .footer { margin-top: 50px; border-top: 1px solid #e2e8f0; padding-top: 20px; text-align: center; font-size: 11px; color: #94a3b8; }
+                          </style>
+                        </head>
+                        <body>
+                          <div class="header">
+                            <div class="logo">Taller Automotriz</div>
+                            <div style="text-align: right">
+                              <div style="font-weight: 700">INFORME TÉCNICO</div>
+                              <div style="color: #64748b; font-size: 12px">Fecha: ${new Date().toLocaleDateString('es-CO')}</div>
+                            </div>
+                          </div>
+                          
+                          <div class="info-grid">
+                            <div>
+                              <div class="info-item"><span class="info-label">Cliente:</span> ${order.cliente}</div>
+                              <div class="info-item"><span class="info-label">Teléfono:</span> ${order.telefono}</div>
+                            </div>
+                            <div>
+                              <div class="info-item"><span class="info-label">Vehículo:</span> ${order.marca} ${order.modelo}</div>
+                              <div class="info-item"><span class="info-label">Placa:</span> <strong>${order.placa}</strong></div>
+                              <div class="info-item"><span class="info-label">Kilometraje:</span> ${order.kilometraje ? parseInt(order.kilometraje).toLocaleString() : 'N/A'} KM</div>
+                            </div>
+                          </div>
+
+                          <div class="title">Resultados de la Inspección Técnica</div>
+
+                          ${reportGenerator.secciones.map(sec => `
+                            <div class="section">
+                              <div class="section-title">${sec.categoria || 'REVISIÓN GENERAL'}</div>
+                              <div class="section-content">${sec.descripcion}</div>
+                            </div>
+                          `).join('')}
+
+                          <div class="footer">
+                            Este informe es un diagnóstico basado en la inspección visual y herramientas especializadas.<br>
+                            Generado digitalmente por el Panel de Administración.
+                          </div>
+
+                          <script>window.print();</script>
+                        </body>
+                      </html>
+                    `);
+                    win.document.close();
+                  }}
+                >
+                  <FileText size={20} /> GENERAR INFORME PDF
+                </button>
               </div>
             )}
           </div>
