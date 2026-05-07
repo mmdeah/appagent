@@ -12,6 +12,8 @@ const PAYMENT_METHODS = ['Efectivo', 'Nequi', 'Bancolombia', 'Banco de Bogota', 
 
 const emptyForm = { placa: '', cliente: '', telefono: '', correo: '', marca: '', modelo: '', anio: '', kilometraje: '', servicios: '', notas: '' };
 
+const REVISION_CATEGORIES_FALLBACK = ["Suspensión", "Frenos", "Dirección", "Transmisión", "Fugas", "Batería / Eléctrico", "Chequeo Visual Motor", "Niveles", "Otros", "Insumos", "Servicios Especializados"];
+
 export default function AdminView() {
   const { theme, toggleTheme } = useContext(ThemeContext);
   const [orders, setOrders] = useState([]);
@@ -701,7 +703,7 @@ export default function AdminView() {
                           style={{ width: '100%' }}
                         >
                           <option value="">-- Seleccionar Categoría --</option>
-                          {formConfig && Object.keys(formConfig).map(cat => (
+                          {(formConfig ? Object.keys(formConfig) : REVISION_CATEGORIES_FALLBACK).map(cat => (
                             <option key={cat} value={cat}>{cat}</option>
                           ))}
                           <option value="Otro">Otro (Especificar en descripción)</option>
