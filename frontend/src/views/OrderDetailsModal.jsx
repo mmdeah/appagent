@@ -4,6 +4,8 @@ import { MessageCircle, Printer, CheckCircle, X, Plus, Trash2, Camera, Edit2, Sa
 
 const fmt = (n) => (parseFloat(n) || 0).toLocaleString('es-CO', { minimumFractionDigits: 0 });
 
+const PAYMENT_METHODS = ['Efectivo', 'Nequi', 'Bancolombia', 'Banco de Bogota', 'Tarjeta'];
+
 export default function OrderDetailsModal({ order, onClose }) {
   const [activeTab, setActiveTab] = useState('info');
   const [reportData, setReportData] = useState(order.reports?.[0] || null);
