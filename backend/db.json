@@ -17,7 +17,9 @@
         "Batería / Eléctrico": ["Batería", "Alternador", "Motor de Arranque"],
         "Chequeo Visual Motor": ["Correa Distribución", "Correa Accesorios", "Aceite Motor", "Cableado Visible", "Empaque tapavalvulas", "Empaque de Carter", "Reten Delantero Cigueñal", "Reten Trasero Cigueñal", "Tapacadena", "Sensor"],
         "Niveles": ["Aceite Motor", "Líquido Frenos", "Líquido Dirección", "Refrigerante", "Agua Limpiaparabrisas"],
-        "Otros": ["Luces", "Limpiaparabrisas", "Pito", "Espejos", "Vidrios", "Tapicería", "Llantas (Estado)", "Llantas (Presión)"]
+        "Otros": ["Luces", "Limpiaparabrisas", "Pito", "Espejos", "Vidrios", "Tapicería", "Llantas (Estado)", "Llantas (Presión)"],
+        "Insumos": ["Silicona", "Utiles de Aseo", "Prensa", "Pegante Shellac", "Cableado / Conexiones Electricas"],
+        "Servicios Especializados": ["Diagnostico Profundo en", "Sincronizacion", "Mantenimiento de Frenos", "Escaner / Calibracion"]
       }
     }
   ]

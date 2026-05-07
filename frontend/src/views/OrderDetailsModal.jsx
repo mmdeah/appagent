@@ -351,9 +351,26 @@ export default function OrderDetailsModal({ order, onClose }) {
       const vRepuesto = parseFloat(it.valorRepuesto) || 0;
       const cRepuesto = parseInt(it.cantidadRepuesto) || 1;
 
-      if (mO > 0) newItems.push({ descripcion: `Mano de obra: ${it.item}`, cantidad: 1, precio: mO, aplicaIva: false });
-      if (vRep > 0) newItems.push({ descripcion: `Reparación: ${it.item}`, cantidad: 1, precio: vRep, aplicaIva: false });
-      if (vRepuesto > 0) newItems.push({ descripcion: `Repuesto: ${it.item}`, cantidad: cRepuesto, precio: vRepuesto, aplicaIva: false });
+      if (it.category === 'Insumos' && it.state === 'Necesario') {
+        newItems.push({ 
+          descripcion: `Insumo: ${it.item}`, 
+          cantidad: parseInt(it.cantidad) || 1, 
+          precio: 0, 
+          aplicaIva: false 
+        });
+      } else if (it.category === 'Servicios Especializados' && it.state === 'Realizar') {
+        const desc = it.item === 'Diagnostico Profundo en' ? `Diagnóstico Profundo (${it.area || 'General'})` : it.item;
+        newItems.push({ 
+          descripcion: desc, 
+          cantidad: 1, 
+          precio: mO, 
+          aplicaIva: false 
+        });
+      } else {
+        if (mO > 0) newItems.push({ descripcion: `Mano de obra: ${it.item}`, cantidad: 1, precio: mO, aplicaIva: false });
+        if (vRep > 0) newItems.push({ descripcion: `Reparación: ${it.item}`, cantidad: 1, precio: vRep, aplicaIva: false });
+        if (vRepuesto > 0) newItems.push({ descripcion: `Repuesto: ${it.item}`, cantidad: cRepuesto, precio: vRepuesto, aplicaIva: false });
+      }
     });
 
     if (newItems.length > 0) {
@@ -603,7 +620,11 @@ export default function OrderDetailsModal({ order, onClose }) {
                       {reportData.items.map((it, idx) => (
                         <tr key={idx}>
                           <td style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>{it.category}</td>
-                          <td style={{ fontWeight: 500 }}>{it.item}</td>
+                          <td style={{ fontWeight: 500 }}>
+                            {it.item}
+                            {it.area && <span style={{ color: 'var(--primary)', fontWeight: 700, marginLeft: '0.4rem' }}>({it.area})</span>}
+                            {it.cantidad && <span style={{ color: 'var(--text-muted)', fontSize: '0.8rem', marginLeft: '0.4rem' }}>x{it.cantidad}</span>}
+                          </td>
                           <td>
                             <span style={{ color: stateColor[it.state] || 'var(--text)', fontWeight: 600, fontSize: '0.82rem' }}>{it.state}</span>
                           </td>

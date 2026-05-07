@@ -30,8 +30,12 @@ const REVISION_CATEGORIES = {
   "Batería / Eléctrico": ["Batería", "Alternador", "Motor de Arranque"],
   "Chequeo Visual Motor": ["Correa Distribución", "Correa Accesorios", "Aceite Motor", "Cableado Visible", "Empaque tapavalvulas", "Empaque de Carter", "Reten Delantero Cigueñal", "Reten Trasero Cigueñal", "Tapacadena", "Sensor"],
   "Niveles": ["Aceite Motor", "Líquido Frenos", "Líquido Dirección", "Refrigerante", "Agua Limpiaparabrisas"],
-  "Otros": ["Luces", "Limpiaparabrisas", "Pito", "Espejos", "Vidrios", "Tapicería", "Llantas (Estado)", "Llantas (Presión)"]
+  "Otros": ["Luces", "Limpiaparabrisas", "Pito", "Espejos", "Vidrios", "Tapicería", "Llantas (Estado)", "Llantas (Presión)"],
+  "Insumos": ["Silicona", "Utiles de Aseo", "Prensa", "Pegante Shellac", "Cableado / Conexiones Electricas"],
+  "Servicios Especializados": ["Diagnostico Profundo en", "Sincronizacion", "Mantenimiento de Frenos", "Escaner / Calibracion"]
 };
+
+const DIAGNOSTICO_AREAS = ["Suspensión", "Frenos", "Motor", "Caja de Cambios", "Clutch / Embrague", "Sistema de Refrigeración", "Inyección", "Sistema Eléctrico"];
 
 export default function TechnicianView() {
   const { theme, toggleTheme } = useContext(ThemeContext);
@@ -324,6 +328,85 @@ export default function TechnicianView() {
             {items.map(item => {
               const key = `${category}-${item}`;
               const data = reportData[key];
+
+              // CUSTOM RENDERING FOR INSUMOS
+              if (category === 'Insumos') {
+                const isSelected = data?.state === 'Necesario';
+                return (
+                  <div key={item} style={{ marginBottom: '0.75rem', paddingBottom: '0.75rem', borderBottom: '1px solid rgba(255,255,255,0.03)' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.5rem' }}>
+                      <label style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', cursor: 'pointer', flex: 1 }}>
+                        <input 
+                          type="checkbox" 
+                          checked={isSelected} 
+                          onChange={e => handleItemStateChange(category, item, e.target.checked ? 'Necesario' : null)}
+                          style={{ width: 18, height: 18 }}
+                        />
+                        <span style={{ fontSize: '1.1rem', fontWeight: 600 }}>{item}</span>
+                      </label>
+                      {isSelected && (
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                          <span style={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--text-muted)' }}>CANT:</span>
+                          <input 
+                            type="number" 
+                            min="1" 
+                            style={{ width: 60, padding: '0.3rem', textAlign: 'center' }} 
+                            value={data?.cantidad || 1} 
+                            onChange={e => handleDetail(category, item, 'cantidad', parseInt(e.target.value) || 1)}
+                          />
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                );
+              }
+
+              // CUSTOM RENDERING FOR SERVICIOS ESPECIALIZADOS
+              if (category === 'Servicios Especializados') {
+                const isSelected = data?.state === 'Realizar';
+                const isDiagnostico = item === 'Diagnostico Profundo en';
+                return (
+                  <div key={item} style={{ marginBottom: '0.75rem', paddingBottom: '0.75rem', borderBottom: '1px solid rgba(255,255,255,0.03)' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.5rem', flexWrap: 'wrap' }}>
+                      <label style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', cursor: 'pointer' }}>
+                        <input 
+                          type="checkbox" 
+                          checked={isSelected} 
+                          onChange={e => handleItemStateChange(category, item, e.target.checked ? 'Realizar' : null)}
+                          style={{ width: 18, height: 18 }}
+                        />
+                        <span style={{ fontSize: '1.1rem', fontWeight: 600 }}>{item}</span>
+                      </label>
+                      
+                      {isSelected && isDiagnostico && (
+                        <select 
+                          value={data?.area || ''} 
+                          onChange={e => handleDetail(category, item, 'area', e.target.value)}
+                          style={{ padding: '0.3rem', fontSize: '0.85rem', borderRadius: 6, flex: 1, minWidth: 120 }}
+                        >
+                          <option value="">-- Seleccionar Área --</option>
+                          {DIAGNOSTICO_AREAS.map(a => <option key={a} value={a}>{a}</option>)}
+                        </select>
+                      )}
+
+                      {isSelected && (
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                          <span style={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--text-muted)' }}>VALOR ($):</span>
+                          <input 
+                            type="text" 
+                            className="price-input" 
+                            style={{ width: 110, padding: '0.3rem' }} 
+                            value={data?.manoObra ? fmt(data.manoObra) : ''} 
+                            onChange={e => handleDetail(category, item, 'manoObra', e.target.value.replace(/\D/g, ''))}
+                          />
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                );
+              }
+
+              // STANDARD RENDERING
               const isGood = data?.state === 'Bueno';
               const isWarn = data?.state === 'Regular';
               const isBad = data?.state === 'Malo';
