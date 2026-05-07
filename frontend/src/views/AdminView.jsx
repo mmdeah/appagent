@@ -167,9 +167,17 @@ export default function AdminView() {
     try {
       const res = await fetch(`${API_URL}/settings`);
       const data = await res.json();
-      const config = Array.isArray(data) ? data.find(s => s.id === 'revision_form') : data;
+      // Handle both array and object responses
+      let config = Array.isArray(data) ? data.find(s => s.id === 'revision_form') : data;
+      
+      // If data was an array but revision_form wasn't found, it might be the first element
+      if (Array.isArray(data) && !config && data.length > 0) config = data[0];
+
       if (config && config.categories) {
         setFormConfig(config.categories);
+      } else if (data && data.categories) {
+        // Direct object response with categories
+        setFormConfig(data.categories);
       } else {
         console.error("Configuración no encontrada en settings:", data);
       }
