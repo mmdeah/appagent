@@ -189,9 +189,9 @@ export default function OrderDetailsModal({ order, onClose }) {
     `);
   };
 
-  const printQuote = () => {
+  const printQuote = (forcedTitle = null) => {
     const sub = totals.sub, iva = totals.iva, total = totals.total;
-    const mainTitle = (order.estado === 'Entregado' || order.estado === 'Docs Rápidos') ? 'CUENTA DE COBRO' : 'COTIZACIÓN';
+    const mainTitle = forcedTitle || ((order.estado === 'Entregado' || order.estado === 'Docs Rápidos') ? 'CUENTA DE COBRO' : 'COTIZACIÓN');
     const rows = quoteItems.map((it, i) => {
       const lineTotal = it.precio * it.cantidad;
       const lineIva = it.aplicaIva ? lineTotal * 0.19 : 0;
@@ -587,8 +587,11 @@ export default function OrderDetailsModal({ order, onClose }) {
                   <MessageCircle size={16} /> WhatsApp
                 </a>
                 <button onClick={printInfo} className="btn-secondary"><Printer size={16} /> Imprimir Orden</button>
-                <button onClick={printQuote} className="btn-success" style={{ background: '#3b82f6', borderColor: '#3b82f6' }}>
-                  <Printer size={16} /> Cuenta de Cobro / PDF
+                <button onClick={() => printQuote('COTIZACIÓN')} className="btn-secondary">
+                  <Printer size={16} /> Cotización PDF
+                </button>
+                <button onClick={() => printQuote('CUENTA DE COBRO')} className="btn-success" style={{ background: '#3b82f6', borderColor: '#3b82f6' }}>
+                  <Printer size={16} /> Cuenta de Cobro PDF
                 </button>
                 <button onClick={() => setShowConfirm(true)} className="btn-success" style={{ marginLeft: 'auto' }}>
                   <CheckCircle size={16} /> Entregar Vehículo
@@ -782,7 +785,10 @@ export default function OrderDetailsModal({ order, onClose }) {
                 <button onClick={authorizeQuote} className="btn-primary" style={{ background: 'var(--success)', borderColor: 'var(--success)' }}>
                   <CheckCircle size={16} /> Autorizar y Empezar Trabajo
                 </button>
-                <button onClick={printQuote} className="btn-secondary" style={{ marginLeft: 'auto' }}><Printer size={16} /> Imprimir / PDF</button>
+                <div style={{ marginLeft: 'auto', display: 'flex', gap: '0.5rem' }}>
+                  <button onClick={() => printQuote('COTIZACIÓN')} className="btn-secondary"><Printer size={16} /> Cotización PDF</button>
+                  <button onClick={() => printQuote('CUENTA DE COBRO')} className="btn-secondary"><Printer size={16} /> Cta. Cobro PDF</button>
+                </div>
               </div>
             </div>
           )}
