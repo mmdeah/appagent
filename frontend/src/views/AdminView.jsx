@@ -3,7 +3,7 @@ import { API_URL, getPicoYPlaca } from '../api';
 import OrderDetailsModal from './OrderDetailsModal';
 import PhotoUploadModal from './PhotoUploadModal';
 import { ThemeContext } from '../App';
-import { PlusCircle, BarChart3, Camera, X, Car, Trash2, Zap, LayoutDashboard, History, Receipt, CheckCircle, AlertTriangle, ClipboardList, Save, Settings, FileText, Plus } from 'lucide-react';
+import { PlusCircle, BarChart3, Camera, X, Car, Trash2, Zap, LayoutDashboard, History, Receipt, CheckCircle, AlertTriangle, ClipboardList, Save, Settings, FileText, Plus, Sparkles } from 'lucide-react';
 
 const fmt = (n) => (parseFloat(n) || 0).toLocaleString('es-CO', { minimumFractionDigits: 0 });
 
@@ -36,6 +36,65 @@ export default function AdminView() {
   const [formConfig, setFormConfig] = useState(null);
   const [newCategoryName, setNewCategoryName] = useState('');
   const [reportGenerator, setReportGenerator] = useState({ placa: '', secciones: [{ categoria: '', descripcion: '' }] });
+  const [reportOrderId, setReportOrderId] = useState('');
+  const [allQuotes, setAllQuotes] = useState(true);
+  const [selectedQuoteItems, setSelectedQuoteItems] = useState([]);
+  const [aiInstructions, setAiInstructions] = useState('');
+  const [isGeneratingReport, setIsGeneratingReport] = useState(false);
+  const [reportError, setReportError] = useState('');
+
+  const handleGenerateReport = async () => {
+    if (!reportOrderId) return;
+    setIsGeneratingReport(true);
+    setReportError('');
+    try {
+      const selectedOrder = orders.find(o => o.id === reportOrderId);
+      const payload = {
+        orderId: reportOrderId,
+        allQuotes: allQuotes,
+        selectedItems: allQuotes ? [] : selectedQuoteItems,
+        notes: aiInstructions
+      };
+
+      const res = await fetch(`${API_URL}/generate-ai-report`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+
+      if (!res.ok) {
+        let errMsg = 'Error al generar el informe';
+        try {
+          const err = await res.json();
+          errMsg = err.error || err.details || errMsg;
+        } catch (_) {}
+        throw new Error(errMsg);
+      }
+
+      // Download the PDF blob returned by the backend
+      const blob = await res.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `Informe_Tecnico_${selectedOrder?.placa || 'Reporte'}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      window.URL.revokeObjectURL(url);
+      
+      // Reset form and update orders
+      fetchOrders();
+      setAiInstructions('');
+      setReportOrderId('');
+      setAllQuotes(true);
+      setSelectedQuoteItems([]);
+    } catch (e) {
+      console.error("Error in handleGenerateReport:", e);
+      setReportError(e.message || 'Error en la generación del reporte.');
+    } finally {
+      setIsGeneratingReport(false);
+    }
+  };
 
   const fetchExpenses = async () => {
     try {
@@ -691,164 +750,199 @@ export default function AdminView() {
             )}
 
             {activeTab === 'Informes' && (
-              <div className="card" style={{ padding: '2rem', maxWidth: 800, margin: '0 auto' }}>
-                <div style={{ textAlign: 'center', marginBottom: '2rem' }}>
-                  <div style={{ background: 'rgba(99,102,241,0.1)', color: 'var(--primary)', width: 56, height: 56, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 1rem' }}>
-                    <FileText size={28} />
+              <div className="card" style={{ padding: '2.5rem', maxWidth: 850, margin: '0 auto', background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 'var(--radius)' }}>
+                <div style={{ textAlign: 'center', marginBottom: '2.5rem' }}>
+                  <div style={{ background: 'linear-gradient(135deg, rgba(99,102,241,0.15), rgba(79,70,229,0.15))', color: 'var(--primary)', width: 64, height: 64, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 1.25rem', boxShadow: '0 8px 16px -4px rgba(99,102,241,0.2)' }}>
+                    <Sparkles size={32} style={{ color: 'var(--primary)' }} />
                   </div>
-                  <h2 style={{ fontSize: '1.5rem', fontWeight: 800 }}>Generador de Informe Técnico</h2>
-                  <p style={{ color: 'var(--text-muted)' }}>Crea un reporte profesional detallado para el cliente.</p>
+                  <h2 style={{ fontSize: '1.65rem', fontWeight: 800, background: 'linear-gradient(135deg, var(--text), var(--primary))', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
+                    Generador de Informe Técnico con IA
+                  </h2>
+                  <p style={{ color: 'var(--text-muted)', marginTop: '0.5rem', fontSize: '0.98rem' }}>
+                    Redacta diagnósticos automotrices de alta precisión mediante la IA **GPT-OSS 120B** y descárgalos en una plantilla premium de PDF.
+                  </p>
                 </div>
 
+                {reportError && (
+                  <div style={{ background: 'rgba(239,68,68,0.1)', border: '1px solid var(--error)', color: 'var(--error)', padding: '1rem', borderRadius: 12, marginBottom: '1.5rem', fontSize: '0.92rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                    <AlertTriangle size={16} />
+                    <strong>Error:</strong> {reportError}
+                  </div>
+                )}
+
+                {/* Step 1: Selector of Plate / Order */}
                 <div style={{ marginBottom: '2rem' }}>
-                  <label style={{ display: 'block', fontWeight: 700, marginBottom: '0.5rem', fontSize: '0.9rem', color: 'var(--text-muted)', textTransform: 'uppercase' }}>1. Seleccionar Vehículo Activo</label>
+                  <label style={{ display: 'block', fontWeight: 700, marginBottom: '0.6rem', fontSize: '0.85rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                    1. Seleccionar Vehículo / Orden de Servicio
+                  </label>
                   <select 
-                    value={reportGenerator.placa} 
-                    onChange={e => setReportGenerator({ ...reportGenerator, placa: e.target.value })}
-                    style={{ width: '100%', padding: '0.8rem', fontSize: '1.1rem', fontWeight: 700 }}
+                    value={reportOrderId} 
+                    onChange={e => {
+                      const ordId = e.target.value;
+                      setReportOrderId(ordId);
+                      setAllQuotes(true);
+                      const selectedOrd = orders.find(o => o.id === ordId);
+                      const q = selectedOrd?.quotes?.[0];
+                      if (q && q.items) {
+                        setSelectedQuoteItems(q.items.map(item => item.descripcion));
+                      } else {
+                        setSelectedQuoteItems([]);
+                      }
+                    }}
+                    style={{ width: '100%', padding: '0.9rem 1.2rem', fontSize: '1.1rem', fontWeight: 700, borderRadius: 12, border: '2px solid var(--border)', background: 'var(--bg)', cursor: 'pointer', transition: 'border-color 0.2s' }}
                   >
-                    <option value="">-- Seleccionar Placa --</option>
-                    {orders.filter(o => o.estado !== 'Entregado').map(o => (
-                      <option key={o.id} value={o.placa}>{o.placa} - {o.marca} {o.modelo} ({o.cliente})</option>
+                    <option value="">-- Escoger Placa / Orden --</option>
+                    {orders.map(o => (
+                      <option key={o.id} value={o.id}>
+                        {o.placa} - {o.marca} {o.modelo} ({o.cliente}) {o.estado === 'Entregado' ? '✅ Entregado' : '⏳ Activo'}
+                      </option>
                     ))}
                   </select>
                 </div>
 
-                <div style={{ marginBottom: '2rem' }}>
-                  <label style={{ display: 'block', fontWeight: 700, marginBottom: '1rem', fontSize: '0.9rem', color: 'var(--text-muted)', textTransform: 'uppercase' }}>2. Detalles del Informe</label>
-                  
-                  {reportGenerator.secciones.map((sec, idx) => (
-                    <div key={idx} style={{ background: 'rgba(255,255,255,0.02)', padding: '1.25rem', borderRadius: 12, border: '1px solid var(--border)', marginBottom: '1rem', position: 'relative' }}>
-                      {idx > 0 && (
-                        <button 
-                          onClick={() => {
-                            const newSecs = reportGenerator.secciones.filter((_, i) => i !== idx);
-                            setReportGenerator({ ...reportGenerator, secciones: newSecs });
-                          }}
-                          style={{ position: 'absolute', top: '0.5rem', right: '0.5rem', background: 'none', border: 'none', color: 'var(--error)', cursor: 'pointer', opacity: 0.5 }}
-                        >
-                          <X size={16} />
-                        </button>
-                      )}
-                      
-                      <div style={{ marginBottom: '1rem' }}>
-                        <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 700, marginBottom: '0.4rem' }}>Categoría / Sistema</label>
-                        <select 
-                          value={sec.categoria} 
-                          onChange={e => {
-                            const newSecs = [...reportGenerator.secciones];
-                            newSecs[idx].categoria = e.target.value;
-                            setReportGenerator({ ...reportGenerator, secciones: newSecs });
-                          }}
-                          style={{ width: '100%' }}
-                        >
-                          <option value="">-- Seleccionar Categoría --</option>
-                          {(formConfig ? Object.keys(formConfig) : REVISION_CATEGORIES_FALLBACK).map(cat => (
-                            <option key={cat} value={cat}>{cat}</option>
-                          ))}
-                          <option value="Otro">Otro (Especificar en descripción)</option>
-                        </select>
+                {/* Expandable vehicle info card once selected */}
+                {reportOrderId && (() => {
+                  const selectedOrder = orders.find(o => o.id === reportOrderId);
+                  if (!selectedOrder) return null;
+                  const quote = selectedOrder.quotes?.[0];
+                  const hasQuote = quote && quote.items && quote.items.length > 0;
+
+                  return (
+                    <div style={{ animation: 'fadeIn 0.3s ease-out' }}>
+                      {/* Technical Sheet grid */}
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem', background: 'rgba(255,255,255,0.02)', border: '1px solid var(--border)', padding: '1.25rem', borderRadius: 12, marginBottom: '2rem' }}>
+                        <div>
+                          <div style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase' }}>Cliente</div>
+                          <div style={{ fontWeight: 600, fontSize: '0.95rem', marginTop: '0.15rem' }}>{selectedOrder.cliente}</div>
+                        </div>
+                        <div>
+                          <div style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase' }}>Vehículo</div>
+                          <div style={{ fontWeight: 600, fontSize: '0.95rem', marginTop: '0.15rem' }}>{selectedOrder.marca} {selectedOrder.modelo} ({selectedOrder.anio || 'N/A'})</div>
+                        </div>
+                        <div>
+                          <div style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase' }}>Kilometraje</div>
+                          <div style={{ fontWeight: 600, fontSize: '0.95rem', marginTop: '0.15rem' }}>{selectedOrder.kilometraje ? parseInt(selectedOrder.kilometraje).toLocaleString() : 'N/A'} KM</div>
+                        </div>
+                        <div>
+                          <div style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase' }}>Ingreso</div>
+                          <div style={{ fontWeight: 600, fontSize: '0.95rem', marginTop: '0.15rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{selectedOrder.motivoIngreso || selectedOrder.servicios || 'Mantenimiento Gral.'}</div>
+                        </div>
                       </div>
 
-                      <div>
-                        <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 700, marginBottom: '0.4rem' }}>Hallazgos y Recomendaciones</label>
+                      {/* Step 2: Quote filter checklist */}
+                      <div style={{ marginBottom: '2rem', borderTop: '1px solid var(--border)', paddingTop: '1.5rem' }}>
+                        <label style={{ display: 'block', fontWeight: 700, marginBottom: '0.8rem', fontSize: '0.85rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                          2. Filtrado de ítems de la Cotización
+                        </label>
+
+                        {!hasQuote ? (
+                          <div style={{ background: 'rgba(245,158,11,0.06)', border: '1px dashed rgba(245,158,11,0.3)', color: '#fbbf24', padding: '1rem 1.25rem', borderRadius: 12, fontSize: '0.9rem' }}>
+                            💡 **Aviso:** Esta orden no posee una cotización asociada. El informe se redactará enfocándose en los datos generales y observaciones que agregues abajo.
+                          </div>
+                        ) : (
+                          <div>
+                            {/* Toggle Selector for All vs Specific */}
+                            <div style={{ display: 'flex', gap: '1rem', marginBottom: '1.25rem' }}>
+                              <button 
+                                type="button"
+                                onClick={() => {
+                                  setAllQuotes(true);
+                                  setSelectedQuoteItems(quote.items.map(item => item.descripcion));
+                                }}
+                                style={{ flex: 1, padding: '0.75rem', borderRadius: 10, border: '1px solid var(--border)', background: allQuotes ? 'var(--primary)' : 'transparent', color: allQuotes ? 'white' : 'var(--text)', fontWeight: 600, cursor: 'pointer', transition: 'all 0.2s', fontSize: '0.9rem' }}
+                              >
+                                Toda la Cotización
+                              </button>
+                              <button 
+                                type="button"
+                                onClick={() => setAllQuotes(false)}
+                                style={{ flex: 1, padding: '0.75rem', borderRadius: 10, border: '1px solid var(--border)', background: !allQuotes ? 'var(--primary)' : 'transparent', color: !allQuotes ? 'white' : 'var(--text)', fontWeight: 600, cursor: 'pointer', transition: 'all 0.2s', fontSize: '0.9rem' }}
+                              >
+                                Seleccionar ítems específicos
+                              </button>
+                            </div>
+
+                            {/* Checklist list shown only if specific option is active */}
+                            {!allQuotes && (
+                              <div style={{ animation: 'fadeIn 0.25s ease-out', border: '1px solid var(--border)', borderRadius: 12, background: 'rgba(0,0,0,0.1)', padding: '1rem', maxHeight: 220, overflowY: 'auto' }}>
+                                <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '0.6rem', fontWeight: 600 }}>
+                                  Marca los ítems que deseas que la IA analice para el informe técnico:
+                                </div>
+                                {quote.items.map((item, idx) => {
+                                  const isChecked = selectedQuoteItems.includes(item.descripcion);
+                                  return (
+                                    <label 
+                                      key={idx} 
+                                      style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', padding: '0.6rem 0.8rem', background: isChecked ? 'rgba(99,102,241,0.06)' : 'transparent', borderRadius: 8, cursor: 'pointer', transition: 'background-color 0.2s', marginBottom: '0.25rem', userSelect: 'none' }}
+                                    >
+                                      <input 
+                                        type="checkbox" 
+                                        checked={isChecked}
+                                        onChange={() => {
+                                          if (isChecked) {
+                                            setSelectedQuoteItems(selectedQuoteItems.filter(i => i !== item.descripcion));
+                                          } else {
+                                            setSelectedQuoteItems([...selectedQuoteItems, item.descripcion]);
+                                          }
+                                        }}
+                                        style={{ width: 16, height: 16, cursor: 'pointer' }}
+                                      />
+                                      <div style={{ flex: 1, fontSize: '0.9rem' }}>
+                                        <span style={{ fontWeight: 600, color: isChecked ? 'var(--primary)' : 'var(--text)' }}>
+                                          {item.descripcion}
+                                        </span>
+                                        <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginLeft: '0.5rem' }}>
+                                          (Cant: {item.cantidad} - ${parseFloat(item.precio).toLocaleString('es-CO')})
+                                        </span>
+                                      </div>
+                                    </label>
+                                  );
+                                })}
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Step 3: Instructions to AI */}
+                      <div style={{ marginBottom: '2.5rem', borderTop: '1px solid var(--border)', paddingTop: '1.5rem' }}>
+                        <label style={{ display: 'block', fontWeight: 700, marginBottom: '0.6rem', fontSize: '0.85rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                          3. Indicaciones / Enfoque para la IA
+                        </label>
                         <textarea 
-                          placeholder="Escribe aquí el detalle técnico..."
-                          value={sec.descripcion}
-                          onChange={e => {
-                            const newSecs = [...reportGenerator.secciones];
-                            newSecs[idx].descripcion = e.target.value;
-                            setReportGenerator({ ...reportGenerator, secciones: newSecs });
-                          }}
-                          style={{ width: '100%', minHeight: 100 }}
+                          placeholder="Ej. Enfatizar el desgaste severo en el tensor de correa para evitar roturas mecánicas graves en vía. Escribir en tono de urgencia técnica."
+                          value={aiInstructions}
+                          onChange={e => setAiInstructions(e.target.value)}
+                          style={{ width: '100%', minHeight: 100, padding: '1rem', borderRadius: 12, border: '1px solid var(--border)', background: 'var(--bg)', fontSize: '0.92rem', color: 'var(--text)', resize: 'vertical' }}
                         />
+                        <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginTop: '0.4rem' }}>
+                          Usa este campo para guiar a la IA sobre qué puntos destacar o qué tono formal o preventivo adoptar.
+                        </div>
                       </div>
+
+                      {/* Submit / Generate button */}
+                      <button 
+                        type="button"
+                        disabled={isGeneratingReport || (!allQuotes && selectedQuoteItems.length === 0)}
+                        onClick={handleGenerateReport}
+                        className="btn-primary"
+                        style={{ width: '100%', padding: '1.25rem', fontSize: '1.1rem', fontWeight: 800, gap: '0.75rem', borderRadius: 12, justifyContent: 'center', height: 'auto', opacity: isGeneratingReport ? 0.75 : 1, transition: 'all 0.2s', cursor: isGeneratingReport ? 'not-allowed' : 'pointer', border: 'none', background: 'var(--primary)', color: 'white' }}
+                      >
+                        {isGeneratingReport ? (
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                            <div className="spinner" style={{ width: 20, height: 20, border: '3px solid rgba(255,255,255,0.3)', borderTopColor: 'white', borderRadius: '50%', animation: 'spin 1s linear infinite' }} />
+                            <span>IA Generando Informe Técnico y PDF...</span>
+                          </div>
+                        ) : (
+                          <>
+                            <Sparkles size={20} />
+                            <span>Generar Informe Técnico IA (PDF Oficial)</span>
+                          </>
+                        )}
+                      </button>
                     </div>
-                  ))}
-
-                  <button 
-                    className="btn-secondary" 
-                    style={{ width: '100%', borderStyle: 'dashed', background: 'transparent' }}
-                    onClick={() => setReportGenerator({ 
-                      ...reportGenerator, 
-                      secciones: [...reportGenerator.secciones, { categoria: '', descripcion: '' }] 
-                    })}
-                  >
-                    <Plus size={16} /> Añadir otra categoría al informe
-                  </button>
-                </div>
-
-                <button 
-                  className="btn-primary" 
-                  disabled={!reportGenerator.placa || reportGenerator.secciones.some(s => !s.descripcion)}
-                  style={{ width: '100%', padding: '1.25rem', fontSize: '1.1rem', fontWeight: 800, gap: '0.75rem' }}
-                  onClick={() => {
-                    const order = orders.find(o => o.placa === reportGenerator.placa);
-                    if (!order) return;
-                    
-                    const win = window.open('', '_blank');
-                    win.document.write(`
-                      <html>
-                        <head>
-                          <title>Informe Técnico - ${order.placa}</title>
-                          <style>
-                            body { font-family: 'Inter', sans-serif; padding: 40px; color: #1e293b; line-height: 1.6; }
-                            .header { display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 2px solid #2563eb; padding-bottom: 20px; margin-bottom: 30px; }
-                            .logo { color: #2563eb; font-weight: 800; font-size: 24px; text-transform: uppercase; }
-                            .title { font-size: 20px; font-weight: 700; text-transform: uppercase; margin-bottom: 20px; text-align: center; color: #334155; }
-                            .info-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 30px; background: #f8fafc; padding: 20px; borderRadius: 8px; }
-                            .info-item { font-size: 13px; }
-                            .info-label { font-weight: 700; color: #64748b; text-transform: uppercase; font-size: 11px; }
-                            .section { margin-bottom: 25px; page-break-inside: avoid; }
-                            .section-title { background: #2563eb; color: white; padding: 6px 12px; font-weight: 800; font-size: 12px; text-transform: uppercase; margin-bottom: 10px; border-radius: 4px; }
-                            .section-content { padding: 0 10px; font-size: 14px; white-space: pre-wrap; }
-                            .footer { margin-top: 50px; border-top: 1px solid #e2e8f0; padding-top: 20px; text-align: center; font-size: 11px; color: #94a3b8; }
-                          </style>
-                        </head>
-                        <body>
-                          <div class="header">
-                            <div class="logo">Taller Automotriz</div>
-                            <div style="text-align: right">
-                              <div style="font-weight: 700">INFORME TÉCNICO</div>
-                              <div style="color: #64748b; font-size: 12px">Fecha: ${new Date().toLocaleDateString('es-CO')}</div>
-                            </div>
-                          </div>
-                          
-                          <div class="info-grid">
-                            <div>
-                              <div class="info-item"><span class="info-label">Cliente:</span> ${order.cliente}</div>
-                              <div class="info-item"><span class="info-label">Teléfono:</span> ${order.telefono}</div>
-                            </div>
-                            <div>
-                              <div class="info-item"><span class="info-label">Vehículo:</span> ${order.marca} ${order.modelo}</div>
-                              <div class="info-item"><span class="info-label">Placa:</span> <strong>${order.placa}</strong></div>
-                              <div class="info-item"><span class="info-label">Kilometraje:</span> ${order.kilometraje ? parseInt(order.kilometraje).toLocaleString() : 'N/A'} KM</div>
-                            </div>
-                          </div>
-
-                          <div class="title">Resultados de la Inspección Técnica</div>
-
-                          ${reportGenerator.secciones.map(sec => `
-                            <div class="section">
-                              <div class="section-title">${sec.categoria || 'REVISIÓN GENERAL'}</div>
-                              <div class="section-content">${sec.descripcion}</div>
-                            </div>
-                          `).join('')}
-
-                          <div class="footer">
-                            Este informe es un diagnóstico basado en la inspección visual y herramientas especializadas.<br>
-                            Generado digitalmente por el Panel de Administración.
-                          </div>
-
-                          <script>window.print();</script>
-                        </body>
-                      </html>
-                    `);
-                    win.document.close();
-                  }}
-                >
-                  <FileText size={20} /> GENERAR INFORME PDF
-                </button>
+                  );
+                })()}
               </div>
             )}
           </div>
