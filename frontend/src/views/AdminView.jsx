@@ -48,7 +48,7 @@ export default function AdminView() {
     setIsGeneratingReport(true);
     setReportError('');
     try {
-      const selectedOrder = orders.find(o => o.id === reportOrderId);
+      const selectedOrder = orders.find(o => String(o.id) === String(reportOrderId));
       const payload = {
         orderId: reportOrderId,
         allQuotes: allQuotes,
@@ -781,7 +781,7 @@ export default function AdminView() {
                       const ordId = e.target.value;
                       setReportOrderId(ordId);
                       setAllQuotes(true);
-                      const selectedOrd = orders.find(o => o.id === ordId);
+                      const selectedOrd = orders.find(o => String(o.id) === String(ordId));
                       const q = selectedOrd?.quotes?.[0];
                       if (q && q.items) {
                         setSelectedQuoteItems(q.items.map(item => item.descripcion));
@@ -802,7 +802,7 @@ export default function AdminView() {
 
                 {/* Expandable vehicle info card once selected */}
                 {reportOrderId && (() => {
-                  const selectedOrder = orders.find(o => o.id === reportOrderId);
+                  const selectedOrder = orders.find(o => String(o.id) === String(reportOrderId));
                   if (!selectedOrder) return null;
                   const quote = selectedOrder.quotes?.[0];
                   const hasQuote = quote && quote.items && quote.items.length > 0;
