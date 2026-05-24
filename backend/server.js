@@ -48,6 +48,29 @@ server.use(cors());
 server.use(middlewares);
 server.use(jsonServer.bodyParser);
 
+// One-time cleanup: move AI reports (no items field) from reports → ai_reports
+server.post('/api/migrate-ai-reports', (req, res) => {
+  try {
+    const db = router.db;
+    const allReports = db.get('reports').value() || [];
+    const corrupt = allReports.filter(r => !r.items);
+    const clean   = allReports.filter(r =>  r.items);
+
+    if (corrupt.length === 0) {
+      return res.json({ message: 'Nada que limpiar, todo está bien.', moved: 0 });
+    }
+
+    // Move corrupt reports to ai_reports
+    corrupt.forEach(r => db.get('ai_reports').push(r).value());
+    // Keep only valid reports
+    db.set('reports', clean).write();
+
+    res.json({ message: `Se movieron ${corrupt.length} reporte(s) de IA a ai_reports.`, moved: corrupt.length });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
 // Custom routes can be added here
 server.post('/api/generate-ai-report', async (req, res) => {
   try {
