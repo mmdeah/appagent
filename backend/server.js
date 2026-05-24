@@ -218,7 +218,7 @@ Genera el informe técnico formal en español enfocado en los ítems seleccionad
 
     // Call the Python script to build the PDF using ReportLab
     console.log("Calling python generate_pdf.py with generated report...");
-    const pyProcess = spawn('python', [path.join(__dirname, 'generate_pdf.py')]);
+    const pyProcess = spawn('python3', [path.join(__dirname, 'generate_pdf.py')]);
     
     let stdoutData = "";
     let stderrData = "";
