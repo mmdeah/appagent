@@ -192,46 +192,63 @@ export default function OrderDetailsModal({ order, onClose }) {
   const printQuote = (forcedTitle = null) => {
     const sub = totals.sub, iva = totals.iva, total = totals.total;
     const mainTitle = forcedTitle || ((order.estado === 'Entregado' || order.estado === 'Docs Rápidos') ? 'CUENTA DE COBRO' : 'COTIZACIÓN');
+    const isCuentaCobro = mainTitle === 'CUENTA DE COBRO';
     const prioOrder = ['urgente', 'plazo_medio', 'plazo_largo'];
     const prioMap = {
-      urgente:     { label: '🔴 Urgente',     color: '#ef4444', bg: '#fef2f2', headerBg: '#fee2e2' },
-      plazo_medio: { label: '🟡 Plazo Medio', color: '#d97706', bg: '#fffbeb', headerBg: '#fef3c7' },
-      plazo_largo: { label: '🟢 Plazo Largo', color: '#059669', bg: '#f0fdf4', headerBg: '#dcfce7' },
+      urgente:     { label: 'Urgente',     color: '#ef4444', bg: '#fef2f2', headerBg: '#fee2e2' },
+      plazo_medio: { label: 'Plazo Medio', color: '#d97706', bg: '#fffbeb', headerBg: '#fef3c7' },
+      plazo_largo: { label: 'Plazo Largo', color: '#059669', bg: '#f0fdf4', headerBg: '#dcfce7' },
     };
-    // Sort items by priority order
-    const sortedItems = [...quoteItems].sort((a, b) => {
-      return prioOrder.indexOf(a.prioridad || 'urgente') - prioOrder.indexOf(b.prioridad || 'urgente');
-    });
-    // Build rows grouped by priority with subtotals
+
     let rows = '';
     let globalNum = 1;
-    prioOrder.forEach(prioKey => {
-      const group = sortedItems.filter(it => (it.prioridad || 'urgente') === prioKey);
-      if (group.length === 0) return;
-      const p = prioMap[prioKey];
-      const groupTotal = group.reduce((acc, it) => {
-        const lt = it.precio * it.cantidad;
-        return acc + (it.aplicaIva ? lt * 1.19 : lt);
-      }, 0);
-      // Group header row
-      rows += `<tr><td colspan="7" style="background:${p.headerBg};color:${p.color};font-weight:800;font-size:0.85rem;padding:6px 10px;letter-spacing:0.03em">${p.label}</td></tr>`;
-      group.forEach(it => {
+
+    if (isCuentaCobro) {
+      // Cuenta de cobro: simple list, no priority grouping
+      rows = quoteItems.map((it, i) => {
         const lineTotal = it.precio * it.cantidad;
         const lineIva = it.aplicaIva ? lineTotal * 0.19 : 0;
-        rows += `
+        return `
           <tr>
-            <td class="col-num">${globalNum++}</td>
+            <td class="col-num">${i + 1}</td>
             <td class="col-desc">${it.descripcion}</td>
-            <td style="text-align:center"><span style="font-size:0.78rem;font-weight:700;padding:2px 8px;border-radius:6px;background:${p.bg};color:${p.color}">${p.label}</span></td>
             <td style="text-align:center">${it.cantidad}</td>
             <td class="col-price">$${fmt(it.precio)} COP</td>
             <td class="col-iva">${lineIva > 0 ? '$' + fmt(lineIva) + ' COP' : '—'}</td>
             <td class="col-total">$${fmt(lineTotal + lineIva)} COP</td>
           </tr>`;
+      }).join('');
+    } else {
+      // Cotización: sorted by priority with group headers and subtotals
+      const sortedItems = [...quoteItems].sort((a, b) =>
+        prioOrder.indexOf(a.prioridad || 'urgente') - prioOrder.indexOf(b.prioridad || 'urgente')
+      );
+      prioOrder.forEach(prioKey => {
+        const group = sortedItems.filter(it => (it.prioridad || 'urgente') === prioKey);
+        if (group.length === 0) return;
+        const p = prioMap[prioKey];
+        const groupTotal = group.reduce((acc, it) => {
+          const lt = it.precio * it.cantidad;
+          return acc + (it.aplicaIva ? lt * 1.19 : lt);
+        }, 0);
+        rows += `<tr><td colspan="7" style="background:${p.headerBg};color:${p.color};font-weight:800;font-size:0.85rem;padding:6px 10px;letter-spacing:0.03em">${p.label}</td></tr>`;
+        group.forEach(it => {
+          const lineTotal = it.precio * it.cantidad;
+          const lineIva = it.aplicaIva ? lineTotal * 0.19 : 0;
+          rows += `
+            <tr>
+              <td class="col-num">${globalNum++}</td>
+              <td class="col-desc">${it.descripcion}</td>
+              <td style="text-align:center"><span style="font-size:0.78rem;font-weight:700;padding:2px 8px;border-radius:6px;background:${p.bg};color:${p.color}">${p.label}</span></td>
+              <td style="text-align:center">${it.cantidad}</td>
+              <td class="col-price">$${fmt(it.precio)} COP</td>
+              <td class="col-iva">${lineIva > 0 ? '$' + fmt(lineIva) + ' COP' : '—'}</td>
+              <td class="col-total">$${fmt(lineTotal + lineIva)} COP</td>
+            </tr>`;
+        });
+        rows += `<tr style="background:${p.headerBg}"><td colspan="6" style="text-align:right;font-weight:700;font-size:0.85rem;color:${p.color};padding:5px 10px">Subtotal ${p.label}:</td><td class="col-total" style="font-weight:800;color:${p.color}">$${fmt(groupTotal)} COP</td></tr>`;
       });
-      // Group subtotal row
-      rows += `<tr style="background:${p.headerBg}"><td colspan="6" style="text-align:right;font-weight:700;font-size:0.85rem;color:${p.color};padding:5px 10px">Subtotal ${p.label}:</td><td class="col-total" style="font-weight:800;color:${p.color}">$${fmt(groupTotal)} COP</td></tr>`;
-    });
+    }
     printWindow(`${mainTitle} ${order.placa}`, `
       <div class="header-title">${mainTitle}</div>
       
@@ -261,7 +278,7 @@ export default function OrderDetailsModal({ order, onClose }) {
       <table>
         <thead>
           <tr>
-            <th>#</th><th>Descripción</th><th style="text-align:center">Prioridad</th><th style="text-align: center">Cant.</th><th style="text-align: right">Precio Unit.</th><th style="text-align: right">IVA</th><th style="text-align: right">Total</th>
+            <th>#</th><th>Descripción</th>${!isCuentaCobro ? '<th style="text-align:center">Prioridad</th>' : ''}<th style="text-align:center">Cant.</th><th style="text-align:right">Precio Unit.</th><th style="text-align:right">IVA</th><th style="text-align:right">Total</th>
           </tr>
         </thead>
         <tbody>${rows}</tbody>
@@ -756,9 +773,9 @@ export default function OrderDetailsModal({ order, onClose }) {
                         <td style={{ textAlign: 'center', whiteSpace: 'nowrap' }}>
                           {(() => {
                             const prioridades = [
-                              { key: 'urgente',     label: '🔴 Urgente',      bg: 'rgba(239,68,68,0.15)',   color: '#ef4444', border: '#ef4444' },
-                              { key: 'plazo_medio', label: '🟡 Plazo Medio',  bg: 'rgba(245,158,11,0.15)', color: '#f59e0b', border: '#f59e0b' },
-                              { key: 'plazo_largo', label: '🟢 Plazo Largo',  bg: 'rgba(16,185,129,0.15)', color: '#10b981', border: '#10b981' },
+                              { key: 'urgente',     label: 'Urgente',      bg: 'rgba(239,68,68,0.15)',   color: '#ef4444', border: '#ef4444' },
+                              { key: 'plazo_medio', label: 'Plazo Medio',  bg: 'rgba(245,158,11,0.15)', color: '#f59e0b', border: '#f59e0b' },
+                              { key: 'plazo_largo', label: 'Plazo Largo',  bg: 'rgba(16,185,129,0.15)', color: '#10b981', border: '#10b981' },
                             ];
                             const current = it.prioridad || 'urgente';
                             const p = prioridades.find(p => p.key === current) || prioridades[0];
