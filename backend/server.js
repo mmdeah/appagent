@@ -26,7 +26,7 @@ if (dataDir !== __dirname && !fs.existsSync(dbFile)) {
 // Ensure all required collections exist
 try {
   const dbData = JSON.parse(fs.readFileSync(dbFile, 'utf8'));
-  const requiredKeys = ['orders', 'quotes', 'reports', 'expenses', 'archived_orders', 'todos'];
+  const requiredKeys = ['orders', 'quotes', 'reports', 'expenses', 'archived_orders', 'ai_reports', 'todos'];
   let modified = false;
   requiredKeys.forEach(key => {
     if (!dbData[key]) {
@@ -207,14 +207,14 @@ Genera el informe técnico formal en español enfocado en los ítems seleccionad
       recomendacion_alerta: reportJson.recomendacion_alerta
     };
 
-    // Save the report in the lowdb database to mark the order as "Revisado"
-    const newReport = {
+    // Save the AI report in its own collection (separate from technician reports)
+    const newAiReport = {
       id: Date.now().toString(),
       orderId: order.id,
       fecha: new Date().toISOString(),
       contenido: reportJson
     };
-    db.get('reports').push(newReport).write();
+    db.get('ai_reports').push(newAiReport).write();
 
     // Call the Python script to build the PDF using ReportLab
     console.log("Calling python generate_pdf.py with generated report...");

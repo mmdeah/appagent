@@ -144,7 +144,7 @@ export default function OrderDetailsModal({ order, onClose }) {
   };
 
   const printReport = () => {
-    if (!reportData || !reportData.items) return;
+    if (!reportData) return;
     const stateBadge = { Bueno: 'badge-good', Regular: 'badge-warn', Malo: 'badge-bad' };
     const rows = reportData.items.map((it, i) => `
       <tr>
@@ -604,11 +604,9 @@ export default function OrderDetailsModal({ order, onClose }) {
           {activeTab === 'reporte' && (
             <div>
               <p className="section-title">Reporte Técnico del Técnico</p>
-              {!reportData || !reportData.items ? (
+              {!reportData ? (
                 <div style={{ textAlign: 'center', padding: '3rem', color: 'var(--text-muted)' }}>
-                  {!reportData
-                    ? 'El técnico aún no ha subido el reporte de revisión.'
-                    : 'Este reporte fue generado por IA — ver el PDF descargado.'}
+                  El técnico aún no ha subido el reporte de revisión.
                 </div>
               ) : (
                 <>
