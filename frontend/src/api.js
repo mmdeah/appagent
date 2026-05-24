@@ -12,6 +12,16 @@ if (envUrl.endsWith('/')) {
 
 export const API_URL = envUrl;
 
+// URL del servidor principal (appagent) — usado para endpoints como /api/generate-ai-report
+let backendUrl = import.meta.env.VITE_BACKEND_URL || 'http://localhost:4000';
+if (backendUrl && !backendUrl.startsWith('http')) {
+  backendUrl = 'https://' + backendUrl;
+}
+if (backendUrl.endsWith('/')) {
+  backendUrl = backendUrl.slice(0, -1);
+}
+export const BACKEND_URL = backendUrl;
+
 /**
  * Retorna un mensaje si la placa tiene restricción de Pico y Placa hoy.
  * Lunes (1): 1, 2

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useContext } from 'react';
-import { API_URL, getPicoYPlaca } from '../api';
+import { API_URL, BACKEND_URL, getPicoYPlaca } from '../api';
 import OrderDetailsModal from './OrderDetailsModal';
 import PhotoUploadModal from './PhotoUploadModal';
 import { ThemeContext } from '../App';
@@ -56,7 +56,7 @@ export default function AdminView() {
         notes: aiInstructions
       };
 
-      const res = await fetch(`${API_URL}/generate-ai-report`, {
+      const res = await fetch(`${BACKEND_URL}/api/generate-ai-report`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)
