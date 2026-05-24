@@ -58,13 +58,14 @@ server.post('/api/generate-ai-report', async (req, res) => {
 
     // Get DB data
     const db = router.db; // lowdb instance used by json-server
-    const order = db.get('orders').find({ id: orderId }).value();
+    const parsedOrderId = isNaN(orderId) ? orderId : Number(orderId);
+    const order = db.get('orders').find(o => String(o.id) === String(parsedOrderId)).value();
     if (!order) {
       return res.status(404).json({ error: `Order with ID ${orderId} not found` });
     }
 
     // Find quote for the order
-    const quote = db.get('quotes').find({ orderId: order.id }).value();
+    const quote = db.get('quotes').find(q => String(q.orderId) === String(order.id)).value();
     
     // Determine which items to include
     let itemsToAnalyze = [];
