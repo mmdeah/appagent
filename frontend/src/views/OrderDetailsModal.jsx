@@ -144,7 +144,7 @@ export default function OrderDetailsModal({ order, onClose }) {
   };
 
   const printReport = () => {
-    if (!reportData) return;
+    if (!reportData || !reportData.items) return;
     const stateBadge = { Bueno: 'badge-good', Regular: 'badge-warn', Malo: 'badge-bad' };
     const rows = reportData.items.map((it, i) => `
       <tr>
@@ -604,7 +604,7 @@ export default function OrderDetailsModal({ order, onClose }) {
           {activeTab === 'reporte' && (
             <div>
               <p className="section-title">Reporte Técnico del Técnico</p>
-              {!reportData ? (
+              {(!reportData || !reportData.items) ? (
                 <div style={{ textAlign: 'center', padding: '3rem', color: 'var(--text-muted)' }}>
                   El técnico aún no ha subido el reporte de revisión.
                 </div>
