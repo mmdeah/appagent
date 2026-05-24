@@ -18,6 +18,7 @@ export default function OrderDetailsModal({ order, onClose }) {
   const [metodoPago, setMetodoPago] = useState('Efectivo');
   const [notasEntrega, setNotasEntrega] = useState(order.notasEntrega || '');
   const [isEditingInfo, setIsEditingInfo] = useState(false);
+  const [showPriority, setShowPriority] = useState(() => localStorage.getItem('quote_show_priority') !== 'false');
   const [editedOrder, setEditedOrder] = useState({ ...order });
 
   const showStatus = (text, type = 'success') => {
@@ -192,7 +193,7 @@ export default function OrderDetailsModal({ order, onClose }) {
   const printQuote = (forcedTitle = null) => {
     const sub = totals.sub, iva = totals.iva, total = totals.total;
     const mainTitle = forcedTitle || ((order.estado === 'Entregado' || order.estado === 'Docs Rápidos') ? 'CUENTA DE COBRO' : 'COTIZACIÓN');
-    const isCuentaCobro = mainTitle === 'CUENTA DE COBRO';
+    const isCuentaCobro = mainTitle === 'CUENTA DE COBRO' || !showPriority;
     const prioOrder = ['urgente', 'plazo_medio', 'plazo_largo'];
     const prioMap = {
       urgente:     { label: 'Urgente',     color: '#ef4444', bg: '#fef2f2', headerBg: '#fee2e2' },
@@ -846,6 +847,29 @@ export default function OrderDetailsModal({ order, onClose }) {
                     <span>TOTAL</span><span>${fmt(totals.total)}</span>
                   </div>
                 </div>
+              </div>
+
+              <div className="hide-on-print" style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', marginBottom: '1rem', padding: '0.65rem 1rem', background: 'rgba(255,255,255,0.03)', border: '1px solid var(--border)', borderRadius: 10 }}>
+                <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)', fontWeight: 600 }}>Mostrar prioridades en PDF de cotización:</span>
+                <button
+                  onClick={() => {
+                    const next = !showPriority;
+                    setShowPriority(next);
+                    localStorage.setItem('quote_show_priority', String(next));
+                  }}
+                  style={{
+                    display: 'flex', alignItems: 'center', gap: '0.4rem',
+                    padding: '0.35rem 0.9rem', borderRadius: 20, fontWeight: 700, fontSize: '0.82rem', cursor: 'pointer', transition: 'all 0.2s',
+                    background: showPriority ? 'rgba(99,102,241,0.15)' : 'rgba(107,114,128,0.1)',
+                    color: showPriority ? 'var(--primary)' : 'var(--text-muted)',
+                    border: showPriority ? '1.5px solid var(--primary)' : '1.5px solid var(--border)',
+                  }}
+                >
+                  <span style={{ width: 28, height: 16, borderRadius: 99, background: showPriority ? 'var(--primary)' : '#6b7280', display: 'inline-flex', alignItems: 'center', padding: '0 2px', transition: 'all 0.2s' }}>
+                    <span style={{ width: 12, height: 12, borderRadius: '50%', background: 'white', marginLeft: showPriority ? 'auto' : 0, transition: 'margin 0.2s' }} />
+                  </span>
+                  {showPriority ? 'Activado' : 'Desactivado'}
+                </button>
               </div>
 
               <div className="hide-on-print" style={{ display: 'flex', gap: '0.75rem' }}>
