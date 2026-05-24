@@ -792,9 +792,9 @@ export default function AdminView() {
                     style={{ width: '100%', padding: '0.9rem 1.2rem', fontSize: '1.1rem', fontWeight: 700, borderRadius: 12, border: '2px solid var(--border)', background: 'var(--bg)', cursor: 'pointer', transition: 'border-color 0.2s' }}
                   >
                     <option value="">-- Escoger Placa / Orden --</option>
-                    {orders.map(o => (
+                    {orders.filter(o => o.estado !== 'Entregado').map(o => (
                       <option key={o.id} value={o.id}>
-                        {o.placa} - {o.marca} {o.modelo} ({o.cliente}) {o.estado === 'Entregado' ? '✅ Entregado' : '⏳ Activo'}
+                        {o.placa} - {o.marca} {o.modelo} ({o.cliente})
                       </option>
                     ))}
                   </select>
