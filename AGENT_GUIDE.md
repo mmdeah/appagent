@@ -10,8 +10,8 @@
 |---|---|---|
 | **Frontend (web)** | `https://appagent.up.railway.app` | React + Vite. Vistas: Admin, Técnico, Cliente |
 | **Panel Admin** | `https://appagent.up.railway.app/admin` | Vista exclusiva del administrador |
-| **Panel Técnico** | `https://appagent.up.railway.app/technician` | Vista exclusiva del técnico |
-| **Portal Cliente** | `https://appagent.up.railway.app/client` | Vista pública para que el cliente consulte su vehículo |
+| **Panel Técnico** | `https://appagent.up.railway.app/tecnico` | Vista exclusiva del técnico |
+| **Portal Cliente** | `https://appagent.up.railway.app/cliente` | Vista pública para que el cliente consulte su vehículo por placa |
 | **Backend (JSON Server)** | `https://json-server-production-0af6.up.railway.app` | Express + json-server. Base de datos en volumen Railway |
 
 Todas las llamadas a la API se hacen contra el Backend. El frontend consume el backend directamente desde el navegador.
