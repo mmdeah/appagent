@@ -192,13 +192,20 @@ export default function OrderDetailsModal({ order, onClose }) {
   const printQuote = (forcedTitle = null) => {
     const sub = totals.sub, iva = totals.iva, total = totals.total;
     const mainTitle = forcedTitle || ((order.estado === 'Entregado' || order.estado === 'Docs Rápidos') ? 'CUENTA DE COBRO' : 'COTIZACIÓN');
+    const prioMap = {
+      urgente:     { label: '🔴 Urgente',     color: '#ef4444', bg: '#fef2f2' },
+      plazo_medio: { label: '🟡 Plazo Medio', color: '#d97706', bg: '#fffbeb' },
+      plazo_largo: { label: '🟢 Plazo Largo', color: '#059669', bg: '#f0fdf4' },
+    };
     const rows = quoteItems.map((it, i) => {
       const lineTotal = it.precio * it.cantidad;
       const lineIva = it.aplicaIva ? lineTotal * 0.19 : 0;
+      const prio = prioMap[it.prioridad] || prioMap['urgente'];
       return `
         <tr>
           <td class="col-num">${i + 1}</td>
           <td class="col-desc">${it.descripcion}</td>
+          <td style="text-align:center"><span style="font-size:0.78rem;font-weight:700;padding:2px 8px;border-radius:6px;background:${prio.bg};color:${prio.color}">${prio.label}</span></td>
           <td style="text-align: center">${it.cantidad}</td>
           <td class="col-price">$${fmt(it.precio)} COP</td>
           <td class="col-iva">${lineIva > 0 ? '$' + fmt(lineIva) + ' COP' : '—'}</td>
@@ -235,7 +242,7 @@ export default function OrderDetailsModal({ order, onClose }) {
       <table>
         <thead>
           <tr>
-            <th>#</th><th>Descripción</th><th style="text-align: center">Cant.</th><th style="text-align: right">Precio Unit.</th><th style="text-align: right">IVA</th><th style="text-align: right">Total</th>
+            <th>#</th><th>Descripción</th><th style="text-align:center">Prioridad</th><th style="text-align: center">Cant.</th><th style="text-align: right">Precio Unit.</th><th style="text-align: right">IVA</th><th style="text-align: right">Total</th>
           </tr>
         </thead>
         <tbody>${rows}</tbody>
@@ -706,7 +713,8 @@ export default function OrderDetailsModal({ order, onClose }) {
               <table className="data-table">
                 <thead>
                   <tr>
-                    <th style={{ width: '40%' }}>Descripción</th>
+                    <th style={{ width: '35%' }}>Descripción</th>
+                    <th style={{ textAlign: 'center' }}>Prioridad</th>
                     <th style={{ textAlign: 'center' }}>Cant.</th>
                     <th style={{ textAlign: 'center' }}>Vr. Unitario</th>
                     <th style={{ textAlign: 'center' }}>+IVA 19%</th>
@@ -725,6 +733,30 @@ export default function OrderDetailsModal({ order, onClose }) {
                             onChange={e => { const q=[...quoteItems]; q[idx].descripcion=e.target.value; setQuoteItems(q); }}
                             style={{ fontSize: '0.85rem' }} />
                           <span className="show-on-print">{it.descripcion}</span>
+                        </td>
+                        <td style={{ textAlign: 'center', whiteSpace: 'nowrap' }}>
+                          {(() => {
+                            const prioridades = [
+                              { key: 'urgente',     label: '🔴 Urgente',      bg: 'rgba(239,68,68,0.15)',   color: '#ef4444', border: '#ef4444' },
+                              { key: 'plazo_medio', label: '🟡 Plazo Medio',  bg: 'rgba(245,158,11,0.15)', color: '#f59e0b', border: '#f59e0b' },
+                              { key: 'plazo_largo', label: '🟢 Plazo Largo',  bg: 'rgba(16,185,129,0.15)', color: '#10b981', border: '#10b981' },
+                            ];
+                            const current = it.prioridad || 'urgente';
+                            const p = prioridades.find(p => p.key === current) || prioridades[0];
+                            return (
+                              <>
+                                <select
+                                  className="hide-on-print"
+                                  value={current}
+                                  onChange={e => { const q=[...quoteItems]; q[idx].prioridad=e.target.value; setQuoteItems(q); }}
+                                  style={{ fontSize: '0.78rem', fontWeight: 700, padding: '0.25rem 0.4rem', borderRadius: 8, border: `1.5px solid ${p.border}`, background: p.bg, color: p.color, cursor: 'pointer', outline: 'none' }}
+                                >
+                                  {prioridades.map(op => <option key={op.key} value={op.key}>{op.label}</option>)}
+                                </select>
+                                <span className="show-on-print" style={{ fontSize: '0.78rem', fontWeight: 700, padding: '2px 7px', borderRadius: 6, background: p.bg, color: p.color }}>{p.label}</span>
+                              </>
+                            );
+                          })()}
                         </td>
                         <td style={{ textAlign: 'center' }}>
                           <input className="hide-on-print" type="number" step="any" min="0.1" value={it.cantidad}
@@ -758,7 +790,7 @@ export default function OrderDetailsModal({ order, onClose }) {
               </table>
 
               <div className="hide-on-print" style={{ marginTop: '0.75rem', marginBottom: '1.5rem' }}>
-                <button className="btn-secondary" style={{ fontSize: '0.82rem' }} onClick={() => setQuoteItems([...quoteItems, { descripcion: '', cantidad: 1, precio: 0, aplicaIva: false }])}>
+                <button className="btn-secondary" style={{ fontSize: '0.82rem' }} onClick={() => setQuoteItems([...quoteItems, { descripcion: '', cantidad: 1, precio: 0, aplicaIva: false, prioridad: 'urgente' }])}>
                   <Plus size={14} /> Añadir ítem
                 </button>
               </div>
