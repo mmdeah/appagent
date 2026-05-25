@@ -24,7 +24,7 @@ const fmt = (n) => {
   return num.toLocaleString('es-CO', { minimumFractionDigits: 0 });
 };
 
-const REVISION_CATEGORIES = {
+const REVISION_CATEGORIES_DEFAULT = {
   "Suspensión": ["Amortiguadores Del.", "Amortiguadores Tras.", "Bujes de Tijera", "Tijeras", "Lágrimas", "Soporte de Amortiguadores", "Bujes Barra Estabilizadora", "Soportes de Motor", "Rótulas"],
   "Frenos": ["Pastillas Del.", "Pastillas Tras.", "Discos Del.", "Discos Tras.", "Líquido de Frenos", "Freno de Mano", "Mangueras de Freno", "Bomba de Freno", "Cilindro de Freno", "Campanas Traseras", "Bandas Traseras"],
   "Dirección": ["Caja de Dirección", "Terminales", "Axiales", "Bomba de Dirección", "Aceite Hidráulico", "Holgura Volante"],
@@ -57,6 +57,19 @@ export default function TechnicianView() {
   const [pastReports, setPastReports] = useState([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [viewingPastReport, setViewingPastReport] = useState(null);
+  const [revisionCategories, setRevisionCategories] = useState(REVISION_CATEGORIES_DEFAULT);
+
+  const fetchConfig = async () => {
+    try {
+      const res = await fetch(`${API_URL}/settings/revision_form`);
+      const data = await res.json();
+      if (data && data.categories) {
+        setRevisionCategories(data.categories);
+      }
+    } catch (e) {
+      console.warn('No se pudo cargar la config del formulario, usando valores por defecto');
+    }
+  };
 
   const fetchOrders = () => {
     setLoading(true);
@@ -79,6 +92,7 @@ export default function TechnicianView() {
   useEffect(() => {
     fetchOrders();
     fetchPastReports();
+    fetchConfig();
   }, []);
 
   const handleItemStateChange = (category, item, state) => {
@@ -198,7 +212,7 @@ export default function TechnicianView() {
               </div>
             )}
 
-            {Object.entries(REVISION_CATEGORIES).map(([category, items]) => (
+            {Object.entries(revisionCategories).map(([category, items]) => (
               <div key={category} className="card" style={{ marginBottom: '1rem', padding: '1rem' }}>
                 <h3 style={{ fontSize: '1rem', fontWeight: 800, textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: '1rem', borderBottom: '1px solid var(--border)', paddingBottom: '0.4rem' }}>{category}</h3>
                 {items.map(item => {
