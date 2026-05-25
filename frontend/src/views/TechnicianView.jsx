@@ -118,14 +118,94 @@ export default function TechnicianView() {
     }));
   };
 
+  const buildWhatsAppMessage = (items, validCodes, precioDiag) => {
+    const o = selectedOrder;
+    const fecha = new Date().toLocaleDateString('es-CO');
+    const fmtNum = (n) => Number(n || 0).toLocaleString('es-CO', { minimumFractionDigits: 0 });
+
+    const conAtencion = items.filter(i => i.state === 'Malo' || i.state === 'Regular');
+    const insumos = items.filter(i => i.state === 'Necesario');
+    const servicios = items.filter(i => i.state === 'Realizar');
+
+    let totalMO = 0;
+    let msg = `🔧 *REVISIÓN TÉCNICA*\n`;
+    msg += `🚗 *${o.placa}* | ${o.marca} ${o.modelo}\n`;
+    msg += `📅 ${fecha}\n`;
+    if (o.kilometraje) msg += `🛣️ ${fmtNum(o.kilometraje)} km\n`;
+    msg += `\n`;
+
+    if (conAtencion.length > 0) {
+      msg += `⚠️ *REQUIERE ATENCIÓN:*\n`;
+      conAtencion.forEach(i => {
+        const icono = i.state === 'Malo' ? '🔴' : '🟡';
+        msg += `${icono} ${i.item} _(${i.category})_ - ${i.state.toUpperCase()}\n`;
+        if (i.manoObra) {
+          totalMO += Number(i.manoObra);
+          msg += `   💵 M.O: $${fmtNum(i.manoObra)}`;
+        }
+        const extras = [];
+        if (i.requiereRepuesto) extras.push('requiere repuesto');
+        if (i.recibeReparacion) extras.push('reparación');
+        if (extras.length) msg += ` | ${extras.join(', ')}`;
+        if (i.manoObra || extras.length) msg += `\n`;
+      });
+      msg += `\n`;
+    }
+
+    if (insumos.length > 0) {
+      msg += `🔩 *INSUMOS NECESARIOS:*\n`;
+      insumos.forEach(i => {
+        msg += `• ${i.item}${i.cantidad && i.cantidad > 1 ? ` (x${i.cantidad})` : ''}\n`;
+      });
+      msg += `\n`;
+    }
+
+    if (servicios.length > 0) {
+      msg += `🛠️ *SERVICIOS ESPECIALIZADOS:*\n`;
+      servicios.forEach(i => {
+        msg += `• ${i.item}${i.area ? ` — ${i.area}` : ''}`;
+        if (i.manoObra) {
+          totalMO += Number(i.manoObra);
+          msg += ` | $${fmtNum(i.manoObra)}`;
+        }
+        msg += `\n`;
+      });
+      msg += `\n`;
+    }
+
+    if (validCodes.length > 0) {
+      msg += `💻 *CÓDIGOS ESCÁNER:*\n`;
+      validCodes.forEach(c => {
+        msg += `• ${c.prefix}${c.code}${c.description ? `: ${c.description}` : ''}\n`;
+      });
+      if (precioDiag > 0) {
+        totalMO += precioDiag;
+        msg += `   Diagnóstico: $${fmtNum(precioDiag)}\n`;
+      }
+      msg += `\n`;
+    }
+
+    const buenas = items.filter(i => i.state === 'Bueno');
+    if (buenas.length > 0) {
+      msg += `✅ *En buen estado (${buenas.length} ítems revisados)*\n\n`;
+    }
+
+    if (totalMO > 0) {
+      msg += `💰 *TOTAL ESTIMADO M.O: $${fmtNum(totalMO)}*\n`;
+    }
+
+    return msg.trim();
+  };
+
   const submitReport = async () => {
     const items = Object.values(reportData);
     const validCodes = scannerCodes.filter(c => c.code.length > 0);
+    const precioDiag = validCodes.length > 0 ? (parseFloat(precioDiagnostico.replace(/\D/g,'')) || 0) : 0;
     const payload = {
       orderId: selectedOrder.id,
       items,
       scannerCodes: validCodes,
-      precioDiagnostico: validCodes.length > 0 ? (parseFloat(precioDiagnostico.replace(/\D/g,'')) || 0) : 0,
+      precioDiagnostico: precioDiag,
       fecha: new Date().toISOString()
     };
     try {
@@ -134,13 +214,19 @@ export default function TechnicianView() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)
       });
-      setStatusMsg({ text: '✓ Reporte subido exitosamente', type: 'success' });
-      setTimeout(() => { 
-        setSelectedOrder(null); 
-        setReportData({}); 
-        setScannerCodes([{ prefix: 'P', code: '', description: '' }]); 
-        setPrecioDiagnostico(''); 
-        setStatusMsg({ text: '', type: '' }); 
+      setStatusMsg({ text: '✓ Reporte subido — abriendo WhatsApp...', type: 'success' });
+
+      // Abrir WhatsApp con el resumen
+      const mensaje = buildWhatsAppMessage(items, validCodes, precioDiag);
+      const waUrl = `https://wa.me/573014697942?text=${encodeURIComponent(mensaje)}`;
+      window.open(waUrl, '_blank');
+
+      setTimeout(() => {
+        setSelectedOrder(null);
+        setReportData({});
+        setScannerCodes([{ prefix: 'P', code: '', description: '' }]);
+        setPrecioDiagnostico('');
+        setStatusMsg({ text: '', type: '' });
         fetchOrders();
         fetchPastReports();
       }, 2000);
