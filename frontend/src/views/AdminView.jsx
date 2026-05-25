@@ -448,7 +448,8 @@ export default function AdminView() {
                 { id: 'Historial', icon: <History size={16} />, label: 'Historial' },
                 { id: 'Gastos', icon: <Receipt size={16} />, label: 'Gastos' },
                 { id: 'Docs Rápidos', icon: <Zap size={16} />, label: 'Docs Rápidos' },
-                { id: 'Informes', icon: <FileText size={16} />, label: 'Generar Informe' }
+                { id: 'Informes', icon: <FileText size={16} />, label: 'Generar Informe' },
+                { id: 'Formulario', icon: <Settings size={16} />, label: 'Formulario Técnico' }
               ].map(t => (
                 <button key={t.id} onClick={() => setActiveTab(t.id)}
                   style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', padding: '0.5rem 1rem', background: activeTab === t.id ? 'var(--primary)' : 'transparent', color: activeTab === t.id ? 'white' : 'var(--text-muted)', border: 'none', borderRadius: 'var(--radius-sm)', cursor: 'pointer', fontWeight: 600, fontSize: '1rem', transition: 'all 0.2s', whiteSpace: 'nowrap' }}>
