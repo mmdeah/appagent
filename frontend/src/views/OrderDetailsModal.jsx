@@ -20,6 +20,47 @@ export default function OrderDetailsModal({ order, onClose }) {
   const [isEditingInfo, setIsEditingInfo] = useState(false);
   const [showPriority, setShowPriority] = useState(() => localStorage.getItem('quote_show_priority') !== 'false');
   const [editedOrder, setEditedOrder] = useState({ ...order });
+  const [showAddItem, setShowAddItem] = useState(false);
+  const [newItem, setNewItem] = useState({ category: '', item: '', state: 'Malo', manoObra: '', requiereRepuesto: false, cantidadRepuesto: 1, valorRepuesto: '', recibeReparacion: false, valorReparacion: '' });
+
+  const REPORT_CATEGORIES = ['Suspensión','Frenos','Dirección','Transmisión','Fugas','Batería / Eléctrico','Chequeo Visual Motor','Niveles','Otros','Insumos','Servicios Especializados'];
+  const ITEM_STATES = ['Bueno','Regular','Malo'];
+
+  const handleAddReportItem = async () => {
+    if (!newItem.category || !newItem.item) return;
+    const item = {
+      category: newItem.category,
+      item: newItem.item,
+      state: newItem.state,
+      manoObra: newItem.state !== 'Bueno' ? newItem.manoObra : '',
+      requiereRepuesto: newItem.state !== 'Bueno' ? newItem.requiereRepuesto : false,
+      cantidadRepuesto: newItem.requiereRepuesto ? newItem.cantidadRepuesto : 1,
+      valorRepuesto: newItem.requiereRepuesto ? newItem.valorRepuesto : '',
+      recibeReparacion: newItem.state !== 'Bueno' ? newItem.recibeReparacion : false,
+      valorReparacion: newItem.recibeReparacion ? newItem.valorReparacion : '',
+    };
+    let updatedReport;
+    if (!reportData || !reportData.items) {
+      // Create new report from scratch
+      const payload = { orderId: order.id, items: [item], scannerCodes: [], precioDiagnostico: 0, fecha: new Date().toISOString() };
+      const res = await fetch(`${API_URL}/reports`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+      updatedReport = await res.json();
+    } else {
+      updatedReport = { ...reportData, items: [...reportData.items, item] };
+      await fetch(`${API_URL}/reports/${reportData.id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(updatedReport) });
+    }
+    setReportData(updatedReport);
+    setNewItem({ category: '', item: '', state: 'Malo', manoObra: '', requiereRepuesto: false, cantidadRepuesto: 1, valorRepuesto: '', recibeReparacion: false, valorReparacion: '' });
+    setShowAddItem(false);
+    showStatus('Ítem agregado al reporte');
+  };
+
+  const handleDeleteReportItem = async (idx) => {
+    const updatedReport = { ...reportData, items: reportData.items.filter((_, i) => i !== idx) };
+    await fetch(`${API_URL}/reports/${reportData.id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(updatedReport) });
+    setReportData(updatedReport);
+    showStatus('Ítem eliminado');
+  };
 
   const showStatus = (text, type = 'success') => {
     setStatusMsg({ text, type });
@@ -647,10 +688,110 @@ export default function OrderDetailsModal({ order, onClose }) {
           {/* ── REPORTE TAB ── */}
           {activeTab === 'reporte' && (
             <div>
-              <p className="section-title">Reporte Técnico del Técnico</p>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
+                <p className="section-title" style={{ margin: 0 }}>Reporte Técnico del Técnico</p>
+                <button className="btn-primary hide-on-print" style={{ fontSize: '0.82rem', padding: '0.4rem 0.9rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}
+                  onClick={() => setShowAddItem(v => !v)}>
+                  <Plus size={14} /> Añadir ítem
+                </button>
+              </div>
+
+              {/* Form to add new item */}
+              {showAddItem && (
+                <div className="hide-on-print" style={{ background: 'rgba(99,102,241,0.06)', border: '1px solid var(--primary)', borderRadius: 12, padding: '1.25rem', marginBottom: '1.25rem' }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem', marginBottom: '0.75rem' }}>
+                    <div>
+                      <label style={{ fontSize: '0.78rem', fontWeight: 700, color: 'var(--text-muted)', display: 'block', marginBottom: '0.3rem' }}>CATEGORÍA</label>
+                      <select value={newItem.category} onChange={e => setNewItem({ ...newItem, category: e.target.value })}
+                        style={{ width: '100%', padding: '0.5rem', borderRadius: 8, border: '1px solid var(--border)', background: 'var(--bg)', fontSize: '0.9rem' }}>
+                        <option value="">-- Seleccionar --</option>
+                        {REPORT_CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
+                      </select>
+                    </div>
+                    <div>
+                      <label style={{ fontSize: '0.78rem', fontWeight: 700, color: 'var(--text-muted)', display: 'block', marginBottom: '0.3rem' }}>ÍTEM / DESCRIPCIÓN</label>
+                      <input type="text" placeholder="Ej: Amortiguador delantero" value={newItem.item}
+                        onChange={e => setNewItem({ ...newItem, item: e.target.value })}
+                        style={{ width: '100%', padding: '0.5rem', borderRadius: 8, border: '1px solid var(--border)', background: 'var(--bg)', fontSize: '0.9rem' }} />
+                    </div>
+                  </div>
+
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '0.75rem', marginBottom: '0.75rem' }}>
+                    <div>
+                      <label style={{ fontSize: '0.78rem', fontWeight: 700, color: 'var(--text-muted)', display: 'block', marginBottom: '0.3rem' }}>ESTADO</label>
+                      <div style={{ display: 'flex', gap: '0.4rem' }}>
+                        {ITEM_STATES.map(s => (
+                          <button key={s} type="button" onClick={() => setNewItem({ ...newItem, state: s })}
+                            style={{ flex: 1, padding: '0.4rem', borderRadius: 8, border: '1.5px solid', fontSize: '0.8rem', fontWeight: 700, cursor: 'pointer', transition: 'all 0.15s',
+                              borderColor: newItem.state === s ? (s === 'Bueno' ? '#10b981' : s === 'Regular' ? '#f59e0b' : '#ef4444') : 'var(--border)',
+                              background: newItem.state === s ? (s === 'Bueno' ? 'rgba(16,185,129,0.15)' : s === 'Regular' ? 'rgba(245,158,11,0.15)' : 'rgba(239,68,68,0.15)') : 'transparent',
+                              color: newItem.state === s ? (s === 'Bueno' ? '#10b981' : s === 'Regular' ? '#f59e0b' : '#ef4444') : 'var(--text-muted)'
+                            }}>{s}</button>
+                        ))}
+                      </div>
+                    </div>
+                    {newItem.state !== 'Bueno' && (
+                      <div>
+                        <label style={{ fontSize: '0.78rem', fontWeight: 700, color: 'var(--text-muted)', display: 'block', marginBottom: '0.3rem' }}>MANO DE OBRA ($)</label>
+                        <input type="text" className="price-input" placeholder="0" value={newItem.manoObra ? fmt(newItem.manoObra) : ''}
+                          onChange={e => setNewItem({ ...newItem, manoObra: e.target.value.replace(/\D/g, '') })}
+                          style={{ width: '100%', padding: '0.5rem', borderRadius: 8, border: '1px solid var(--border)', background: 'var(--bg)', fontSize: '0.9rem' }} />
+                      </div>
+                    )}
+                  </div>
+
+                  {newItem.state !== 'Bueno' && (
+                    <div style={{ display: 'flex', gap: '1.5rem', marginBottom: '0.75rem', flexWrap: 'wrap' }}>
+                      <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontWeight: 600, fontSize: '0.9rem', cursor: 'pointer' }}>
+                        <input type="checkbox" checked={newItem.requiereRepuesto} onChange={e => setNewItem({ ...newItem, requiereRepuesto: e.target.checked })} />
+                        Requiere repuesto
+                      </label>
+                      <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontWeight: 600, fontSize: '0.9rem', cursor: 'pointer' }}>
+                        <input type="checkbox" checked={newItem.recibeReparacion} onChange={e => setNewItem({ ...newItem, recibeReparacion: e.target.checked })} />
+                        Recibe reparación
+                      </label>
+                    </div>
+                  )}
+
+                  {newItem.requiereRepuesto && (
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: '0.75rem', marginBottom: '0.75rem' }}>
+                      <div>
+                        <label style={{ fontSize: '0.78rem', fontWeight: 700, color: 'var(--text-muted)', display: 'block', marginBottom: '0.3rem' }}>CANT. REPUESTO</label>
+                        <input type="number" min="0.1" step="any" value={newItem.cantidadRepuesto}
+                          onChange={e => setNewItem({ ...newItem, cantidadRepuesto: parseFloat(e.target.value) || 1 })}
+                          style={{ width: '100%', padding: '0.5rem', borderRadius: 8, border: '1px solid var(--border)', background: 'var(--bg)', fontSize: '0.9rem' }} />
+                      </div>
+                      <div>
+                        <label style={{ fontSize: '0.78rem', fontWeight: 700, color: 'var(--text-muted)', display: 'block', marginBottom: '0.3rem' }}>VALOR REPUESTO ($)</label>
+                        <input type="text" className="price-input" placeholder="0" value={newItem.valorRepuesto ? fmt(newItem.valorRepuesto) : ''}
+                          onChange={e => setNewItem({ ...newItem, valorRepuesto: e.target.value.replace(/\D/g, '') })}
+                          style={{ width: '100%', padding: '0.5rem', borderRadius: 8, border: '1px solid var(--border)', background: 'var(--bg)', fontSize: '0.9rem' }} />
+                      </div>
+                    </div>
+                  )}
+
+                  {newItem.recibeReparacion && (
+                    <div style={{ marginBottom: '0.75rem' }}>
+                      <label style={{ fontSize: '0.78rem', fontWeight: 700, color: 'var(--text-muted)', display: 'block', marginBottom: '0.3rem' }}>VALOR REPARACIÓN ($)</label>
+                      <input type="text" className="price-input" placeholder="0" value={newItem.valorReparacion ? fmt(newItem.valorReparacion) : ''}
+                        onChange={e => setNewItem({ ...newItem, valorReparacion: e.target.value.replace(/\D/g, '') })}
+                        style={{ width: '100%', padding: '0.5rem', borderRadius: 8, border: '1px solid var(--border)', background: 'var(--bg)', fontSize: '0.9rem' }} />
+                    </div>
+                  )}
+
+                  <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'flex-end' }}>
+                    <button className="btn-secondary" onClick={() => setShowAddItem(false)}>Cancelar</button>
+                    <button className="btn-primary" onClick={handleAddReportItem} disabled={!newItem.category || !newItem.item}>
+                      <Plus size={14} /> Agregar al reporte
+                    </button>
+                  </div>
+                </div>
+              )}
+
               {(!reportData || !reportData.items) ? (
                 <div style={{ textAlign: 'center', padding: '3rem', color: 'var(--text-muted)' }}>
-                  El técnico aún no ha subido el reporte de revisión.
+                  El técnico aún no ha subido el reporte de revisión.<br/>
+                  <span style={{ fontSize: '0.85rem' }}>Puedes agregar ítems manualmente con el botón de arriba.</span>
                 </div>
               ) : (
                 <>
@@ -663,6 +804,7 @@ export default function OrderDetailsModal({ order, onClose }) {
                         <th>M. de Obra ($)</th>
                         <th>Repuesto</th>
                         <th>Vr. Reparación ($)</th>
+                        <th className="hide-on-print" style={{ width: 36 }}></th>
                       </tr>
                     </thead>
                     <tbody>
@@ -711,6 +853,13 @@ export default function OrderDetailsModal({ order, onClose }) {
                                   style={{ width: 110, fontSize: '0.82rem' }} />
                               </>
                             ) : <span style={{ color: 'var(--text-muted)' }}>—</span>}
+                          </td>
+                          <td className="hide-on-print" style={{ textAlign: 'center' }}>
+                            <button onClick={() => handleDeleteReportItem(idx)}
+                              style={{ background: 'none', border: 'none', color: 'var(--error)', cursor: 'pointer', padding: '0.2rem', borderRadius: 6, opacity: 0.7 }}
+                              title="Eliminar ítem">
+                              <Trash2 size={14} />
+                            </button>
                           </td>
                         </tr>
                       ))}
