@@ -201,6 +201,12 @@ export default function TechnicianView() {
     const items = Object.values(reportData);
     const validCodes = scannerCodes.filter(c => c.code.length > 0);
     const precioDiag = validCodes.length > 0 ? (parseFloat(precioDiagnostico.replace(/\D/g,'')) || 0) : 0;
+
+    // Abrir WhatsApp ANTES del await para evitar bloqueo de popup del navegador
+    const mensaje = buildWhatsAppMessage(items, validCodes, precioDiag);
+    const waUrl = `https://wa.me/573014697942?text=${encodeURIComponent(mensaje)}`;
+    window.open(waUrl, '_blank');
+
     const payload = {
       orderId: selectedOrder.id,
       items,
@@ -214,13 +220,7 @@ export default function TechnicianView() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)
       });
-      setStatusMsg({ text: '✓ Reporte subido — abriendo WhatsApp...', type: 'success' });
-
-      // Abrir WhatsApp con el resumen
-      const mensaje = buildWhatsAppMessage(items, validCodes, precioDiag);
-      const waUrl = `https://wa.me/573014697942?text=${encodeURIComponent(mensaje)}`;
-      window.open(waUrl, '_blank');
-
+      setStatusMsg({ text: '✓ Reporte subido — revisa WhatsApp', type: 'success' });
       setTimeout(() => {
         setSelectedOrder(null);
         setReportData({});
