@@ -128,24 +128,23 @@ export default function TechnicianView() {
     const servicios = items.filter(i => i.state === 'Realizar');
 
     let totalMO = 0;
-    let msg = `🔧 *REVISIÓN TÉCNICA*\n`;
-    msg += `🚗 *${o.placa}* | ${o.marca} ${o.modelo}\n`;
-    msg += `📅 ${fecha}\n`;
-    if (o.kilometraje) msg += `🛣️ ${fmtNum(o.kilometraje)} km\n`;
+    let msg = `*REVISION TECNICA*\n`;
+    msg += `*${o.placa}* | ${o.marca} ${o.modelo}\n`;
+    msg += `${fecha}\n`;
+    if (o.kilometraje) msg += `${fmtNum(o.kilometraje)} km\n`;
     msg += `\n`;
 
     if (conAtencion.length > 0) {
-      msg += `⚠️ *REQUIERE ATENCIÓN:*\n`;
+      msg += `*REQUIERE ATENCION:*\n`;
       conAtencion.forEach(i => {
-        const icono = i.state === 'Malo' ? '🔴' : '🟡';
-        msg += `${icono} ${i.item} _(${i.category})_ - ${i.state.toUpperCase()}\n`;
+        msg += `- ${i.item} (${i.category}) - ${i.state.toUpperCase()}\n`;
         if (i.manoObra) {
           totalMO += Number(i.manoObra);
-          msg += `   💵 M.O: $${fmtNum(i.manoObra)}`;
+          msg += `  M.O: $${fmtNum(i.manoObra)}`;
         }
         const extras = [];
         if (i.requiereRepuesto) extras.push('requiere repuesto');
-        if (i.recibeReparacion) extras.push('reparación');
+        if (i.recibeReparacion) extras.push('reparacion');
         if (extras.length) msg += ` | ${extras.join(', ')}`;
         if (i.manoObra || extras.length) msg += `\n`;
       });
@@ -153,17 +152,17 @@ export default function TechnicianView() {
     }
 
     if (insumos.length > 0) {
-      msg += `🔩 *INSUMOS NECESARIOS:*\n`;
+      msg += `*INSUMOS NECESARIOS:*\n`;
       insumos.forEach(i => {
-        msg += `• ${i.item}${i.cantidad && i.cantidad > 1 ? ` (x${i.cantidad})` : ''}\n`;
+        msg += `- ${i.item}${i.cantidad && i.cantidad > 1 ? ` (x${i.cantidad})` : ''}\n`;
       });
       msg += `\n`;
     }
 
     if (servicios.length > 0) {
-      msg += `🛠️ *SERVICIOS ESPECIALIZADOS:*\n`;
+      msg += `*SERVICIOS ESPECIALIZADOS:*\n`;
       servicios.forEach(i => {
-        msg += `• ${i.item}${i.area ? ` — ${i.area}` : ''}`;
+        msg += `- ${i.item}${i.area ? ` - ${i.area}` : ''}`;
         if (i.manoObra) {
           totalMO += Number(i.manoObra);
           msg += ` | $${fmtNum(i.manoObra)}`;
@@ -174,24 +173,24 @@ export default function TechnicianView() {
     }
 
     if (validCodes.length > 0) {
-      msg += `💻 *CÓDIGOS ESCÁNER:*\n`;
+      msg += `*CODIGOS ESCANER:*\n`;
       validCodes.forEach(c => {
-        msg += `• ${c.prefix}${c.code}${c.description ? `: ${c.description}` : ''}\n`;
+        msg += `- ${c.prefix}${c.code}${c.description ? `: ${c.description}` : ''}\n`;
       });
       if (precioDiag > 0) {
         totalMO += precioDiag;
-        msg += `   Diagnóstico: $${fmtNum(precioDiag)}\n`;
+        msg += `  Diagnostico: $${fmtNum(precioDiag)}\n`;
       }
       msg += `\n`;
     }
 
     const buenas = items.filter(i => i.state === 'Bueno');
     if (buenas.length > 0) {
-      msg += `✅ *En buen estado (${buenas.length} ítems revisados)*\n\n`;
+      msg += `En buen estado: ${buenas.length} items revisados\n\n`;
     }
 
     if (totalMO > 0) {
-      msg += `💰 *TOTAL ESTIMADO M.O: $${fmtNum(totalMO)}*\n`;
+      msg += `*TOTAL ESTIMADO M.O: $${fmtNum(totalMO)}*\n`;
     }
 
     return msg.trim();
