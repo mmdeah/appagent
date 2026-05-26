@@ -3,7 +3,7 @@ import { API_URL, BACKEND_URL, getPicoYPlaca } from '../api';
 import OrderDetailsModal from './OrderDetailsModal';
 import PhotoUploadModal from './PhotoUploadModal';
 import { ThemeContext } from '../App';
-import { PlusCircle, BarChart3, Camera, X, Car, Trash2, Zap, LayoutDashboard, History, Receipt, CheckCircle, AlertTriangle, ClipboardList, Save, Settings, FileText, Plus, Sparkles } from 'lucide-react';
+import { PlusCircle, BarChart3, Camera, X, Car, Trash2, Zap, LayoutDashboard, History, Receipt, CheckCircle, AlertTriangle, ClipboardList, Save, Settings, FileText, Plus, Sparkles, CreditCard, Clock, BadgeCheck, Ban } from 'lucide-react';
 
 const fmt = (n) => (parseFloat(n) || 0).toLocaleString('es-CO', { minimumFractionDigits: 0 });
 
@@ -45,6 +45,58 @@ export default function AdminView() {
   const [historialSearch, setHistorialSearch] = useState('');
   const [historialDesde, setHistorialDesde] = useState('');
   const [historialHasta, setHistorialHasta] = useState('');
+  const [aldBillings, setAldBillings] = useState([]);
+
+  const MESES = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+
+  const fetchAldBillings = () => {
+    fetch(`${API_URL}/ald_billings`)
+      .then(r => r.json())
+      .then(data => setAldBillings(Array.isArray(data) ? data : []))
+      .catch(() => {});
+  };
+
+  const calcOrderTotal = (o) => {
+    const q = o.quotes?.find(q => q.autorizada) || o.quotes?.[0];
+    if (!q) return 0;
+    return (q.items || []).reduce((sum, i) =>
+      sum + (Number(i.manoObra)||0) + (Number(i.repuesto)||0) + (Number(i.reparacion)||0), 0);
+  };
+
+  const getNextCorteALD = () => {
+    const now = new Date();
+    const thisMonth19 = new Date(now.getFullYear(), now.getMonth(), 19);
+    const next = now <= thisMonth19 ? thisMonth19 : new Date(now.getFullYear(), now.getMonth() + 1, 19);
+    const days = Math.ceil((next - now) / 86400000);
+    return { date: next, days: days <= 0 ? 0 : days };
+  };
+
+  const markFacturada = async (cycleId, year, month) => {
+    const fechaEnvio = new Date().toISOString();
+    const venc = new Date(); venc.setDate(venc.getDate() + 35);
+    const fechaVencimiento = venc.toISOString();
+    const existing = aldBillings.find(b => b.id === cycleId);
+    if (existing) {
+      await fetch(`${API_URL}/ald_billings/${cycleId}`, {
+        method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ fechaEnvio, fechaVencimiento })
+      });
+    } else {
+      await fetch(`${API_URL}/ald_billings`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: cycleId, year, month, fechaEnvio, fechaVencimiento, pagado: false, fechaPago: null })
+      });
+    }
+    fetchAldBillings();
+  };
+
+  const markPagada = async (cycleId) => {
+    await fetch(`${API_URL}/ald_billings/${cycleId}`, {
+      method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ pagado: true, fechaPago: new Date().toISOString() })
+    });
+    fetchAldBillings();
+  };
 
   const handleGenerateReport = async () => {
     if (!reportOrderId) return;
@@ -266,7 +318,7 @@ export default function AdminView() {
     }
   };
 
-  useEffect(() => { fetchOrders(); fetchExpenses(); fetchTodos(); fetchConfig(); }, []);
+  useEffect(() => { fetchOrders(); fetchExpenses(); fetchTodos(); fetchConfig(); fetchAldBillings(); }, []);
 
   const deleteOrder = (id) => {
     setOrderToDelete(id);
@@ -452,7 +504,8 @@ export default function AdminView() {
                 { id: 'Gastos', icon: <Receipt size={16} />, label: 'Gastos' },
                 { id: 'Docs Rápidos', icon: <Zap size={16} />, label: 'Docs Rápidos' },
                 { id: 'Informes', icon: <FileText size={16} />, label: 'Generar Informe' },
-                { id: 'Formulario', icon: <Settings size={16} />, label: 'Formulario Técnico' }
+                { id: 'Formulario', icon: <Settings size={16} />, label: 'Formulario Técnico' },
+                { id: 'ALD', icon: <CreditCard size={16} />, label: 'ALD' }
               ].map(t => (
                 <button key={t.id} onClick={() => setActiveTab(t.id)}
                   style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', padding: '0.5rem 1rem', background: activeTab === t.id ? 'var(--primary)' : 'transparent', color: activeTab === t.id ? 'white' : 'var(--text-muted)', border: 'none', borderRadius: 'var(--radius-sm)', cursor: 'pointer', fontWeight: 600, fontSize: '1rem', transition: 'all 0.2s', whiteSpace: 'nowrap' }}>
@@ -462,7 +515,37 @@ export default function AdminView() {
             </div>
 
             {/* Tab Content */}
-            {activeTab === 'Kanban' && (
+            {activeTab === 'Kanban' && (() => {
+              const { date: corteDate, days: corteDays } = getNextCorteALD();
+              const aldVehiculosMes = orders.filter(o => /ald/i.test(o.cliente || '') && o.estado !== 'Entregado');
+              const vencidas = aldBillings.filter(b => !b.pagado && b.fechaVencimiento && new Date(b.fechaVencimiento) < new Date());
+              const corteColor = corteDays <= 3 ? '#ef4444' : corteDays <= 7 ? '#f59e0b' : '#10b981';
+              const corteBg = corteDays <= 3 ? 'rgba(239,68,68,0.1)' : corteDays <= 7 ? 'rgba(245,158,11,0.1)' : 'rgba(16,185,129,0.1)';
+              return (<>
+              <div style={{ display: 'flex', gap: '0.75rem', marginBottom: '1.25rem', flexWrap: 'wrap' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', background: corteBg, border: `1px solid ${corteColor}`, borderRadius: 10, padding: '0.6rem 1.1rem', flex: '0 0 auto' }}>
+                  <Clock size={18} color={corteColor} />
+                  <div>
+                    <div style={{ fontSize: '0.75rem', fontWeight: 700, color: corteColor, textTransform: 'uppercase', lineHeight: 1 }}>Próximo corte ALD</div>
+                    <div style={{ fontSize: '1.1rem', fontWeight: 900, color: corteColor, lineHeight: 1.3 }}>
+                      {corteDays === 0 ? '¡Hoy!' : `${corteDays} día${corteDays !== 1 ? 's' : ''}`}
+                    </div>
+                    <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>
+                      19 de {MESES[corteDate.getMonth()]} · {aldVehiculosMes.length} vehículo{aldVehiculosMes.length !== 1 ? 's' : ''} ALD activo{aldVehiculosMes.length !== 1 ? 's' : ''}
+                    </div>
+                  </div>
+                </div>
+                {vencidas.length > 0 && (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', background: 'rgba(239,68,68,0.1)', border: '1px solid #ef4444', borderRadius: 10, padding: '0.6rem 1.1rem', cursor: 'pointer', flex: '0 0 auto' }} onClick={() => setActiveTab('ALD')}>
+                    <Ban size={18} color="#ef4444" />
+                    <div>
+                      <div style={{ fontSize: '0.75rem', fontWeight: 700, color: '#ef4444', textTransform: 'uppercase', lineHeight: 1 }}>Pago vencido</div>
+                      <div style={{ fontSize: '1.1rem', fontWeight: 900, color: '#ef4444', lineHeight: 1.3 }}>{vencidas.length} factura{vencidas.length !== 1 ? 's' : ''}</div>
+                      <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>Ver en pestaña ALD</div>
+                    </div>
+                  </div>
+                )}
+              </div>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1.25rem' }}>
                 {COLUMNS.map(col => (
                   <div key={col} className="kanban-column">
@@ -521,7 +604,8 @@ export default function AdminView() {
                   </div>
                 ))}
               </div>
-            )}
+              </>);
+            })()}
 
             {activeTab === 'Historial' && (() => {
               const entregadas = orders.filter(o => o.estado === 'Entregado');
@@ -693,6 +777,116 @@ export default function AdminView() {
                 )}
               </div>
             )}
+
+            {activeTab === 'ALD' && (() => {
+              const aldOrders = orders.filter(o => /ald/i.test(o.cliente || '') && o.estado === 'Entregado');
+              const grouped = {};
+              aldOrders.forEach(o => {
+                if (!o.fecha) return;
+                const d = new Date(o.fecha);
+                const key = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
+                if (!grouped[key]) grouped[key] = { year: d.getFullYear(), month: d.getMonth()+1, ordersList: [] };
+                grouped[key].ordersList.push(o);
+              });
+              const cycles = Object.entries(grouped).map(([key, data]) => ({
+                ...data, id: key,
+                billing: aldBillings.find(b => b.id === key) || null
+              })).sort((a, b) => b.id.localeCompare(a.id));
+
+              const getStatus = (billing) => {
+                if (!billing || !billing.fechaEnvio) return { label: 'Pendiente de facturar', color: 'var(--text-muted)', bg: 'rgba(255,255,255,0.05)', icon: <Clock size={14}/> };
+                if (billing.pagado) return { label: `Pagado · ${new Date(billing.fechaPago).toLocaleDateString('es-CO')}`, color: '#10b981', bg: 'rgba(16,185,129,0.1)', icon: <BadgeCheck size={14}/> };
+                const venc = new Date(billing.fechaVencimiento);
+                if (venc < new Date()) return { label: `VENCIDO · vencía ${venc.toLocaleDateString('es-CO')}`, color: '#ef4444', bg: 'rgba(239,68,68,0.1)', icon: <Ban size={14}/> };
+                const diasRestantes = Math.ceil((venc - new Date()) / 86400000);
+                return { label: `Esperando pago · vence ${venc.toLocaleDateString('es-CO')} (${diasRestantes}d)`, color: '#f59e0b', bg: 'rgba(245,158,11,0.1)', icon: <Clock size={14}/> };
+              };
+
+              return (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
+                    <div>
+                      <h2 style={{ fontSize: '1.4rem', fontWeight: 800, margin: 0 }}>Facturación ALD</h2>
+                      <p style={{ color: 'var(--text-muted)', margin: '0.2rem 0 0' }}>Ciclos mensuales · corte día 19 · pago a 35 días</p>
+                    </div>
+                    <div style={{ display: 'flex', gap: '1rem' }}>
+                      {[
+                        { label: 'Ciclos', val: cycles.length, color: 'var(--primary)' },
+                        { label: 'Pendientes', val: cycles.filter(c => !c.billing?.fechaEnvio).length, color: '#f59e0b' },
+                        { label: 'Vencidos', val: aldBillings.filter(b => !b.pagado && b.fechaVencimiento && new Date(b.fechaVencimiento) < new Date()).length, color: '#ef4444' },
+                        { label: 'Pagados', val: aldBillings.filter(b => b.pagado).length, color: '#10b981' },
+                      ].map(s => (
+                        <div key={s.label} className="card" style={{ padding: '0.75rem 1.2rem', textAlign: 'center', minWidth: 70 }}>
+                          <div style={{ fontSize: '1.5rem', fontWeight: 900, color: s.color }}>{s.val}</div>
+                          <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 600 }}>{s.label}</div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  {cycles.length === 0 && (
+                    <div className="card" style={{ padding: '3rem', textAlign: 'center', color: 'var(--text-muted)', borderStyle: 'dashed' }}>
+                      No hay vehículos ALD entregados aún.
+                    </div>
+                  )}
+
+                  {cycles.map(cycle => {
+                    const st = getStatus(cycle.billing);
+                    const total = cycle.ordersList.reduce((s, o) => s + calcOrderTotal(o), 0);
+                    return (
+                      <div key={cycle.id} className="card" style={{ padding: '1.5rem', borderLeft: `4px solid ${st.color}` }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '1rem', marginBottom: '1.25rem' }}>
+                          <div>
+                            <h3 style={{ fontSize: '1.2rem', fontWeight: 800, margin: 0 }}>{MESES[cycle.month-1]} {cycle.year}</h3>
+                            <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem', marginTop: '0.4rem', padding: '0.3rem 0.75rem', background: st.bg, borderRadius: 20, fontSize: '0.85rem', fontWeight: 700, color: st.color }}>
+                              {st.icon} {st.label}
+                            </div>
+                          </div>
+                          <div style={{ textAlign: 'right' }}>
+                            <div style={{ fontSize: '1.4rem', fontWeight: 900 }}>${fmt(total)}</div>
+                            <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>{cycle.ordersList.length} vehículo{cycle.ordersList.length !== 1 ? 's' : ''}</div>
+                          </div>
+                        </div>
+
+                        <table className="data-table" style={{ marginBottom: '1rem' }}>
+                          <thead><tr><th>Placa</th><th>Vehículo</th><th>Fecha</th><th>Total</th></tr></thead>
+                          <tbody>
+                            {cycle.ordersList.map(o => (
+                              <tr key={o.id} style={{ cursor: 'pointer' }} onClick={() => setSelectedOrder(o)}>
+                                <td style={{ fontWeight: 700 }}>{o.placa}</td>
+                                <td>{o.marca} {o.modelo}</td>
+                                <td style={{ color: 'var(--text-muted)', fontSize: '0.9rem' }}>{o.fecha ? new Date(o.fecha).toLocaleDateString('es-CO') : '—'}</td>
+                                <td style={{ fontWeight: 700 }}>{total > 0 ? `$${fmt(calcOrderTotal(o))}` : '—'}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+
+                        <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
+                          {!cycle.billing?.fechaEnvio && (
+                            <button className="btn-primary" style={{ fontSize: '0.9rem' }}
+                              onClick={() => { if(window.confirm(`¿Marcar factura de ${MESES[cycle.month-1]} ${cycle.year} como enviada hoy?`)) markFacturada(cycle.id, cycle.year, cycle.month); }}>
+                              Marcar factura enviada
+                            </button>
+                          )}
+                          {cycle.billing?.fechaEnvio && !cycle.billing?.pagado && (
+                            <button className="btn-secondary" style={{ fontSize: '0.9rem', color: '#10b981', borderColor: '#10b981' }}
+                              onClick={() => { if(window.confirm(`¿Confirmar pago recibido de ${MESES[cycle.month-1]} ${cycle.year}?`)) markPagada(cycle.id); }}>
+                              <BadgeCheck size={15} /> Marcar pagado
+                            </button>
+                          )}
+                          {cycle.billing?.fechaEnvio && (
+                            <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
+                              Factura enviada: {new Date(cycle.billing.fechaEnvio).toLocaleDateString('es-CO')}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              );
+            })()}
 
             {activeTab === 'Gastos' && (
               <div style={{ display: 'grid', gridTemplateColumns: '300px 1fr', gap: '1.5rem' }}>
