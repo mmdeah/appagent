@@ -42,6 +42,9 @@ export default function AdminView() {
   const [aiInstructions, setAiInstructions] = useState('');
   const [isGeneratingReport, setIsGeneratingReport] = useState(false);
   const [reportError, setReportError] = useState('');
+  const [historialSearch, setHistorialSearch] = useState('');
+  const [historialDesde, setHistorialDesde] = useState('');
+  const [historialHasta, setHistorialHasta] = useState('');
 
   const handleGenerateReport = async () => {
     if (!reportOrderId) return;
@@ -520,41 +523,88 @@ export default function AdminView() {
               </div>
             )}
 
-            {activeTab === 'Historial' && (
-              <div className="card" style={{ padding: '1.5rem' }}>
-                <h2 style={{ fontSize: '1.2rem', marginBottom: '1rem', fontWeight: 700 }}>Órdenes Entregadas</h2>
-                <table className="data-table">
-                  <thead>
-                    <tr>
-                      <th>Placa</th>
-                      <th>Cliente</th>
-                      <th>Vehículo</th>
-                      <th>Método Pago</th>
-                      <th>Acciones</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {orders.filter(o => o.estado === 'Entregado').length === 0 && (
-                      <tr><td colSpan="5" style={{ textAlign: 'center', color: 'var(--text-muted)' }}>No hay órdenes entregadas.</td></tr>
+            {activeTab === 'Historial' && (() => {
+              const entregadas = orders.filter(o => o.estado === 'Entregado');
+              const filtradas = entregadas.filter(o => {
+                const matchPlaca = !historialSearch || o.placa?.toUpperCase().includes(historialSearch.toUpperCase());
+                const fechaOrden = o.fecha ? new Date(o.fecha) : null;
+                const matchDesde = !historialDesde || (fechaOrden && fechaOrden >= new Date(historialDesde));
+                const matchHasta = !historialHasta || (fechaOrden && fechaOrden <= new Date(historialHasta + 'T23:59:59'));
+                return matchPlaca && matchDesde && matchHasta;
+              });
+              return (
+                <div className="card" style={{ padding: '1.5rem' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem', flexWrap: 'wrap', gap: '0.75rem' }}>
+                    <h2 style={{ fontSize: '1.2rem', fontWeight: 700, margin: 0 }}>
+                      Órdenes Entregadas <span style={{ color: 'var(--text-muted)', fontWeight: 400, fontSize: '1rem' }}>({filtradas.length}{filtradas.length !== entregadas.length ? ` de ${entregadas.length}` : ''})</span>
+                    </h2>
+                    {(historialSearch || historialDesde || historialHasta) && (
+                      <button className="btn-secondary" style={{ fontSize: '0.85rem', padding: '0.3rem 0.75rem' }} onClick={() => { setHistorialSearch(''); setHistorialDesde(''); setHistorialHasta(''); }}>
+                        Limpiar filtros
+                      </button>
                     )}
-                    {orders.filter(o => o.estado === 'Entregado').map(o => (
-                      <tr key={o.id}>
-                        <td style={{ fontWeight: 700 }}>{o.placa}</td>
-                        <td>{o.cliente}</td>
-                        <td>{o.marca} {o.modelo}</td>
-                        <td><span className="badge badge-blue" style={{ background: 'rgba(99,102,241,0.1)', color: 'var(--primary)', border: 'none' }}>{o.metodoPago || 'Efectivo'}</span></td>
-                        <td>
-                          <div style={{ display: 'flex', gap: '0.5rem' }}>
-                            <button className="btn-secondary" style={{ padding: '0.4rem 0.6rem', fontSize: '0.9rem' }} onClick={() => setSelectedOrder(o)}>Ver Detalle</button>
-                            <button className="btn-secondary" style={{ padding: '0.4rem 0.6rem', fontSize: '0.9rem', color: 'var(--error)' }} onClick={() => deleteOrder(o.id)}><Trash2 size={14} /></button>
-                          </div>
-                        </td>
+                  </div>
+
+                  <div style={{ display: 'flex', gap: '0.75rem', marginBottom: '1.25rem', flexWrap: 'wrap', alignItems: 'flex-end' }}>
+                    <div style={{ flex: '1 1 180px', minWidth: 150 }}>
+                      <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-muted)', marginBottom: '0.3rem', textTransform: 'uppercase' }}>Buscar placa</label>
+                      <input
+                        type="text"
+                        placeholder="Ej: ABC123"
+                        value={historialSearch}
+                        onChange={e => setHistorialSearch(e.target.value.toUpperCase())}
+                        style={{ width: '100%', fontWeight: 700, letterSpacing: 1 }}
+                      />
+                    </div>
+                    <div style={{ flex: '1 1 150px', minWidth: 140 }}>
+                      <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-muted)', marginBottom: '0.3rem', textTransform: 'uppercase' }}>Desde</label>
+                      <input type="date" value={historialDesde} onChange={e => setHistorialDesde(e.target.value)} style={{ width: '100%' }} />
+                    </div>
+                    <div style={{ flex: '1 1 150px', minWidth: 140 }}>
+                      <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-muted)', marginBottom: '0.3rem', textTransform: 'uppercase' }}>Hasta</label>
+                      <input type="date" value={historialHasta} onChange={e => setHistorialHasta(e.target.value)} style={{ width: '100%' }} />
+                    </div>
+                  </div>
+
+                  <table className="data-table">
+                    <thead>
+                      <tr>
+                        <th>Placa</th>
+                        <th>Cliente</th>
+                        <th>Vehículo</th>
+                        <th>Fecha</th>
+                        <th>Método Pago</th>
+                        <th>Acciones</th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
+                    </thead>
+                    <tbody>
+                      {filtradas.length === 0 && (
+                        <tr><td colSpan="6" style={{ textAlign: 'center', color: 'var(--text-muted)' }}>
+                          {entregadas.length === 0 ? 'No hay órdenes entregadas.' : 'Sin resultados para los filtros aplicados.'}
+                        </td></tr>
+                      )}
+                      {filtradas.map(o => (
+                        <tr key={o.id}>
+                          <td style={{ fontWeight: 700 }}>{o.placa}</td>
+                          <td>{o.cliente}</td>
+                          <td>{o.marca} {o.modelo}</td>
+                          <td style={{ color: 'var(--text-muted)', fontSize: '0.9rem' }}>
+                            {o.fecha ? new Date(o.fecha).toLocaleDateString('es-CO') : '—'}
+                          </td>
+                          <td><span className="badge badge-blue" style={{ background: 'rgba(99,102,241,0.1)', color: 'var(--primary)', border: 'none' }}>{o.metodoPago || 'Efectivo'}</span></td>
+                          <td>
+                            <div style={{ display: 'flex', gap: '0.5rem' }}>
+                              <button className="btn-secondary" style={{ padding: '0.4rem 0.6rem', fontSize: '0.9rem' }} onClick={() => setSelectedOrder(o)}>Ver Detalle</button>
+                              <button className="btn-secondary" style={{ padding: '0.4rem 0.6rem', fontSize: '0.9rem', color: 'var(--error)' }} onClick={() => deleteOrder(o.id)}><Trash2 size={14} /></button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              );
+            })()}
 
             {activeTab === 'Formulario' && (
               <div className="card" style={{ padding: '1.5rem' }}>
