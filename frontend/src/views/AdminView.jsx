@@ -59,8 +59,11 @@ export default function AdminView() {
   const calcOrderTotal = (o) => {
     const q = o.quotes?.find(q => q.autorizada) || o.quotes?.[0];
     if (!q) return 0;
-    return (q.items || []).reduce((sum, i) =>
-      sum + (Number(i.manoObra)||0) + (Number(i.repuesto)||0) + (Number(i.reparacion)||0), 0);
+    return (q.items || []).reduce((sum, i) => {
+      const lineTotal = (Number(i.precio) || 0) * (Number(i.cantidad) || 1);
+      const iva = i.aplicaIva ? lineTotal * 0.19 : 0;
+      return sum + lineTotal + iva;
+    }, 0);
   };
 
   const getNextCorteALD = () => {
