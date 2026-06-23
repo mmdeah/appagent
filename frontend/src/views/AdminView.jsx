@@ -46,14 +46,19 @@ export default function AdminView() {
   const [historialDesde, setHistorialDesde] = useState('');
   const [historialHasta, setHistorialHasta] = useState('');
   const [aldBillings, setAldBillings] = useState([]);
+  const [cnBillings, setCnBillings] = useState([]);
 
   const MESES = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+  const IS_FLOTA = (cliente) => /(ald|ayvens)/i.test(cliente || '');
+  const IS_CN = (cliente) => /consult.?networks/i.test(cliente || '');
 
   const fetchAldBillings = () => {
     fetch(`${API_URL}/ald_billings`)
-      .then(r => r.json())
-      .then(data => setAldBillings(Array.isArray(data) ? data : []))
-      .catch(() => {});
+      .then(r => r.json()).then(data => setAldBillings(Array.isArray(data) ? data : [])).catch(() => {});
+  };
+  const fetchCnBillings = () => {
+    fetch(`${API_URL}/cn_billings`)
+      .then(r => r.json()).then(data => setCnBillings(Array.isArray(data) ? data : [])).catch(() => {});
   };
 
   const calcOrderTotal = (o) => {
@@ -74,32 +79,36 @@ export default function AdminView() {
     return { date: next, days: days <= 0 ? 0 : days };
   };
 
-  const markFacturada = async (cycleId, year, month) => {
-    const fechaEnvio = new Date().toISOString();
-    const venc = new Date(); venc.setDate(venc.getDate() + 35);
-    const fechaVencimiento = venc.toISOString();
-    const existing = aldBillings.find(b => b.id === cycleId);
-    if (existing) {
-      await fetch(`${API_URL}/ald_billings/${cycleId}`, {
+  const makeBillingHandlers = (collection, billings, refetch) => ({
+    markFacturada: async (cycleId, year, month) => {
+      const fechaEnvio = new Date().toISOString();
+      const venc = new Date(); venc.setDate(venc.getDate() + 35);
+      const fechaVencimiento = venc.toISOString();
+      const existing = billings.find(b => b.id === cycleId);
+      if (existing) {
+        await fetch(`${API_URL}/${collection}/${cycleId}`, {
+          method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ fechaEnvio, fechaVencimiento })
+        });
+      } else {
+        await fetch(`${API_URL}/${collection}`, {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ id: cycleId, year, month, fechaEnvio, fechaVencimiento, pagado: false, fechaPago: null })
+        });
+      }
+      refetch();
+    },
+    markPagada: async (cycleId) => {
+      await fetch(`${API_URL}/${collection}/${cycleId}`, {
         method: 'PATCH', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ fechaEnvio, fechaVencimiento })
+        body: JSON.stringify({ pagado: true, fechaPago: new Date().toISOString() })
       });
-    } else {
-      await fetch(`${API_URL}/ald_billings`, {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id: cycleId, year, month, fechaEnvio, fechaVencimiento, pagado: false, fechaPago: null })
-      });
+      refetch();
     }
-    fetchAldBillings();
-  };
+  });
 
-  const markPagada = async (cycleId) => {
-    await fetch(`${API_URL}/ald_billings/${cycleId}`, {
-      method: 'PATCH', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ pagado: true, fechaPago: new Date().toISOString() })
-    });
-    fetchAldBillings();
-  };
+  const aldHandlers = makeBillingHandlers('ald_billings', aldBillings, fetchAldBillings);
+  const cnHandlers  = makeBillingHandlers('cn_billings',  cnBillings,  fetchCnBillings);
 
   const handleGenerateReport = async () => {
     if (!reportOrderId) return;
@@ -321,7 +330,7 @@ export default function AdminView() {
     }
   };
 
-  useEffect(() => { fetchOrders(); fetchExpenses(); fetchTodos(); fetchConfig(); fetchAldBillings(); }, []);
+  useEffect(() => { fetchOrders(); fetchExpenses(); fetchTodos(); fetchConfig(); fetchAldBillings(); fetchCnBillings(); }, []);
 
   const deleteOrder = (id) => {
     setOrderToDelete(id);
@@ -508,7 +517,8 @@ export default function AdminView() {
                 { id: 'Docs Rápidos', icon: <Zap size={16} />, label: 'Docs Rápidos' },
                 { id: 'Informes', icon: <FileText size={16} />, label: 'Generar Informe' },
                 { id: 'Formulario', icon: <Settings size={16} />, label: 'Formulario Técnico' },
-                { id: 'ALD', icon: <CreditCard size={16} />, label: 'ALD' }
+                { id: 'ALD', icon: <CreditCard size={16} />, label: 'ALD / Ayvens' },
+                { id: 'ConsultNetworks', icon: <CreditCard size={16} />, label: 'Consult Networks' }
               ].map(t => (
                 <button key={t.id} onClick={() => setActiveTab(t.id)}
                   style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', padding: '0.5rem 1rem', background: activeTab === t.id ? 'var(--primary)' : 'transparent', color: activeTab === t.id ? 'white' : 'var(--text-muted)', border: 'none', borderRadius: 'var(--radius-sm)', cursor: 'pointer', fontWeight: 600, fontSize: '1rem', transition: 'all 0.2s', whiteSpace: 'nowrap' }}>
@@ -520,7 +530,7 @@ export default function AdminView() {
             {/* Tab Content */}
             {activeTab === 'Kanban' && (() => {
               const { date: corteDate, days: corteDays } = getNextCorteALD();
-              const aldVehiculosMes = orders.filter(o => /ald/i.test(o.cliente || '') && o.estado !== 'Entregado');
+              const aldVehiculosMes = orders.filter(o => IS_FLOTA(o.cliente) && o.estado !== 'Entregado');
               const vencidas = aldBillings.filter(b => !b.pagado && b.fechaVencimiento && new Date(b.fechaVencimiento) < new Date());
               const corteColor = corteDays <= 3 ? '#ef4444' : corteDays <= 7 ? '#f59e0b' : '#10b981';
               const corteBg = corteDays <= 3 ? 'rgba(239,68,68,0.1)' : corteDays <= 7 ? 'rgba(245,158,11,0.1)' : 'rgba(16,185,129,0.1)';
@@ -671,7 +681,7 @@ export default function AdminView() {
                         </td></tr>
                       )}
                       {filtradas.map(o => {
-                        const isALD = /ald/i.test(o.cliente || '');
+                        const isALD = IS_FLOTA(o.cliente);
                         return (
                         <tr key={o.id} style={isALD ? { background: 'rgba(251,191,36,0.12)', borderLeft: '3px solid #f59e0b' } : {}}>
                           <td style={{ fontWeight: 700 }}>{o.placa}{isALD && <span style={{ marginLeft: '0.4rem', fontSize: '0.75rem', fontWeight: 800, color: '#f59e0b', background: 'rgba(251,191,36,0.2)', padding: '0.1rem 0.4rem', borderRadius: 4 }}>ALD</span>}</td>
@@ -781,10 +791,17 @@ export default function AdminView() {
               </div>
             )}
 
-            {activeTab === 'ALD' && (() => {
-              const aldOrders = orders.filter(o => /ald/i.test(o.cliente || '') && o.estado === 'Entregado');
+            {(activeTab === 'ALD' || activeTab === 'ConsultNetworks') && (() => {
+              const isALDTab = activeTab === 'ALD';
+              const clientFilter = isALDTab ? IS_FLOTA : IS_CN;
+              const billings = isALDTab ? aldBillings : cnBillings;
+              const handlers = isALDTab ? aldHandlers : cnHandlers;
+              const tabTitle = isALDTab ? 'Flotas (ALD / Ayvens)' : 'Consult Networks';
+              const emptyMsg = isALDTab ? 'No hay vehículos de flota entregados aún.' : 'No hay vehículos de Consult Networks entregados aún.';
+
+              const clientOrders = orders.filter(o => clientFilter(o.cliente) && o.estado === 'Entregado');
               const grouped = {};
-              aldOrders.forEach(o => {
+              clientOrders.forEach(o => {
                 if (!o.fecha) return;
                 const d = new Date(o.fecha);
                 const key = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
@@ -792,8 +809,7 @@ export default function AdminView() {
                 grouped[key].ordersList.push(o);
               });
               const cycles = Object.entries(grouped).map(([key, data]) => ({
-                ...data, id: key,
-                billing: aldBillings.find(b => b.id === key) || null
+                ...data, id: key, billing: billings.find(b => b.id === key) || null
               })).sort((a, b) => b.id.localeCompare(a.id));
 
               const getStatus = (billing) => {
@@ -809,15 +825,15 @@ export default function AdminView() {
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
                     <div>
-                      <h2 style={{ fontSize: '1.4rem', fontWeight: 800, margin: 0 }}>Facturación ALD</h2>
+                      <h2 style={{ fontSize: '1.4rem', fontWeight: 800, margin: 0 }}>{tabTitle}</h2>
                       <p style={{ color: 'var(--text-muted)', margin: '0.2rem 0 0' }}>Ciclos mensuales · corte día 19 · pago a 35 días</p>
                     </div>
-                    <div style={{ display: 'flex', gap: '1rem' }}>
+                    <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
                       {[
                         { label: 'Ciclos', val: cycles.length, color: 'var(--primary)' },
                         { label: 'Pendientes', val: cycles.filter(c => !c.billing?.fechaEnvio).length, color: '#f59e0b' },
-                        { label: 'Vencidos', val: aldBillings.filter(b => !b.pagado && b.fechaVencimiento && new Date(b.fechaVencimiento) < new Date()).length, color: '#ef4444' },
-                        { label: 'Pagados', val: aldBillings.filter(b => b.pagado).length, color: '#10b981' },
+                        { label: 'Vencidos', val: billings.filter(b => !b.pagado && b.fechaVencimiento && new Date(b.fechaVencimiento) < new Date()).length, color: '#ef4444' },
+                        { label: 'Pagados', val: billings.filter(b => b.pagado).length, color: '#10b981' },
                       ].map(s => (
                         <div key={s.label} className="card" style={{ padding: '0.75rem 1.2rem', textAlign: 'center', minWidth: 70 }}>
                           <div style={{ fontSize: '1.5rem', fontWeight: 900, color: s.color }}>{s.val}</div>
@@ -828,9 +844,7 @@ export default function AdminView() {
                   </div>
 
                   {cycles.length === 0 && (
-                    <div className="card" style={{ padding: '3rem', textAlign: 'center', color: 'var(--text-muted)', borderStyle: 'dashed' }}>
-                      No hay vehículos ALD entregados aún.
-                    </div>
+                    <div className="card" style={{ padding: '3rem', textAlign: 'center', color: 'var(--text-muted)', borderStyle: 'dashed' }}>{emptyMsg}</div>
                   )}
 
                   {cycles.map(cycle => {
@@ -852,36 +866,37 @@ export default function AdminView() {
                         </div>
 
                         <table className="data-table" style={{ marginBottom: '1rem' }}>
-                          <thead><tr><th>Placa</th><th>Vehículo</th><th>Fecha</th><th>Total</th></tr></thead>
+                          <thead><tr><th>Placa</th><th>Cliente</th><th>Vehículo</th><th>Fecha</th><th>Total</th></tr></thead>
                           <tbody>
                             {cycle.ordersList.map(o => (
                               <tr key={o.id} style={{ cursor: 'pointer' }} onClick={() => setSelectedOrder(o)}>
                                 <td style={{ fontWeight: 700 }}>{o.placa}</td>
+                                <td style={{ fontSize: '0.9rem', color: 'var(--text-muted)' }}>{o.cliente}</td>
                                 <td>{o.marca} {o.modelo}</td>
                                 <td style={{ color: 'var(--text-muted)', fontSize: '0.9rem' }}>{o.fecha ? new Date(o.fecha).toLocaleDateString('es-CO') : '—'}</td>
-                                <td style={{ fontWeight: 700 }}>{total > 0 ? `$${fmt(calcOrderTotal(o))}` : '—'}</td>
+                                <td style={{ fontWeight: 700 }}>${fmt(calcOrderTotal(o))}</td>
                               </tr>
                             ))}
                           </tbody>
                         </table>
 
-                        <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
+                        <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap', alignItems: 'center' }}>
                           {!cycle.billing?.fechaEnvio && (
                             <button className="btn-primary" style={{ fontSize: '0.9rem' }}
-                              onClick={() => { if(window.confirm(`¿Marcar factura de ${MESES[cycle.month-1]} ${cycle.year} como enviada hoy?`)) markFacturada(cycle.id, cycle.year, cycle.month); }}>
+                              onClick={() => { if(window.confirm(`¿Marcar factura de ${MESES[cycle.month-1]} ${cycle.year} como enviada hoy?`)) handlers.markFacturada(cycle.id, cycle.year, cycle.month); }}>
                               Marcar factura enviada
                             </button>
                           )}
                           {cycle.billing?.fechaEnvio && !cycle.billing?.pagado && (
                             <button className="btn-secondary" style={{ fontSize: '0.9rem', color: '#10b981', borderColor: '#10b981' }}
-                              onClick={() => { if(window.confirm(`¿Confirmar pago recibido de ${MESES[cycle.month-1]} ${cycle.year}?`)) markPagada(cycle.id); }}>
+                              onClick={() => { if(window.confirm(`¿Confirmar pago recibido de ${MESES[cycle.month-1]} ${cycle.year}?`)) handlers.markPagada(cycle.id); }}>
                               <BadgeCheck size={15} /> Marcar pagado
                             </button>
                           )}
                           {cycle.billing?.fechaEnvio && (
-                            <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
+                            <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>
                               Factura enviada: {new Date(cycle.billing.fechaEnvio).toLocaleDateString('es-CO')}
-                            </div>
+                            </span>
                           )}
                         </div>
                       </div>

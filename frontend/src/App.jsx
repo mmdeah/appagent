@@ -4,6 +4,7 @@ import LoginView from './views/LoginView';
 import ClientView from './views/ClientView';
 import AdminView from './views/AdminView';
 import TechnicianView from './views/TechnicianView';
+import ContableView from './views/ContableView';
 
 export const ThemeContext = React.createContext({ theme: 'dark', toggleTheme: () => {} });
 
@@ -26,6 +27,7 @@ function App() {
             <Route path="/cliente" element={<ClientView />} />
             <Route path="/admin/*" element={<AdminView />} />
             <Route path="/tecnico/*" element={<TechnicianView />} />
+            <Route path="/contable" element={<ContableView />} />
           </Routes>
         </div>
       </BrowserRouter>

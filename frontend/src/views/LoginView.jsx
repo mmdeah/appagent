@@ -1,6 +1,6 @@
 import React, { useState, useContext } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Shield, Wrench, Car, ArrowLeft, Lock } from 'lucide-react';
+import { Shield, Wrench, Car, ArrowLeft, Lock, Building2 } from 'lucide-react';
 import { ThemeContext } from '../App';
 
 const roles = [
@@ -12,6 +12,15 @@ const roles = [
     iconBg: 'rgba(99,102,241,0.15)',
     pass: 'admin123',
     path: '/admin'
+  },
+  {
+    id: 'contable',
+    label: 'Contable',
+    desc: 'Facturación ALD, Ayvens y Consult Networks',
+    icon: <Building2 size={22} color="#f59e0b" />,
+    iconBg: 'rgba(245,158,11,0.15)',
+    pass: 'contable123',
+    path: '/contable'
   },
   {
     id: 'tecnico',

@@ -26,7 +26,7 @@ if (dataDir !== __dirname && !fs.existsSync(dbFile)) {
 // Ensure all required collections exist
 try {
   const dbData = JSON.parse(fs.readFileSync(dbFile, 'utf8'));
-  const requiredKeys = ['orders', 'quotes', 'reports', 'expenses', 'archived_orders', 'ai_reports', 'todos', 'ald_billings'];
+  const requiredKeys = ['orders', 'quotes', 'reports', 'expenses', 'archived_orders', 'ai_reports', 'todos', 'ald_billings', 'cn_billings'];
   let modified = false;
   requiredKeys.forEach(key => {
     if (!dbData[key]) {
