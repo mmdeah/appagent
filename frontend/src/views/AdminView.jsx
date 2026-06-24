@@ -73,16 +73,27 @@ export default function AdminView() {
 
   const getNextCorteALD = () => {
     const now = new Date();
-    const thisMonth19 = new Date(now.getFullYear(), now.getMonth(), 19);
-    const next = now <= thisMonth19 ? thisMonth19 : new Date(now.getFullYear(), now.getMonth() + 1, 19);
+    const thisMonth20 = new Date(now.getFullYear(), now.getMonth(), 20);
+    const next = now < thisMonth20 ? thisMonth20 : new Date(now.getFullYear(), now.getMonth() + 1, 20);
     const days = Math.ceil((next - now) / 86400000);
     return { date: next, days: days <= 0 ? 0 : days };
+  };
+
+  const getCyclePeriodLabel = (year, month) => {
+    // Cycle identified by cut date (20th of `month`/`year`)
+    // Period = 20th of prev month → 19th of this month
+    const prevMonth = month === 1 ? 12 : month - 1;
+    const prevYear  = month === 1 ? year - 1 : year;
+    return {
+      period: `20 de ${MESES[prevMonth - 1]} ${prevYear} — 19 de ${MESES[month - 1]} ${year}`,
+      cutDate: `20 de ${MESES[month - 1]} ${year}`
+    };
   };
 
   const makeBillingHandlers = (collection, billings, refetch) => ({
     markFacturada: async (cycleId, year, month) => {
       const fechaEnvio = new Date().toISOString();
-      const venc = new Date(); venc.setDate(venc.getDate() + 35);
+      const venc = new Date(); venc.setDate(venc.getDate() + 30);
       const fechaVencimiento = venc.toISOString();
       const existing = billings.find(b => b.id === cycleId);
       if (existing) {
@@ -544,7 +555,7 @@ export default function AdminView() {
                       {corteDays === 0 ? '¡Hoy!' : `${corteDays} día${corteDays !== 1 ? 's' : ''}`}
                     </div>
                     <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>
-                      19 de {MESES[corteDate.getMonth()]} · {aldVehiculosMes.length} vehículo{aldVehiculosMes.length !== 1 ? 's' : ''} ALD activo{aldVehiculosMes.length !== 1 ? 's' : ''}
+                      20 de {MESES[corteDate.getMonth()]} · {aldVehiculosMes.length} vehículo{aldVehiculosMes.length !== 1 ? 's' : ''} ALD activo{aldVehiculosMes.length !== 1 ? 's' : ''}
                     </div>
                   </div>
                 </div>
@@ -804,8 +815,13 @@ export default function AdminView() {
               clientOrders.forEach(o => {
                 if (!o.fecha) return;
                 const d = new Date(o.fecha);
-                const key = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
-                if (!grouped[key]) grouped[key] = { year: d.getFullYear(), month: d.getMonth()+1, ordersList: [] };
+                // Cycle = cut on the 20th of next month if delivered on/after 20th,
+                // otherwise cut on the 20th of this month
+                let cm = d.getMonth() + 1; // 1-indexed
+                let cy = d.getFullYear();
+                if (d.getDate() >= 20) { cm++; if (cm > 12) { cm = 1; cy++; } }
+                const key = `${cy}-${String(cm).padStart(2,'0')}`;
+                if (!grouped[key]) grouped[key] = { year: cy, month: cm, ordersList: [] };
                 grouped[key].ordersList.push(o);
               });
               const cycles = Object.entries(grouped).map(([key, data]) => ({
@@ -826,7 +842,7 @@ export default function AdminView() {
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
                     <div>
                       <h2 style={{ fontSize: '1.4rem', fontWeight: 800, margin: 0 }}>{tabTitle}</h2>
-                      <p style={{ color: 'var(--text-muted)', margin: '0.2rem 0 0' }}>Ciclos mensuales · corte día 19 · pago a 35 días</p>
+                      <p style={{ color: 'var(--text-muted)', margin: '0.2rem 0 0' }}>Corte el día 20 de cada mes · pago a 30 días desde el corte</p>
                     </div>
                     <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
                       {[
@@ -849,26 +865,31 @@ export default function AdminView() {
 
                   {cycles.map(cycle => {
                     const st = getStatus(cycle.billing);
-                    const total = cycle.ordersList.reduce((s, o) => s + calcOrderTotal(o), 0);
+                    const { period, cutDate } = getCyclePeriodLabel(cycle.year, cycle.month);
+                    const sortedOrders = [...cycle.ordersList].sort((a, b) => new Date(a.fecha) - new Date(b.fecha));
+                    const total = sortedOrders.reduce((s, o) => s + calcOrderTotal(o), 0);
                     return (
                       <div key={cycle.id} className="card" style={{ padding: '1.5rem', borderLeft: `4px solid ${st.color}` }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '1rem', marginBottom: '1.25rem' }}>
                           <div>
-                            <h3 style={{ fontSize: '1.2rem', fontWeight: 800, margin: 0 }}>{MESES[cycle.month-1]} {cycle.year}</h3>
-                            <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem', marginTop: '0.4rem', padding: '0.3rem 0.75rem', background: st.bg, borderRadius: 20, fontSize: '0.85rem', fontWeight: 700, color: st.color }}>
+                            <h3 style={{ fontSize: '1.2rem', fontWeight: 800, margin: 0 }}>Corte {cutDate}</h3>
+                            <div style={{ fontSize: '0.82rem', color: 'var(--text-muted)', marginTop: '0.2rem' }}>
+                              Período: {period}
+                            </div>
+                            <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem', marginTop: '0.5rem', padding: '0.3rem 0.75rem', background: st.bg, borderRadius: 20, fontSize: '0.85rem', fontWeight: 700, color: st.color }}>
                               {st.icon} {st.label}
                             </div>
                           </div>
                           <div style={{ textAlign: 'right' }}>
                             <div style={{ fontSize: '1.4rem', fontWeight: 900 }}>${fmt(total)}</div>
-                            <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>{cycle.ordersList.length} vehículo{cycle.ordersList.length !== 1 ? 's' : ''}</div>
+                            <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>{sortedOrders.length} vehículo{sortedOrders.length !== 1 ? 's' : ''}</div>
                           </div>
                         </div>
 
                         <table className="data-table" style={{ marginBottom: '1rem' }}>
-                          <thead><tr><th>Placa</th><th>Cliente</th><th>Vehículo</th><th>Fecha</th><th>Total</th></tr></thead>
+                          <thead><tr><th>Placa</th><th>Cliente</th><th>Vehículo</th><th>Fecha entrega</th><th>Total</th></tr></thead>
                           <tbody>
-                            {cycle.ordersList.map(o => (
+                            {sortedOrders.map(o => (
                               <tr key={o.id} style={{ cursor: 'pointer' }} onClick={() => setSelectedOrder(o)}>
                                 <td style={{ fontWeight: 700 }}>{o.placa}</td>
                                 <td style={{ fontSize: '0.9rem', color: 'var(--text-muted)' }}>{o.cliente}</td>
