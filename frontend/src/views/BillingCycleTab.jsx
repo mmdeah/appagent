@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { API_URL } from '../api';
-import { BadgeCheck, Ban, Clock, X, MoveRight, Plus, Trash2 } from 'lucide-react';
+import { BadgeCheck, Ban, Clock, X, MoveRight, Plus, Trash2, EyeOff } from 'lucide-react';
 
 const fmt = n => (parseFloat(n) || 0).toLocaleString('es-CO', { minimumFractionDigits: 0 });
 const MESES = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
@@ -45,7 +45,7 @@ export default function BillingCycleTab({
   const [manualForm, setManualForm]       = useState(EMPTY_MANUAL);
 
   // Build cycles — respect fleetCycleOverride per order
-  const clientOrders = orders.filter(o => clientFilter(o.cliente) && o.estado === 'Entregado');
+  const clientOrders = orders.filter(o => clientFilter(o.cliente) && o.estado === 'Entregado' && !o.fleetExcluded);
   const grouped = {};
   clientOrders.forEach(o => {
     if (!o.fecha) return;
@@ -174,6 +174,15 @@ export default function BillingCycleTab({
       body: JSON.stringify({ pagado: true, fechaPago: new Date().toISOString() })
     });
     onRefreshBillings();
+  };
+
+  // Exclude order from fleet view
+  const excludeOrder = async (orderId) => {
+    await fetch(`${API_URL}/orders/${orderId}`, {
+      method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ fleetExcluded: true })
+    });
+    onRefreshOrders();
   };
 
   // Move order
@@ -380,10 +389,16 @@ export default function BillingCycleTab({
                           ) : <span style={{ color: 'var(--text-muted)', fontSize: '0.82rem' }}>—</span>}
                         </td>
                         <td style={{ textAlign: 'center' }}>
-                          <button style={{ background: 'none', border: '1px solid var(--border)', cursor: 'pointer', color: 'var(--text-muted)', fontSize: '0.78rem', padding: '0.2rem 0.5rem', borderRadius: 6, display: 'inline-flex', alignItems: 'center', gap: '0.25rem' }}
-                            onClick={() => { setMovingOrder({ orderId: o.id, placa: o.placa, fromCycleId: cycle.id }); setMoveTarget(''); }}>
-                            <MoveRight size={12}/> Mover
-                          </button>
+                          <div style={{ display: 'flex', gap: '0.3rem', justifyContent: 'center' }}>
+                            <button style={{ background: 'none', border: '1px solid var(--border)', cursor: 'pointer', color: 'var(--text-muted)', fontSize: '0.78rem', padding: '0.2rem 0.5rem', borderRadius: 6, display: 'inline-flex', alignItems: 'center', gap: '0.25rem' }}
+                              onClick={() => { setMovingOrder({ orderId: o.id, placa: o.placa, fromCycleId: cycle.id }); setMoveTarget(''); }}>
+                              <MoveRight size={12}/> Mover
+                            </button>
+                            <button title="Sacar de esta vista" style={{ background: 'none', border: '1px solid rgba(239,68,68,0.35)', cursor: 'pointer', color: '#ef4444', fontSize: '0.78rem', padding: '0.2rem 0.5rem', borderRadius: 6, display: 'inline-flex', alignItems: 'center', gap: '0.25rem' }}
+                              onClick={() => { if (window.confirm(`¿Sacar "${o.placa} — ${o.cliente}" de esta vista? Se puede revertir desde el detalle de la orden.`)) excludeOrder(o.id); }}>
+                              <EyeOff size={12}/>
+                            </button>
+                          </div>
                         </td>
                       </tr>
                     );
