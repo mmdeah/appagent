@@ -4,6 +4,7 @@ const fs = require('fs');
 const path = require('path');
 const cors = require('cors');
 const { spawn } = require('child_process');
+const multer = require('multer');
 
 const server = jsonServer.create();
 const middlewares = jsonServer.defaults();
@@ -44,9 +45,82 @@ try {
 
 const router = jsonServer.router(dbFile);
 
+// PDF uploads directory (persists via Railway volume)
+const uploadsDir = path.join(dataDir, 'uploads');
+if (!fs.existsSync(uploadsDir)) fs.mkdirSync(uploadsDir, { recursive: true });
+
+const storage = multer.diskStorage({
+  destination: (req, file, cb) => cb(null, uploadsDir),
+  filename: (req, file, cb) => {
+    const ts = Date.now();
+    const safe = file.originalname.replace(/[^a-zA-Z0-9._-]/g, '_');
+    cb(null, `${ts}_${safe}`);
+  }
+});
+const upload = multer({
+  storage,
+  limits: { fileSize: 20 * 1024 * 1024 },
+  fileFilter: (req, file, cb) => {
+    if (file.mimetype === 'application/pdf') cb(null, true);
+    else cb(new Error('Solo se permiten archivos PDF'));
+  }
+});
+
 server.use(cors());
 server.use(middlewares);
 server.use(jsonServer.bodyParser);
+
+// Upload PDF for an order
+server.post('/api/orders/:orderId/pdfs', upload.single('pdf'), (req, res) => {
+  try {
+    if (!req.file) return res.status(400).json({ error: 'No se recibió ningún archivo' });
+    const { orderId } = req.params;
+    const db = router.db;
+    const order = db.get('orders').find(o => String(o.id) === String(orderId)).value();
+    if (!order) return res.status(404).json({ error: 'Orden no encontrada' });
+
+    const newPdf = {
+      id: Date.now(),
+      filename: req.file.filename,
+      originalName: req.file.originalname,
+      size: req.file.size,
+      uploadedAt: new Date().toISOString()
+    };
+    const pdfs = [...(order.pdfs || []), newPdf];
+    db.get('orders').find(o => String(o.id) === String(orderId)).assign({ pdfs }).write();
+    res.json(newPdf);
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// Download a PDF
+server.get('/api/orders/:orderId/pdfs/:filename', (req, res) => {
+  const filePath = path.join(uploadsDir, req.params.filename);
+  if (!fs.existsSync(filePath)) return res.status(404).json({ error: 'Archivo no encontrado' });
+  res.download(filePath, req.params.filename);
+});
+
+// Delete a PDF
+server.delete('/api/orders/:orderId/pdfs/:fileId', (req, res) => {
+  try {
+    const { orderId, fileId } = req.params;
+    const db = router.db;
+    const order = db.get('orders').find(o => String(o.id) === String(orderId)).value();
+    if (!order) return res.status(404).json({ error: 'Orden no encontrada' });
+
+    const target = (order.pdfs || []).find(p => String(p.id) === String(fileId));
+    if (target) {
+      const filePath = path.join(uploadsDir, target.filename);
+      if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
+    }
+    const pdfs = (order.pdfs || []).filter(p => String(p.id) !== String(fileId));
+    db.get('orders').find(o => String(o.id) === String(orderId)).assign({ pdfs }).write();
+    res.json({ ok: true });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
 
 // One-time cleanup: move AI reports (no items field) from reports → ai_reports
 server.post('/api/migrate-ai-reports', (req, res) => {

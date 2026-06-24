@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
-import { API_URL } from '../api';
-import { MessageCircle, Printer, CheckCircle, X, Plus, Trash2, Camera, Edit2, Save } from 'lucide-react';
+import React, { useState, useRef } from 'react';
+import { API_URL, BACKEND_URL } from '../api';
+import { MessageCircle, Printer, CheckCircle, X, Plus, Trash2, Camera, Edit2, Save, FileText, Upload, Download } from 'lucide-react';
 
 const fmt = (n) => (parseFloat(n) || 0).toLocaleString('es-CO', { minimumFractionDigits: 0 });
 
@@ -483,10 +483,38 @@ export default function OrderDetailsModal({ order, onClose }) {
 
   const stateColor = { Bueno: '#34d399', Regular: '#fbbf24', Malo: '#f87171' };
 
+  const [pdfs, setPdfs] = useState(order.pdfs || []);
+  const [uploadingPdf, setUploadingPdf] = useState(false);
+  const pdfInputRef = useRef(null);
+
+  const uploadPdf = async (file) => {
+    if (!file) return;
+    setUploadingPdf(true);
+    const fd = new FormData();
+    fd.append('pdf', file);
+    try {
+      const res = await fetch(`${BACKEND_URL}/api/orders/${order.id}/pdfs`, { method: 'POST', body: fd });
+      if (!res.ok) throw new Error(await res.text());
+      const newPdf = await res.json();
+      setPdfs(prev => [...prev, newPdf]);
+    } catch (e) {
+      alert('Error al subir el PDF: ' + e.message);
+    } finally {
+      setUploadingPdf(false);
+    }
+  };
+
+  const deletePdf = async (pdf) => {
+    if (!window.confirm(`¿Eliminar "${pdf.originalName}"?`)) return;
+    await fetch(`${BACKEND_URL}/api/orders/${order.id}/pdfs/${pdf.id}`, { method: 'DELETE' });
+    setPdfs(prev => prev.filter(p => p.id !== pdf.id));
+  };
+
   const tabs = [
     { id: 'info', label: 'Información' },
     { id: 'reporte', label: 'Reporte Técnico' },
     { id: 'cotizacion', label: 'Cotización' },
+    { id: 'pdfs', label: `Documentos${pdfs.length ? ` (${pdfs.length})` : ''}` },
   ];
 
   return (<>
@@ -1031,6 +1059,64 @@ export default function OrderDetailsModal({ order, onClose }) {
                   <button onClick={() => printQuote('CUENTA DE COBRO')} className="btn-secondary"><Printer size={16} /> Cta. Cobro PDF</button>
                 </div>
               </div>
+            </div>
+          )}
+
+          {/* ── DOCUMENTOS TAB ── */}
+          {activeTab === 'pdfs' && (
+            <div>
+              <p className="section-title">Documentos PDF</p>
+
+              {/* Upload area */}
+              <div
+                style={{ border: '2px dashed var(--border)', borderRadius: 10, padding: '2rem', textAlign: 'center', marginBottom: '1.5rem', cursor: 'pointer', transition: 'border-color 0.2s' }}
+                onClick={() => pdfInputRef.current?.click()}
+                onDragOver={e => e.preventDefault()}
+                onDrop={e => { e.preventDefault(); const f = e.dataTransfer.files[0]; if (f) uploadPdf(f); }}
+              >
+                <input ref={pdfInputRef} type="file" accept="application/pdf" style={{ display: 'none' }}
+                  onChange={e => { if (e.target.files[0]) uploadPdf(e.target.files[0]); e.target.value = ''; }} />
+                {uploadingPdf ? (
+                  <div style={{ color: 'var(--primary)', fontWeight: 600 }}>Subiendo...</div>
+                ) : (
+                  <>
+                    <Upload size={28} style={{ color: 'var(--text-muted)', marginBottom: '0.5rem' }} />
+                    <div style={{ fontWeight: 600, marginBottom: '0.2rem' }}>Arrastra un PDF aquí o haz clic para seleccionar</div>
+                    <div style={{ fontSize: '0.82rem', color: 'var(--text-muted)' }}>Máximo 20 MB · Solo archivos PDF</div>
+                  </>
+                )}
+              </div>
+
+              {/* Files list */}
+              {pdfs.length === 0 ? (
+                <div style={{ color: 'var(--text-muted)', textAlign: 'center', padding: '1rem', fontSize: '0.9rem' }}>
+                  No hay documentos adjuntos aún.
+                </div>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
+                  {pdfs.map(pdf => (
+                    <div key={pdf.id} style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', padding: '0.75rem 1rem', background: 'var(--card-bg)', border: '1px solid var(--border)', borderRadius: 8 }}>
+                      <FileText size={20} color="var(--primary)" style={{ flexShrink: 0 }} />
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ fontWeight: 600, fontSize: '0.9rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{pdf.originalName}</div>
+                        <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>
+                          {(pdf.size / 1024).toFixed(0)} KB · {new Date(pdf.uploadedAt).toLocaleDateString('es-CO')}
+                        </div>
+                      </div>
+                      <a
+                        href={`${BACKEND_URL}/api/orders/${order.id}/pdfs/${pdf.filename}`}
+                        download={pdf.originalName}
+                        style={{ display: 'inline-flex', alignItems: 'center', gap: '0.3rem', padding: '0.35rem 0.75rem', background: 'rgba(99,102,241,0.12)', color: 'var(--primary)', border: '1px solid rgba(99,102,241,0.3)', borderRadius: 6, fontSize: '0.82rem', fontWeight: 600, textDecoration: 'none', flexShrink: 0 }}>
+                        <Download size={13}/> Descargar
+                      </a>
+                      <button onClick={() => deletePdf(pdf)}
+                        style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', padding: '0.2rem', flexShrink: 0 }}>
+                        <Trash2 size={16}/>
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           )}
         </div>
