@@ -4,6 +4,7 @@ import OrderDetailsModal from './OrderDetailsModal';
 import PhotoUploadModal from './PhotoUploadModal';
 import { ThemeContext } from '../App';
 import { PlusCircle, BarChart3, Camera, X, Car, Trash2, Zap, LayoutDashboard, History, Receipt, CheckCircle, AlertTriangle, ClipboardList, Save, Settings, FileText, Plus, Sparkles, CreditCard, Clock, BadgeCheck, Ban } from 'lucide-react';
+import BillingCycleTab from './BillingCycleTab';
 
 const fmt = (n) => (parseFloat(n) || 0).toLocaleString('es-CO', { minimumFractionDigits: 0 });
 
@@ -61,16 +62,6 @@ export default function AdminView() {
       .then(r => r.json()).then(data => setCnBillings(Array.isArray(data) ? data : [])).catch(() => {});
   };
 
-  const calcOrderTotal = (o) => {
-    const q = o.quotes?.find(q => q.autorizada) || o.quotes?.[0];
-    if (!q) return 0;
-    return (q.items || []).reduce((sum, i) => {
-      const lineTotal = (Number(i.precio) || 0) * (Number(i.cantidad) || 1);
-      const iva = i.aplicaIva ? lineTotal * 0.19 : 0;
-      return sum + lineTotal + iva;
-    }, 0);
-  };
-
   const getNextCorteALD = () => {
     const now = new Date();
     const thisMonth20 = new Date(now.getFullYear(), now.getMonth(), 20);
@@ -78,48 +69,6 @@ export default function AdminView() {
     const days = Math.ceil((next - now) / 86400000);
     return { date: next, days: days <= 0 ? 0 : days };
   };
-
-  const getCyclePeriodLabel = (year, month) => {
-    // Cycle identified by cut date (20th of `month`/`year`)
-    // Period = 20th of prev month → 19th of this month
-    const prevMonth = month === 1 ? 12 : month - 1;
-    const prevYear  = month === 1 ? year - 1 : year;
-    return {
-      period: `20 de ${MESES[prevMonth - 1]} ${prevYear} — 19 de ${MESES[month - 1]} ${year}`,
-      cutDate: `20 de ${MESES[month - 1]} ${year}`
-    };
-  };
-
-  const makeBillingHandlers = (collection, billings, refetch) => ({
-    markFacturada: async (cycleId, year, month) => {
-      const fechaEnvio = new Date().toISOString();
-      const venc = new Date(); venc.setDate(venc.getDate() + 30);
-      const fechaVencimiento = venc.toISOString();
-      const existing = billings.find(b => b.id === cycleId);
-      if (existing) {
-        await fetch(`${API_URL}/${collection}/${cycleId}`, {
-          method: 'PATCH', headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ fechaEnvio, fechaVencimiento })
-        });
-      } else {
-        await fetch(`${API_URL}/${collection}`, {
-          method: 'POST', headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ id: cycleId, year, month, fechaEnvio, fechaVencimiento, pagado: false, fechaPago: null })
-        });
-      }
-      refetch();
-    },
-    markPagada: async (cycleId) => {
-      await fetch(`${API_URL}/${collection}/${cycleId}`, {
-        method: 'PATCH', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ pagado: true, fechaPago: new Date().toISOString() })
-      });
-      refetch();
-    }
-  });
-
-  const aldHandlers = makeBillingHandlers('ald_billings', aldBillings, fetchAldBillings);
-  const cnHandlers  = makeBillingHandlers('cn_billings',  cnBillings,  fetchCnBillings);
 
   const handleGenerateReport = async () => {
     if (!reportOrderId) return;
@@ -802,130 +751,19 @@ export default function AdminView() {
               </div>
             )}
 
-            {(activeTab === 'ALD' || activeTab === 'ConsultNetworks') && (() => {
-              const isALDTab = activeTab === 'ALD';
-              const clientFilter = isALDTab ? IS_FLOTA : IS_CN;
-              const billings = isALDTab ? aldBillings : cnBillings;
-              const handlers = isALDTab ? aldHandlers : cnHandlers;
-              const tabTitle = isALDTab ? 'Flotas (ALD / Ayvens)' : 'Consult Networks';
-              const emptyMsg = isALDTab ? 'No hay vehículos de flota entregados aún.' : 'No hay vehículos de Consult Networks entregados aún.';
-
-              const clientOrders = orders.filter(o => clientFilter(o.cliente) && o.estado === 'Entregado');
-              const grouped = {};
-              clientOrders.forEach(o => {
-                if (!o.fecha) return;
-                const d = new Date(o.fecha);
-                // Cycle = cut on the 20th of next month if delivered on/after 20th,
-                // otherwise cut on the 20th of this month
-                let cm = d.getMonth() + 1; // 1-indexed
-                let cy = d.getFullYear();
-                if (d.getDate() >= 20) { cm++; if (cm > 12) { cm = 1; cy++; } }
-                const key = `${cy}-${String(cm).padStart(2,'0')}`;
-                if (!grouped[key]) grouped[key] = { year: cy, month: cm, ordersList: [] };
-                grouped[key].ordersList.push(o);
-              });
-              const cycles = Object.entries(grouped).map(([key, data]) => ({
-                ...data, id: key, billing: billings.find(b => b.id === key) || null
-              })).sort((a, b) => b.id.localeCompare(a.id));
-
-              const getStatus = (billing) => {
-                if (!billing || !billing.fechaEnvio) return { label: 'Pendiente de facturar', color: 'var(--text-muted)', bg: 'rgba(255,255,255,0.05)', icon: <Clock size={14}/> };
-                if (billing.pagado) return { label: `Pagado · ${new Date(billing.fechaPago).toLocaleDateString('es-CO')}`, color: '#10b981', bg: 'rgba(16,185,129,0.1)', icon: <BadgeCheck size={14}/> };
-                const venc = new Date(billing.fechaVencimiento);
-                if (venc < new Date()) return { label: `VENCIDO · vencía ${venc.toLocaleDateString('es-CO')}`, color: '#ef4444', bg: 'rgba(239,68,68,0.1)', icon: <Ban size={14}/> };
-                const diasRestantes = Math.ceil((venc - new Date()) / 86400000);
-                return { label: `Esperando pago · vence ${venc.toLocaleDateString('es-CO')} (${diasRestantes}d)`, color: '#f59e0b', bg: 'rgba(245,158,11,0.1)', icon: <Clock size={14}/> };
-              };
-
-              return (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
-                    <div>
-                      <h2 style={{ fontSize: '1.4rem', fontWeight: 800, margin: 0 }}>{tabTitle}</h2>
-                      <p style={{ color: 'var(--text-muted)', margin: '0.2rem 0 0' }}>Corte el día 20 de cada mes · pago a 30 días desde el corte</p>
-                    </div>
-                    <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
-                      {[
-                        { label: 'Ciclos', val: cycles.length, color: 'var(--primary)' },
-                        { label: 'Pendientes', val: cycles.filter(c => !c.billing?.fechaEnvio).length, color: '#f59e0b' },
-                        { label: 'Vencidos', val: billings.filter(b => !b.pagado && b.fechaVencimiento && new Date(b.fechaVencimiento) < new Date()).length, color: '#ef4444' },
-                        { label: 'Pagados', val: billings.filter(b => b.pagado).length, color: '#10b981' },
-                      ].map(s => (
-                        <div key={s.label} className="card" style={{ padding: '0.75rem 1.2rem', textAlign: 'center', minWidth: 70 }}>
-                          <div style={{ fontSize: '1.5rem', fontWeight: 900, color: s.color }}>{s.val}</div>
-                          <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 600 }}>{s.label}</div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-
-                  {cycles.length === 0 && (
-                    <div className="card" style={{ padding: '3rem', textAlign: 'center', color: 'var(--text-muted)', borderStyle: 'dashed' }}>{emptyMsg}</div>
-                  )}
-
-                  {cycles.map(cycle => {
-                    const st = getStatus(cycle.billing);
-                    const { period, cutDate } = getCyclePeriodLabel(cycle.year, cycle.month);
-                    const sortedOrders = [...cycle.ordersList].sort((a, b) => new Date(a.fecha) - new Date(b.fecha));
-                    const total = sortedOrders.reduce((s, o) => s + calcOrderTotal(o), 0);
-                    return (
-                      <div key={cycle.id} className="card" style={{ padding: '1.5rem', borderLeft: `4px solid ${st.color}` }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '1rem', marginBottom: '1.25rem' }}>
-                          <div>
-                            <h3 style={{ fontSize: '1.2rem', fontWeight: 800, margin: 0 }}>Corte {cutDate}</h3>
-                            <div style={{ fontSize: '0.82rem', color: 'var(--text-muted)', marginTop: '0.2rem' }}>
-                              Período: {period}
-                            </div>
-                            <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem', marginTop: '0.5rem', padding: '0.3rem 0.75rem', background: st.bg, borderRadius: 20, fontSize: '0.85rem', fontWeight: 700, color: st.color }}>
-                              {st.icon} {st.label}
-                            </div>
-                          </div>
-                          <div style={{ textAlign: 'right' }}>
-                            <div style={{ fontSize: '1.4rem', fontWeight: 900 }}>${fmt(total)}</div>
-                            <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>{sortedOrders.length} vehículo{sortedOrders.length !== 1 ? 's' : ''}</div>
-                          </div>
-                        </div>
-
-                        <table className="data-table" style={{ marginBottom: '1rem' }}>
-                          <thead><tr><th>Placa</th><th>Cliente</th><th>Vehículo</th><th>Fecha entrega</th><th>Total</th></tr></thead>
-                          <tbody>
-                            {sortedOrders.map(o => (
-                              <tr key={o.id} style={{ cursor: 'pointer' }} onClick={() => setSelectedOrder(o)}>
-                                <td style={{ fontWeight: 700 }}>{o.placa}</td>
-                                <td style={{ fontSize: '0.9rem', color: 'var(--text-muted)' }}>{o.cliente}</td>
-                                <td>{o.marca} {o.modelo}</td>
-                                <td style={{ color: 'var(--text-muted)', fontSize: '0.9rem' }}>{o.fecha ? new Date(o.fecha).toLocaleDateString('es-CO') : '—'}</td>
-                                <td style={{ fontWeight: 700 }}>${fmt(calcOrderTotal(o))}</td>
-                              </tr>
-                            ))}
-                          </tbody>
-                        </table>
-
-                        <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap', alignItems: 'center' }}>
-                          {!cycle.billing?.fechaEnvio && (
-                            <button className="btn-primary" style={{ fontSize: '0.9rem' }}
-                              onClick={() => { if(window.confirm(`¿Marcar factura de ${MESES[cycle.month-1]} ${cycle.year} como enviada hoy?`)) handlers.markFacturada(cycle.id, cycle.year, cycle.month); }}>
-                              Marcar factura enviada
-                            </button>
-                          )}
-                          {cycle.billing?.fechaEnvio && !cycle.billing?.pagado && (
-                            <button className="btn-secondary" style={{ fontSize: '0.9rem', color: '#10b981', borderColor: '#10b981' }}
-                              onClick={() => { if(window.confirm(`¿Confirmar pago recibido de ${MESES[cycle.month-1]} ${cycle.year}?`)) handlers.markPagada(cycle.id); }}>
-                              <BadgeCheck size={15} /> Marcar pagado
-                            </button>
-                          )}
-                          {cycle.billing?.fechaEnvio && (
-                            <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>
-                              Factura enviada: {new Date(cycle.billing.fechaEnvio).toLocaleDateString('es-CO')}
-                            </span>
-                          )}
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              );
-            })()}
+            {(activeTab === 'ALD' || activeTab === 'ConsultNetworks') && (
+              <BillingCycleTab
+                orders={orders}
+                clientFilter={activeTab === 'ALD' ? IS_FLOTA : IS_CN}
+                billings={activeTab === 'ALD' ? aldBillings : cnBillings}
+                collection={activeTab === 'ALD' ? 'ald_billings' : 'cn_billings'}
+                onRefreshBillings={activeTab === 'ALD' ? fetchAldBillings : fetchCnBillings}
+                onRefreshOrders={fetchOrders}
+                title={activeTab === 'ALD' ? 'Flotas (ALD / Ayvens)' : 'Consult Networks'}
+                emptyMsg={activeTab === 'ALD' ? 'No hay vehículos de flota entregados aún.' : 'No hay vehículos de Consult Networks entregados aún.'}
+                onOrderClick={setSelectedOrder}
+              />
+            )}
 
             {activeTab === 'Gastos' && (
               <div style={{ display: 'grid', gridTemplateColumns: '300px 1fr', gap: '1.5rem' }}>
