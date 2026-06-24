@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { API_URL } from '../api';
-import { BadgeCheck, Ban, Clock, X, MoveRight } from 'lucide-react';
+import { BadgeCheck, Ban, Clock, X, MoveRight, Plus, Trash2 } from 'lucide-react';
 
 const fmt = n => (parseFloat(n) || 0).toLocaleString('es-CO', { minimumFractionDigits: 0 });
 const MESES = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
@@ -28,8 +28,10 @@ const getCycleIdFromDate = (fecha) => {
   let cm = d.getMonth() + 1;
   let cy = d.getFullYear();
   if (d.getDate() >= 20) { cm++; if (cm > 12) { cm = 1; cy++; } }
-  return `${cy}-${String(cm).padStart(2, '0')}`;
+  return `${cy}-${String(cm).padStart(2, '00')}`;
 };
+
+const EMPTY_MANUAL = { placa: '', cliente: '', vehiculo: '', fecha: '', total: '', descripcion: '' };
 
 export default function BillingCycleTab({
   orders, clientFilter, billings, collection,
@@ -37,8 +39,10 @@ export default function BillingCycleTab({
   title, emptyMsg, onOrderClick
 }) {
   const [localSelected, setLocalSelected] = useState({});
-  const [movingOrder, setMovingOrder] = useState(null);
-  const [moveTarget, setMoveTarget] = useState('');
+  const [movingOrder, setMovingOrder]     = useState(null);
+  const [moveTarget, setMoveTarget]       = useState('');
+  const [manualModal, setManualModal]     = useState(null); // { cycleId, year, month, billing }
+  const [manualForm, setManualForm]       = useState(EMPTY_MANUAL);
 
   // Build cycles — respect fleetCycleOverride per order
   const clientOrders = orders.filter(o => clientFilter(o.cliente) && o.estado === 'Entregado');
@@ -50,6 +54,14 @@ export default function BillingCycleTab({
     if (!grouped[key]) grouped[key] = { year: cy, month: cm, ordersList: [] };
     grouped[key].ordersList.push(o);
   });
+
+  // Also include cycles that only have manual entries (no app orders)
+  billings.forEach(b => {
+    if (!grouped[b.id] && (b.manualEntries || []).length > 0) {
+      grouped[b.id] = { year: b.year, month: b.month, ordersList: [] };
+    }
+  });
+
   const cycles = Object.entries(grouped).map(([key, data]) => ({
     ...data, id: key,
     billing: billings.find(b => b.id === key) || null,
@@ -83,25 +95,30 @@ export default function BillingCycleTab({
     return { label: `Esperando pago · vence ${venc.toLocaleDateString('es-CO')} (${dias}d)`, color: '#f59e0b', bg: 'rgba(245,158,11,0.1)', icon: <Clock size={14}/> };
   };
 
-  // Selection handlers
-  const toggleSelect = (cycleId, orderId) => {
+  // Selection
+  const toggleSelect = (cycleId, rowId) => {
     setLocalSelected(prev => {
       const set = new Set(prev[cycleId] || []);
-      const key = String(orderId);
+      const key = String(rowId);
       if (set.has(key)) set.delete(key); else set.add(key);
       return { ...prev, [cycleId]: set };
     });
   };
 
-  const toggleSelectAll = (cycleId, orderIds) => {
+  const getAllRowIds = (cycle) => [
+    ...cycle.ordersList.map(o => String(o.id)),
+    ...(cycle.billing?.manualEntries || []).map(e => `m_${e.id}`)
+  ];
+
+  const toggleSelectAll = (cycleId, rowIds) => {
     setLocalSelected(prev => {
       const cur = prev[cycleId] || new Set();
-      const allSel = orderIds.every(id => cur.has(String(id)));
-      return { ...prev, [cycleId]: allSel ? new Set() : new Set(orderIds.map(String)) };
+      const allSel = rowIds.every(id => cur.has(id));
+      return { ...prev, [cycleId]: allSel ? new Set() : new Set(rowIds) };
     });
   };
 
-  // Mark selected as OK
+  // Mark selected OK
   const markSelectedOK = async (cycleId, cycle) => {
     const selected = [...(localSelected[cycleId] || new Set())];
     if (!selected.length) return;
@@ -115,17 +132,16 @@ export default function BillingCycleTab({
     } else {
       await fetch(`${API_URL}/${collection}`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id: cycleId, year: cycle.year, month: cycle.month, fechaEnvio: null, fechaVencimiento: null, pagado: false, fechaPago: null, approvedOrderIds: merged })
+        body: JSON.stringify({ id: cycleId, year: cycle.year, month: cycle.month, fechaEnvio: null, fechaVencimiento: null, pagado: false, fechaPago: null, approvedOrderIds: merged, manualEntries: [] })
       });
     }
     setLocalSelected(prev => ({ ...prev, [cycleId]: new Set() }));
     onRefreshBillings();
   };
 
-  // Remove OK from single order
-  const unmarkOK = async (cycleId, orderId, billing) => {
+  const unmarkOK = async (cycleId, rowId, billing) => {
     if (!billing) return;
-    const updated = (billing.approvedOrderIds || []).filter(id => String(id) !== String(orderId));
+    const updated = (billing.approvedOrderIds || []).filter(id => String(id) !== String(rowId));
     await fetch(`${API_URL}/${collection}/${cycleId}`, {
       method: 'PATCH', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ approvedOrderIds: updated })
@@ -146,7 +162,7 @@ export default function BillingCycleTab({
     } else {
       await fetch(`${API_URL}/${collection}`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id: cycleId, year, month, fechaEnvio, fechaVencimiento, pagado: false, fechaPago: null, approvedOrderIds: [] })
+        body: JSON.stringify({ id: cycleId, year, month, fechaEnvio, fechaVencimiento, pagado: false, fechaPago: null, approvedOrderIds: [], manualEntries: [] })
       });
     }
     onRefreshBillings();
@@ -171,6 +187,53 @@ export default function BillingCycleTab({
     setMoveTarget('');
     onRefreshOrders();
   };
+
+  // Manual entry helpers
+  const openManualModal = (cycle) => {
+    setManualModal({ cycleId: cycle.id, year: cycle.year, month: cycle.month, billing: cycle.billing });
+    setManualForm(EMPTY_MANUAL);
+  };
+
+  const saveManualEntry = async () => {
+    if (!manualForm.placa || !manualForm.total) return;
+    const entry = {
+      id: Date.now(),
+      placa: manualForm.placa.toUpperCase().trim(),
+      cliente: manualForm.cliente.trim(),
+      vehiculo: manualForm.vehiculo.trim(),
+      fecha: manualForm.fecha,
+      total: parseFloat(manualForm.total) || 0,
+      descripcion: manualForm.descripcion.trim(),
+    };
+    const { cycleId, year, month, billing } = manualModal;
+    if (billing) {
+      const existing = billing.manualEntries || [];
+      await fetch(`${API_URL}/${collection}/${cycleId}`, {
+        method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ manualEntries: [...existing, entry] })
+      });
+    } else {
+      await fetch(`${API_URL}/${collection}`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: cycleId, year, month, fechaEnvio: null, fechaVencimiento: null, pagado: false, fechaPago: null, approvedOrderIds: [], manualEntries: [entry] })
+      });
+    }
+    setManualModal(null);
+    onRefreshBillings();
+  };
+
+  const deleteManualEntry = async (cycleId, entryId, billing) => {
+    if (!billing) return;
+    const updated = (billing.manualEntries || []).filter(e => e.id !== entryId);
+    await fetch(`${API_URL}/${collection}/${cycleId}`, {
+      method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ manualEntries: updated })
+    });
+    onRefreshBillings();
+  };
+
+  // Total helpers including manual entries
+  const getManualTotal = (entry) => entry.total || 0;
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
@@ -204,14 +267,25 @@ export default function BillingCycleTab({
       {cycles.map(cycle => {
         const st = getStatus(cycle.billing);
         const { period, cutDate } = getCyclePeriodLabel(cycle.year, cycle.month);
-        const approvedIds = new Set((cycle.billing?.approvedOrderIds || []).map(String));
-        const selectedIds = localSelected[cycle.id] || new Set();
-        const allSel = cycle.ordersList.length > 0 && cycle.ordersList.every(o => selectedIds.has(String(o.id)));
+        const approvedIds  = new Set((cycle.billing?.approvedOrderIds || []).map(String));
+        const selectedIds  = localSelected[cycle.id] || new Set();
+        const manualEntries = cycle.billing?.manualEntries || [];
+        const allRowIds    = getAllRowIds(cycle);
+        const allSel       = allRowIds.length > 0 && allRowIds.every(id => selectedIds.has(id));
 
-        const totalAll      = cycle.ordersList.reduce((s, o) => s + calcOrderTotal(o), 0);
-        const totalOK       = cycle.ordersList.filter(o => approvedIds.has(String(o.id))).reduce((s, o) => s + calcOrderTotal(o), 0);
-        const totalSelected = cycle.ordersList.filter(o => selectedIds.has(String(o.id))).reduce((s, o) => s + calcOrderTotal(o), 0);
-        const selCount      = selectedIds.size;
+        const appTotal     = cycle.ordersList.reduce((s, o) => s + calcOrderTotal(o), 0);
+        const manualTotal  = manualEntries.reduce((s, e) => s + getManualTotal(e), 0);
+        const totalAll     = appTotal + manualTotal;
+        const totalOK      = [
+          ...cycle.ordersList.filter(o => approvedIds.has(String(o.id))).map(o => calcOrderTotal(o)),
+          ...manualEntries.filter(e => approvedIds.has(`m_${e.id}`)).map(e => getManualTotal(e))
+        ].reduce((a, b) => a + b, 0);
+        const totalSelected = [
+          ...cycle.ordersList.filter(o => selectedIds.has(String(o.id))).map(o => calcOrderTotal(o)),
+          ...manualEntries.filter(e => selectedIds.has(`m_${e.id}`)).map(e => getManualTotal(e))
+        ].reduce((a, b) => a + b, 0);
+        const selCount = selectedIds.size;
+        const rowCount = cycle.ordersList.length + manualEntries.length;
 
         return (
           <div key={cycle.id} className="card" style={{ padding: '1.5rem', borderLeft: `4px solid ${st.color}` }}>
@@ -227,13 +301,9 @@ export default function BillingCycleTab({
               </div>
               <div style={{ textAlign: 'right' }}>
                 <div style={{ fontSize: '1.4rem', fontWeight: 900 }}>${fmt(totalAll)}</div>
-                {totalOK > 0 && (
-                  <div style={{ fontSize: '0.85rem', color: '#10b981', fontWeight: 700 }}>OK: ${fmt(totalOK)}</div>
-                )}
-                {selCount > 0 && (
-                  <div style={{ fontSize: '0.85rem', color: 'var(--primary)', fontWeight: 700 }}>Selec: ${fmt(totalSelected)}</div>
-                )}
-                <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>{cycle.ordersList.length} vehículos</div>
+                {totalOK > 0 && <div style={{ fontSize: '0.85rem', color: '#10b981', fontWeight: 700 }}>OK: ${fmt(totalOK)}</div>}
+                {selCount > 0 && <div style={{ fontSize: '0.85rem', color: 'var(--primary)', fontWeight: 700 }}>Selec: ${fmt(totalSelected)}</div>}
+                <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>{rowCount} factura{rowCount !== 1 ? 's' : ''}</div>
               </div>
             </div>
 
@@ -256,12 +326,12 @@ export default function BillingCycleTab({
 
             {/* Table */}
             <div style={{ overflowX: 'auto' }}>
-              <table className="data-table" style={{ marginBottom: '1rem', minWidth: 640 }}>
+              <table className="data-table" style={{ marginBottom: '0.75rem', minWidth: 640 }}>
                 <thead>
                   <tr>
                     <th style={{ width: 36, textAlign: 'center' }}>
                       <input type="checkbox" checked={allSel}
-                        onChange={() => toggleSelectAll(cycle.id, cycle.ordersList.map(o => o.id))}
+                        onChange={() => toggleSelectAll(cycle.id, allRowIds)}
                         style={{ cursor: 'pointer', width: 16, height: 16 }} />
                     </th>
                     <th>Placa</th>
@@ -274,11 +344,12 @@ export default function BillingCycleTab({
                   </tr>
                 </thead>
                 <tbody>
+                  {/* App orders */}
                   {cycle.ordersList.map(o => {
-                    const isOK       = approvedIds.has(String(o.id));
-                    const isSelected = selectedIds.has(String(o.id));
+                    const rowId    = String(o.id);
+                    const isOK       = approvedIds.has(rowId);
+                    const isSelected = selectedIds.has(rowId);
                     const oTotal     = calcOrderTotal(o);
-                    const isOverride = !!o.fleetCycleOverride;
                     return (
                       <tr key={o.id} style={{
                         background: isSelected ? 'rgba(99,102,241,0.08)' : isOK ? 'rgba(16,185,129,0.05)' : 'transparent',
@@ -286,12 +357,12 @@ export default function BillingCycleTab({
                       }}>
                         <td style={{ textAlign: 'center' }}>
                           <input type="checkbox" checked={isSelected}
-                            onChange={() => toggleSelect(cycle.id, o.id)}
+                            onChange={() => toggleSelect(cycle.id, rowId)}
                             style={{ cursor: 'pointer', width: 16, height: 16 }} />
                         </td>
                         <td style={{ fontWeight: 700, cursor: 'pointer' }} onClick={() => onOrderClick(o)}>
                           {o.placa}
-                          {isOverride && <span title="Movido manualmente" style={{ marginLeft: '0.3rem', fontSize: '0.7rem', color: '#f59e0b', fontWeight: 800 }}>★</span>}
+                          {o.fleetCycleOverride && <span title="Movido manualmente" style={{ marginLeft: '0.3rem', fontSize: '0.7rem', color: '#f59e0b', fontWeight: 800 }}>★</span>}
                         </td>
                         <td style={{ fontSize: '0.88rem', color: 'var(--text-muted)' }}>{o.cliente}</td>
                         <td style={{ cursor: 'pointer' }} onClick={() => onOrderClick(o)}>{o.marca} {o.modelo}</td>
@@ -303,17 +374,59 @@ export default function BillingCycleTab({
                           {isOK ? (
                             <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.25rem', color: '#10b981', fontWeight: 700, fontSize: '0.82rem', cursor: 'pointer', padding: '0.2rem 0.5rem', background: 'rgba(16,185,129,0.12)', borderRadius: 12 }}
                               title="Clic para quitar OK"
-                              onClick={() => { if (window.confirm('¿Quitar estado OK a este vehículo?')) unmarkOK(cycle.id, o.id, cycle.billing); }}>
+                              onClick={() => { if (window.confirm('¿Quitar estado OK?')) unmarkOK(cycle.id, rowId, cycle.billing); }}>
                               <BadgeCheck size={13}/> OK
                             </span>
-                          ) : (
-                            <span style={{ color: 'var(--text-muted)', fontSize: '0.82rem' }}>—</span>
-                          )}
+                          ) : <span style={{ color: 'var(--text-muted)', fontSize: '0.82rem' }}>—</span>}
                         </td>
                         <td style={{ textAlign: 'center' }}>
-                          <button style={{ background: 'none', border: '1px solid var(--border)', cursor: 'pointer', color: 'var(--text-muted)', fontSize: '0.78rem', padding: '0.2rem 0.5rem', borderRadius: 6, display: 'inline-flex', alignItems: 'center', gap: '0.25rem', whiteSpace: 'nowrap' }}
+                          <button style={{ background: 'none', border: '1px solid var(--border)', cursor: 'pointer', color: 'var(--text-muted)', fontSize: '0.78rem', padding: '0.2rem 0.5rem', borderRadius: 6, display: 'inline-flex', alignItems: 'center', gap: '0.25rem' }}
                             onClick={() => { setMovingOrder({ orderId: o.id, placa: o.placa, fromCycleId: cycle.id }); setMoveTarget(''); }}>
                             <MoveRight size={12}/> Mover
+                          </button>
+                        </td>
+                      </tr>
+                    );
+                  })}
+
+                  {/* Manual entries */}
+                  {manualEntries.map(e => {
+                    const rowId    = `m_${e.id}`;
+                    const isOK     = approvedIds.has(rowId);
+                    const isSelected = selectedIds.has(rowId);
+                    return (
+                      <tr key={rowId} style={{
+                        background: isSelected ? 'rgba(99,102,241,0.08)' : isOK ? 'rgba(16,185,129,0.05)' : 'rgba(245,158,11,0.04)',
+                        outline: isSelected ? '1px solid rgba(99,102,241,0.25)' : 'none'
+                      }}>
+                        <td style={{ textAlign: 'center' }}>
+                          <input type="checkbox" checked={isSelected}
+                            onChange={() => toggleSelect(cycle.id, rowId)}
+                            style={{ cursor: 'pointer', width: 16, height: 16 }} />
+                        </td>
+                        <td style={{ fontWeight: 700 }}>
+                          {e.placa}
+                          <span style={{ marginLeft: '0.4rem', fontSize: '0.68rem', color: '#f59e0b', fontWeight: 800, background: 'rgba(245,158,11,0.12)', padding: '0.1rem 0.4rem', borderRadius: 8 }}>Manual</span>
+                        </td>
+                        <td style={{ fontSize: '0.88rem', color: 'var(--text-muted)' }}>{e.cliente || '—'}</td>
+                        <td style={{ fontSize: '0.9rem' }}>{e.vehiculo || (e.descripcion || '—')}</td>
+                        <td style={{ color: 'var(--text-muted)', fontSize: '0.9rem' }}>
+                          {e.fecha ? new Date(e.fecha).toLocaleDateString('es-CO') : '—'}
+                        </td>
+                        <td style={{ fontWeight: 700, textAlign: 'right' }}>${fmt(e.total)}</td>
+                        <td style={{ textAlign: 'center' }}>
+                          {isOK ? (
+                            <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.25rem', color: '#10b981', fontWeight: 700, fontSize: '0.82rem', cursor: 'pointer', padding: '0.2rem 0.5rem', background: 'rgba(16,185,129,0.12)', borderRadius: 12 }}
+                              title="Clic para quitar OK"
+                              onClick={() => { if (window.confirm('¿Quitar estado OK?')) unmarkOK(cycle.id, rowId, cycle.billing); }}>
+                              <BadgeCheck size={13}/> OK
+                            </span>
+                          ) : <span style={{ color: 'var(--text-muted)', fontSize: '0.82rem' }}>—</span>}
+                        </td>
+                        <td style={{ textAlign: 'center' }}>
+                          <button style={{ background: 'none', border: '1px solid rgba(239,68,68,0.4)', cursor: 'pointer', color: '#ef4444', fontSize: '0.78rem', padding: '0.2rem 0.5rem', borderRadius: 6, display: 'inline-flex', alignItems: 'center', gap: '0.25rem' }}
+                            onClick={() => { if (window.confirm(`¿Eliminar factura manual ${e.placa}?`)) deleteManualEntry(cycle.id, e.id, cycle.billing); }}>
+                            <Trash2 size={12}/>
                           </button>
                         </td>
                       </tr>
@@ -332,6 +445,10 @@ export default function BillingCycleTab({
 
             {/* Billing actions */}
             <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap', alignItems: 'center' }}>
+              <button className="btn-secondary" style={{ fontSize: '0.88rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}
+                onClick={() => openManualModal(cycle)}>
+                <Plus size={14}/> Agregar factura manual
+              </button>
               {!cycle.billing?.fechaEnvio && (
                 <button className="btn-primary" style={{ fontSize: '0.9rem' }}
                   onClick={() => { if (window.confirm(`¿Marcar factura del Corte ${cutDate} como enviada hoy?`)) markFacturada(cycle.id, cycle.year, cycle.month, cycle.billing); }}>
@@ -381,11 +498,9 @@ export default function BillingCycleTab({
             </select>
             <div style={{ display: 'flex', gap: '0.75rem' }}>
               <button className="btn-secondary" style={{ flex: 1 }} onClick={() => setMovingOrder(null)}>Cancelar</button>
-              <button className="btn-primary" style={{ flex: 1 }} disabled={!moveTarget} onClick={doMove}>
-                Confirmar
-              </button>
+              <button className="btn-primary" style={{ flex: 1 }} disabled={!moveTarget} onClick={doMove}>Confirmar</button>
             </div>
-            {movingOrder && orders.find(o => o.id === movingOrder.orderId)?.fleetCycleOverride && (
+            {orders.find(o => o.id === movingOrder.orderId)?.fleetCycleOverride && (
               <button style={{ width: '100%', marginTop: '0.75rem', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--error)', fontSize: '0.85rem', padding: '0.4rem' }}
                 onClick={async () => {
                   await fetch(`${API_URL}/orders/${movingOrder.orderId}`, {
@@ -398,6 +513,61 @@ export default function BillingCycleTab({
                 Restaurar al corte original (quitar ★)
               </button>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* Manual entry modal */}
+      {manualModal && (
+        <div className="modal-overlay">
+          <div className="modal-box" style={{ maxWidth: 480 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem' }}>
+              <h3 style={{ fontWeight: 800, fontSize: '1.15rem', margin: 0 }}>
+                Agregar factura manual
+              </h3>
+              <button onClick={() => setManualModal(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)' }}>
+                <X size={18}/>
+              </button>
+            </div>
+            <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem', marginBottom: '1.25rem' }}>
+              Corte: <strong>{getCyclePeriodLabel(manualModal.year, manualModal.month).cutDate}</strong>
+            </p>
+
+            {[
+              { label: 'Placa *', key: 'placa', placeholder: 'ABC123', type: 'text' },
+              { label: 'Cliente', key: 'cliente', placeholder: 'Nombre del cliente', type: 'text' },
+              { label: 'Vehículo / Descripción', key: 'vehiculo', placeholder: 'Ej. Toyota Hilux', type: 'text' },
+              { label: 'Fecha de entrega', key: 'fecha', placeholder: '', type: 'date' },
+              { label: 'Total (sin formato) *', key: 'total', placeholder: '350000', type: 'number' },
+            ].map(f => (
+              <div key={f.key} style={{ marginBottom: '0.9rem' }}>
+                <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: '0.3rem' }}>{f.label}</label>
+                <input
+                  type={f.type}
+                  placeholder={f.placeholder}
+                  value={manualForm[f.key]}
+                  onChange={e => setManualForm(prev => ({ ...prev, [f.key]: e.target.value }))}
+                  style={{ width: '100%' }}
+                />
+              </div>
+            ))}
+            <div style={{ marginBottom: '1.25rem' }}>
+              <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: '0.3rem' }}>Notas adicionales</label>
+              <textarea
+                placeholder="Observaciones opcionales..."
+                value={manualForm.descripcion}
+                onChange={e => setManualForm(prev => ({ ...prev, descripcion: e.target.value }))}
+                rows={2}
+                style={{ width: '100%', resize: 'vertical' }}
+              />
+            </div>
+
+            <div style={{ display: 'flex', gap: '0.75rem' }}>
+              <button className="btn-secondary" style={{ flex: 1 }} onClick={() => setManualModal(null)}>Cancelar</button>
+              <button className="btn-primary" style={{ flex: 1 }} disabled={!manualForm.placa || !manualForm.total} onClick={saveManualEntry}>
+                Guardar factura
+              </button>
+            </div>
           </div>
         </div>
       )}
