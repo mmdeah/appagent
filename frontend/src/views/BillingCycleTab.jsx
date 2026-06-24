@@ -18,7 +18,7 @@ const getCyclePeriodLabel = (year, month) => {
   const prevMonth = month === 1 ? 12 : month - 1;
   const prevYear  = month === 1 ? year - 1 : year;
   return {
-    period: `20 de ${MESES[prevMonth - 1]} ${prevYear} — 19 de ${MESES[month - 1]} ${year}`,
+    period: `20 de ${MESES[prevMonth - 1]} ${prevYear} — 20 de ${MESES[month - 1]} ${year}`,
     cutDate: `20 de ${MESES[month - 1]} ${year}`
   };
 };
