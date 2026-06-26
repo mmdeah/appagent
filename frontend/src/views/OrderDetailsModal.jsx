@@ -438,25 +438,16 @@ export default function OrderDetailsModal({ order, onClose }) {
       const vRepuesto = parseFloat(it.valorRepuesto) || 0;
       const cRepuesto = parseInt(it.cantidadRepuesto) || 1;
 
+      const prio = it.prioridad || 'urgente';
       if (it.category === 'Insumos' && it.state === 'Necesario') {
-        newItems.push({ 
-          descripcion: `Insumo: ${it.item}`, 
-          cantidad: parseInt(it.cantidad) || 1, 
-          precio: 0, 
-          aplicaIva: false 
-        });
+        newItems.push({ descripcion: `Insumo: ${it.item}`, cantidad: parseInt(it.cantidad) || 1, precio: 0, aplicaIva: false, prioridad: prio });
       } else if (it.category === 'Servicios Especializados' && it.state === 'Realizar') {
         const desc = it.item === 'Diagnostico Profundo en' ? `Diagnóstico Profundo (${it.area || 'General'})` : it.item;
-        newItems.push({ 
-          descripcion: desc, 
-          cantidad: 1, 
-          precio: mO, 
-          aplicaIva: false 
-        });
+        newItems.push({ descripcion: desc, cantidad: 1, precio: mO, aplicaIva: false, prioridad: prio });
       } else {
-        if (mO > 0) newItems.push({ descripcion: `Mano de obra: ${it.item}`, cantidad: 1, precio: mO, aplicaIva: false });
-        if (vRep > 0) newItems.push({ descripcion: `Reparación: ${it.item}`, cantidad: 1, precio: vRep, aplicaIva: false });
-        if (vRepuesto > 0) newItems.push({ descripcion: `Repuesto: ${it.item}`, cantidad: cRepuesto, precio: vRepuesto, aplicaIva: false });
+        if (mO > 0) newItems.push({ descripcion: `Mano de obra: ${it.item}`, cantidad: 1, precio: mO, aplicaIva: false, prioridad: prio });
+        if (vRep > 0) newItems.push({ descripcion: `Reparación: ${it.item}`, cantidad: 1, precio: vRep, aplicaIva: false, prioridad: prio });
+        if (vRepuesto > 0) newItems.push({ descripcion: `Repuesto: ${it.item}`, cantidad: cRepuesto, precio: vRepuesto, aplicaIva: false, prioridad: prio });
       }
     });
 
