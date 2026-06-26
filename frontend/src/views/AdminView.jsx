@@ -62,6 +62,40 @@ export default function AdminView() {
       .then(r => r.json()).then(data => setCnBillings(Array.isArray(data) ? data : [])).catch(() => {});
   };
 
+  const [statsPeriod, setStatsPeriod] = useState('mes');
+  const [statsDesde, setStatsDesde] = useState('');
+  const [statsHasta, setStatsHasta] = useState('');
+
+  const calcOrderTotal = (o) => {
+    const q = o.quotes?.find(q => q.autorizada) || o.quotes?.[0];
+    if (!q) return 0;
+    return (q.items || []).reduce((sum, i) => {
+      const lt = (Number(i.precio) || 0) * (Number(i.cantidad) || 1);
+      return sum + lt + (i.aplicaIva ? lt * 0.19 : 0);
+    }, 0);
+  };
+
+  const getStatsRange = () => {
+    const now = new Date();
+    if (statsPeriod === 'semana') {
+      const dow = now.getDay();
+      const mon = new Date(now); mon.setDate(now.getDate() - (dow === 0 ? 6 : dow - 1)); mon.setHours(0,0,0,0);
+      const sun = new Date(mon); sun.setDate(mon.getDate() + 6); sun.setHours(23,59,59,999);
+      return { desde: mon, hasta: sun };
+    }
+    if (statsPeriod === 'mes') {
+      return { desde: new Date(now.getFullYear(), now.getMonth(), 1), hasta: new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999) };
+    }
+    if (statsPeriod === 'año') {
+      return { desde: new Date(now.getFullYear(), 0, 1), hasta: new Date(now.getFullYear(), 11, 31, 23, 59, 59, 999) };
+    }
+    // personalizado
+    return {
+      desde: statsDesde ? new Date(statsDesde + 'T00:00:00') : null,
+      hasta: statsHasta ? new Date(statsHasta + 'T23:59:59') : null,
+    };
+  };
+
   const getNextCorteALD = () => {
     const now = new Date();
     const thisMonth20 = new Date(now.getFullYear(), now.getMonth(), 20);
@@ -641,9 +675,8 @@ export default function AdminView() {
                         </td></tr>
                       )}
                       {filtradas.map(o => {
-                        const isALD = IS_FLOTA(o.cliente);
                         return (
-                        <tr key={o.id} style={isALD ? { background: 'rgba(251,191,36,0.12)', borderLeft: '3px solid #f59e0b' } : {}}>
+                        <tr key={o.id}>
                           <td style={{ fontWeight: 700 }}>{o.placa}{isALD && <span style={{ marginLeft: '0.4rem', fontSize: '0.75rem', fontWeight: 800, color: '#f59e0b', background: 'rgba(251,191,36,0.2)', padding: '0.1rem 0.4rem', borderRadius: 4 }}>ALD</span>}</td>
                           <td>{o.cliente}</td>
                           <td>{o.marca} {o.modelo}</td>
@@ -766,74 +799,166 @@ export default function AdminView() {
               />
             )}
 
-            {activeTab === 'Gastos' && (
-              <div style={{ display: 'grid', gridTemplateColumns: '300px 1fr', gap: '1.5rem' }}>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-                  <div className="card" style={{ padding: '1.5rem' }}>
-                    <h2 style={{ fontSize: '1.1rem', marginBottom: '1rem', fontWeight: 700 }}>Registrar Gasto</h2>
-                    <form onSubmit={handleExpenseSubmit}>
-                      <div style={{ marginBottom: '1rem' }}>
-                        <label style={{ display: 'block', fontSize: '0.9rem', fontWeight: 600, color: 'var(--text-muted)', marginBottom: '0.4rem' }}>Fecha</label>
-                        <input type="date" required value={expenseForm.fecha} onChange={e => setExpenseForm({...expenseForm, fecha: e.target.value})} style={{ width: '100%' }} />
-                      </div>
-                      <div style={{ marginBottom: '1rem' }}>
-                        <label style={{ display: 'block', fontSize: '0.9rem', fontWeight: 600, color: 'var(--text-muted)', marginBottom: '0.4rem' }}>Concepto</label>
-                        <input type="text" required placeholder="Ej. Compra de repuestos" value={expenseForm.concepto} onChange={e => setExpenseForm({...expenseForm, concepto: e.target.value})} style={{ width: '100%' }} />
-                      </div>
-                      <div style={{ marginBottom: '1rem' }}>
-                        <label style={{ display: 'block', fontSize: '0.9rem', fontWeight: 600, color: 'var(--text-muted)', marginBottom: '0.4rem' }}>Monto ($)</label>
-                        <input type="number" required placeholder="0" value={expenseForm.monto} onChange={e => setExpenseForm({...expenseForm, monto: e.target.value})} style={{ width: '100%' }} />
-                      </div>
-                      <div style={{ marginBottom: '1.5rem' }}>
-                        <label style={{ display: 'block', fontSize: '0.9rem', fontWeight: 600, color: 'var(--text-muted)', marginBottom: '0.4rem' }}>Método de Pago</label>
-                        <select value={expenseForm.metodoPago} onChange={e => setExpenseForm({...expenseForm, metodoPago: e.target.value})} style={{ width: '100%' }}>
-                          {PAYMENT_METHODS.map(m => <option key={m} value={m}>{m}</option>)}
-                        </select>
-                      </div>
-                      <button type="submit" className="btn-primary" style={{ width: '100%', justifyContent: 'center' }}>Guardar Gasto</button>
-                    </form>
+            {activeTab === 'Gastos' && (() => {
+              const { desde, hasta } = getStatsRange();
+              const inRange = (fechaStr) => {
+                if (!fechaStr) return false;
+                const d = new Date(fechaStr);
+                return (!desde || d >= desde) && (!hasta || d <= hasta);
+              };
+              const ordenesPeriodo = orders.filter(o => o.estado === 'Entregado' && inRange(o.fecha));
+              const gastosPeriodo  = expenses.filter(g => inRange(g.fecha));
+              const ingresosPeriodo = ordenesPeriodo.reduce((s, o) => s + calcOrderTotal(o), 0);
+              const gastosTotalPeriodo = gastosPeriodo.reduce((s, g) => s + (parseFloat(g.monto) || 0), 0);
+              const ganancia = ingresosPeriodo - gastosTotalPeriodo;
+              const ticketProm = ordenesPeriodo.length > 0 ? ingresosPeriodo / ordenesPeriodo.length : 0;
+
+              // Monthly breakdown for the last 6 months
+              const monthlyData = [];
+              const now = new Date();
+              for (let i = 5; i >= 0; i--) {
+                const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+                const mesDesde = new Date(d.getFullYear(), d.getMonth(), 1);
+                const mesHasta = new Date(d.getFullYear(), d.getMonth() + 1, 0, 23, 59, 59, 999);
+                const ords = orders.filter(o => o.estado === 'Entregado' && o.fecha && new Date(o.fecha) >= mesDesde && new Date(o.fecha) <= mesHasta);
+                const gasts = expenses.filter(g => g.fecha && new Date(g.fecha) >= mesDesde && new Date(g.fecha) <= mesHasta);
+                const ing = ords.reduce((s, o) => s + calcOrderTotal(o), 0);
+                const gas = gasts.reduce((s, g) => s + (parseFloat(g.monto) || 0), 0);
+                monthlyData.push({ label: `${MESES[d.getMonth()].slice(0,3)} ${d.getFullYear()}`, ingresos: ing, gastos: gas, vehiculos: ords.length });
+              }
+              const maxVal = Math.max(...monthlyData.map(m => Math.max(m.ingresos, m.gastos)), 1);
+
+              return (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+                  {/* Period selector */}
+                  <div className="card" style={{ padding: '1.25rem 1.5rem' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+                      <span style={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--text-muted)', marginRight: '0.25rem' }}>Período:</span>
+                      {[{ k: 'semana', l: 'Esta semana' }, { k: 'mes', l: 'Este mes' }, { k: 'año', l: 'Este año' }, { k: 'personalizado', l: 'Personalizado' }].map(p => (
+                        <button key={p.k} onClick={() => setStatsPeriod(p.k)}
+                          style={{ padding: '0.3rem 0.85rem', borderRadius: 20, border: '1px solid var(--border)', background: statsPeriod === p.k ? 'var(--primary)' : 'transparent', color: statsPeriod === p.k ? 'white' : 'var(--text-muted)', fontWeight: 600, fontSize: '0.85rem', cursor: 'pointer' }}>
+                          {p.l}
+                        </button>
+                      ))}
+                      {statsPeriod === 'personalizado' && (
+                        <>
+                          <input type="date" value={statsDesde} onChange={e => setStatsDesde(e.target.value)} style={{ fontSize: '0.85rem', padding: '0.3rem 0.5rem' }} />
+                          <span style={{ color: 'var(--text-muted)' }}>—</span>
+                          <input type="date" value={statsHasta} onChange={e => setStatsHasta(e.target.value)} style={{ fontSize: '0.85rem', padding: '0.3rem 0.5rem' }} />
+                        </>
+                      )}
+                    </div>
                   </div>
 
-                  <div className="card" style={{ padding: '1.5rem' }}>
-                    <h2 style={{ fontSize: '1.1rem', marginBottom: '1rem', fontWeight: 700 }}>Balance por Cuenta</h2>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
-                      {PAYMENT_METHODS.map(m => {
-                        const balance = balancesByMethod[m] || 0;
-                        return (
-                          <div key={m} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0.6rem 0.8rem', background: 'var(--bg)', borderRadius: 'var(--radius-sm)', borderLeft: `4px solid ${balance >= 0 ? 'var(--success)' : 'var(--error)'}` }}>
-                            <span style={{ fontSize: '0.9rem', fontWeight: 700 }}>{m}</span>
-                            <span style={{ fontSize: '1rem', fontWeight: 800, color: balance >= 0 ? 'var(--success)' : 'var(--error)' }}>${fmt(balance)}</span>
+                  {/* Stat cards */}
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: '1rem' }}>
+                    {[
+                      { label: 'Vehículos atendidos', value: ordenesPeriodo.length, color: 'var(--primary)', fmt: n => n },
+                      { label: 'Ingresos', value: ingresosPeriodo, color: '#10b981', fmt: n => `$${fmt(n)}` },
+                      { label: 'Gastos', value: gastosTotalPeriodo, color: '#ef4444', fmt: n => `$${fmt(n)}` },
+                      { label: 'Ganancia neta', value: ganancia, color: ganancia >= 0 ? '#10b981' : '#ef4444', fmt: n => `$${fmt(n)}` },
+                      { label: 'Ticket promedio', value: ticketProm, color: '#f59e0b', fmt: n => `$${fmt(n)}` },
+                    ].map(s => (
+                      <div key={s.label} className="card" style={{ padding: '1.1rem 1.25rem' }}>
+                        <div style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: '0.4rem' }}>{s.label}</div>
+                        <div style={{ fontSize: '1.5rem', fontWeight: 900, color: s.color }}>{s.fmt(s.value)}</div>
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Bar chart + form/table row */}
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 300px', gap: '1.5rem', alignItems: 'start' }}>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+                      {/* Monthly bar chart */}
+                      <div className="card" style={{ padding: '1.5rem' }}>
+                        <h2 style={{ fontSize: '1rem', fontWeight: 700, marginBottom: '1.25rem' }}>Últimos 6 meses</h2>
+                        <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'flex-end', height: 140 }}>
+                          {monthlyData.map(m => (
+                            <div key={m.label} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.25rem' }}>
+                              <div style={{ width: '100%', display: 'flex', gap: '2px', alignItems: 'flex-end', height: 110 }}>
+                                <div title={`Ingresos: $${fmt(m.ingresos)}`} style={{ flex: 1, background: '#10b981', borderRadius: '3px 3px 0 0', height: `${(m.ingresos / maxVal) * 100}%`, minHeight: m.ingresos > 0 ? 3 : 0, transition: 'height 0.3s' }} />
+                                <div title={`Gastos: $${fmt(m.gastos)}`} style={{ flex: 1, background: '#ef4444', borderRadius: '3px 3px 0 0', height: `${(m.gastos / maxVal) * 100}%`, minHeight: m.gastos > 0 ? 3 : 0, transition: 'height 0.3s' }} />
+                              </div>
+                              <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', fontWeight: 600, whiteSpace: 'nowrap' }}>{m.label}</div>
+                              <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)' }}>{m.vehiculos}v</div>
+                            </div>
+                          ))}
+                        </div>
+                        <div style={{ display: 'flex', gap: '1rem', marginTop: '0.75rem', fontSize: '0.78rem' }}>
+                          <span style={{ display: 'flex', alignItems: 'center', gap: '0.3rem' }}><span style={{ width: 10, height: 10, background: '#10b981', borderRadius: 2, display: 'inline-block' }}/> Ingresos</span>
+                          <span style={{ display: 'flex', alignItems: 'center', gap: '0.3rem' }}><span style={{ width: 10, height: 10, background: '#ef4444', borderRadius: 2, display: 'inline-block' }}/> Gastos</span>
+                        </div>
+                      </div>
+
+                      {/* Expense table */}
+                      <div className="card" style={{ padding: '1.5rem' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+                          <h2 style={{ fontSize: '1rem', fontWeight: 700 }}>Historial de Gastos</h2>
+                          <div style={{ fontWeight: 700, color: 'var(--error)', fontSize: '0.95rem' }}>Total: ${fmt(expenses.reduce((acc, g) => acc + (parseFloat(g.monto) || 0), 0))}</div>
+                        </div>
+                        <table className="data-table">
+                          <thead><tr><th>Fecha</th><th>Concepto</th><th>Método</th><th style={{ textAlign: 'right' }}>Monto</th></tr></thead>
+                          <tbody>
+                            {expenses.length === 0 && <tr><td colSpan="4" style={{ textAlign: 'center', color: 'var(--text-muted)' }}>No hay gastos.</td></tr>}
+                            {expenses.map(g => (
+                              <tr key={g.id}>
+                                <td>{new Date(g.fecha).toLocaleDateString('es-CO')}</td>
+                                <td>{g.concepto}</td>
+                                <td><span style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-muted)' }}>{g.metodoPago}</span></td>
+                                <td style={{ textAlign: 'right', fontWeight: 700, color: 'var(--error)' }}>${fmt(g.monto)}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+
+                    {/* Right column: form + balance */}
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                      <div className="card" style={{ padding: '1.5rem' }}>
+                        <h2 style={{ fontSize: '1rem', marginBottom: '1rem', fontWeight: 700 }}>Registrar Gasto</h2>
+                        <form onSubmit={handleExpenseSubmit}>
+                          <div style={{ marginBottom: '1rem' }}>
+                            <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-muted)', marginBottom: '0.4rem' }}>Fecha</label>
+                            <input type="date" required value={expenseForm.fecha} onChange={e => setExpenseForm({...expenseForm, fecha: e.target.value})} style={{ width: '100%' }} />
                           </div>
-                        );
-                      })}
+                          <div style={{ marginBottom: '1rem' }}>
+                            <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-muted)', marginBottom: '0.4rem' }}>Concepto</label>
+                            <input type="text" required placeholder="Ej. Compra de repuestos" value={expenseForm.concepto} onChange={e => setExpenseForm({...expenseForm, concepto: e.target.value})} style={{ width: '100%' }} />
+                          </div>
+                          <div style={{ marginBottom: '1rem' }}>
+                            <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-muted)', marginBottom: '0.4rem' }}>Monto ($)</label>
+                            <input type="number" required placeholder="0" value={expenseForm.monto} onChange={e => setExpenseForm({...expenseForm, monto: e.target.value})} style={{ width: '100%' }} />
+                          </div>
+                          <div style={{ marginBottom: '1.25rem' }}>
+                            <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-muted)', marginBottom: '0.4rem' }}>Método de Pago</label>
+                            <select value={expenseForm.metodoPago} onChange={e => setExpenseForm({...expenseForm, metodoPago: e.target.value})} style={{ width: '100%' }}>
+                              {PAYMENT_METHODS.map(m => <option key={m} value={m}>{m}</option>)}
+                            </select>
+                          </div>
+                          <button type="submit" className="btn-primary" style={{ width: '100%', justifyContent: 'center' }}>Guardar Gasto</button>
+                        </form>
+                      </div>
+
+                      <div className="card" style={{ padding: '1.5rem' }}>
+                        <h2 style={{ fontSize: '1rem', marginBottom: '1rem', fontWeight: 700 }}>Balance por Cuenta</h2>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
+                          {PAYMENT_METHODS.map(m => {
+                            const balance = balancesByMethod[m] || 0;
+                            return (
+                              <div key={m} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0.6rem 0.8rem', background: 'var(--bg)', borderRadius: 'var(--radius-sm)', borderLeft: `4px solid ${balance >= 0 ? 'var(--success)' : 'var(--error)'}` }}>
+                                <span style={{ fontSize: '0.88rem', fontWeight: 700 }}>{m}</span>
+                                <span style={{ fontSize: '0.95rem', fontWeight: 800, color: balance >= 0 ? 'var(--success)' : 'var(--error)' }}>${fmt(balance)}</span>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
                     </div>
                   </div>
                 </div>
-
-                <div className="card" style={{ padding: '1.5rem' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
-                    <h2 style={{ fontSize: '1.1rem', fontWeight: 700 }}>Historial de Gastos</h2>
-                    <div style={{ fontWeight: 700, color: 'var(--error)' }}>Total: ${fmt(expenses.reduce((acc, g) => acc + (parseFloat(g.monto) || 0), 0))}</div>
-                  </div>
-                  <table className="data-table">
-                    <thead>
-                      <tr><th>Fecha</th><th>Concepto</th><th>Método</th><th style={{ textAlign: 'right' }}>Monto</th></tr>
-                    </thead>
-                    <tbody>
-                      {expenses.length === 0 && (<tr><td colSpan="4" style={{ textAlign: 'center', color: 'var(--text-muted)' }}>No hay gastos.</td></tr>)}
-                      {expenses.map(g => (
-                        <tr key={g.id}>
-                          <td>{new Date(g.fecha).toLocaleDateString('es-CO')}</td>
-                          <td>{g.concepto}</td>
-                          <td><span style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-muted)' }}>{g.metodoPago}</span></td>
-                          <td style={{ textAlign: 'right', fontWeight: 700, color: 'var(--error)' }}>${fmt(g.monto)}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            )}
+              );
+            })()}
 
             {activeTab === 'Docs Rápidos' && (
               <div className="card" style={{ padding: '1.5rem', maxWidth: 600, margin: '0 auto' }}>
