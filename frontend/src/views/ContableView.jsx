@@ -78,6 +78,7 @@ export default function ContableView() {
             onRefreshOrders={fetchAll}
             title="Consult Networks"
             emptyMsg="No hay vehículos de Consult Networks entregados aún."
+            noCutDate
             onOrderClick={setSelectedOrder}
           />
         )}

@@ -14,7 +14,13 @@ const calcOrderTotal = (o) => {
   }, 0);
 };
 
-const getCyclePeriodLabel = (year, month) => {
+const getCyclePeriodLabel = (year, month, noCutDate = false) => {
+  if (noCutDate) {
+    return {
+      period: `${MESES[month - 1]} ${year}`,
+      cutDate: `${MESES[month - 1]} ${year}`
+    };
+  }
   const prevMonth = month === 1 ? 12 : month - 1;
   const prevYear  = month === 1 ? year - 1 : year;
   return {
@@ -23,12 +29,12 @@ const getCyclePeriodLabel = (year, month) => {
   };
 };
 
-const getCycleIdFromDate = (fecha) => {
+const getCycleIdFromDate = (fecha, noCutDate = false) => {
   const d = new Date(fecha);
   let cm = d.getMonth() + 1;
   let cy = d.getFullYear();
-  if (d.getDate() >= 20) { cm++; if (cm > 12) { cm = 1; cy++; } }
-  return `${cy}-${String(cm).padStart(2, '00')}`;
+  if (!noCutDate && d.getDate() >= 20) { cm++; if (cm > 12) { cm = 1; cy++; } }
+  return `${cy}-${String(cm).padStart(2, '0')}`;
 };
 
 const EMPTY_MANUAL = { placa: '', cliente: '', vehiculo: '', fecha: '', total: '', descripcion: '' };
@@ -36,7 +42,8 @@ const EMPTY_MANUAL = { placa: '', cliente: '', vehiculo: '', fecha: '', total: '
 export default function BillingCycleTab({
   orders, clientFilter, billings, collection,
   onRefreshBillings, onRefreshOrders,
-  title, emptyMsg, onOrderClick
+  title, emptyMsg, onOrderClick,
+  noCutDate = false
 }) {
   const [localSelected, setLocalSelected] = useState({});
   const [movingOrder, setMovingOrder]     = useState(null);
@@ -49,7 +56,7 @@ export default function BillingCycleTab({
   const grouped = {};
   clientOrders.forEach(o => {
     if (!o.fecha) return;
-    const key = o.fleetCycleOverride || getCycleIdFromDate(o.fecha);
+    const key = o.fleetCycleOverride || getCycleIdFromDate(o.fecha, noCutDate);
     const [cy, cm] = key.split('-').map(Number);
     if (!grouped[key]) grouped[key] = { year: cy, month: cm, ordersList: [] };
     grouped[key].ordersList.push(o);
@@ -251,7 +258,7 @@ export default function BillingCycleTab({
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
         <div>
           <h2 style={{ fontSize: '1.4rem', fontWeight: 800, margin: 0 }}>{title}</h2>
-          <p style={{ color: 'var(--text-muted)', margin: '0.2rem 0 0' }}>Corte el día 20 de cada mes · pago a 30 días desde el corte</p>
+          <p style={{ color: 'var(--text-muted)', margin: '0.2rem 0 0' }}>{noCutDate ? 'Sin fecha de corte fija · pago a 30 días desde emisión de factura' : 'Corte el día 20 de cada mes · pago a 30 días desde el corte'}</p>
         </div>
         <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
           {[
@@ -275,7 +282,7 @@ export default function BillingCycleTab({
       {/* Cycle cards */}
       {cycles.map(cycle => {
         const st = getStatus(cycle.billing);
-        const { period, cutDate } = getCyclePeriodLabel(cycle.year, cycle.month);
+        const { period, cutDate } = getCyclePeriodLabel(cycle.year, cycle.month, noCutDate);
         const approvedIds  = new Set((cycle.billing?.approvedOrderIds || []).map(String));
         const selectedIds  = localSelected[cycle.id] || new Set();
         const manualEntries = cycle.billing?.manualEntries || [];
@@ -302,8 +309,8 @@ export default function BillingCycleTab({
             {/* Card header */}
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '1rem', marginBottom: '1rem' }}>
               <div>
-                <h3 style={{ fontSize: '1.2rem', fontWeight: 800, margin: 0 }}>Corte {cutDate}</h3>
-                <div style={{ fontSize: '0.82rem', color: 'var(--text-muted)', marginTop: '0.2rem' }}>Período: {period}</div>
+                <h3 style={{ fontSize: '1.2rem', fontWeight: 800, margin: 0 }}>{noCutDate ? cutDate : `Corte ${cutDate}`}</h3>
+                {!noCutDate && <div style={{ fontSize: '0.82rem', color: 'var(--text-muted)', marginTop: '0.2rem' }}>Período: {period}</div>}
                 <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem', marginTop: '0.5rem', padding: '0.3rem 0.75rem', background: st.bg, borderRadius: 20, fontSize: '0.85rem', fontWeight: 700, color: st.color }}>
                   {st.icon} {st.label}
                 </div>
@@ -466,7 +473,7 @@ export default function BillingCycleTab({
               </button>
               {!cycle.billing?.fechaEnvio && (
                 <button className="btn-primary" style={{ fontSize: '0.9rem' }}
-                  onClick={() => { if (window.confirm(`¿Marcar factura del Corte ${cutDate} como enviada hoy?`)) markFacturada(cycle.id, cycle.year, cycle.month, cycle.billing); }}>
+                  onClick={() => { if (window.confirm(`¿Marcar factura de ${cutDate} como enviada hoy?`)) markFacturada(cycle.id, cycle.year, cycle.month, cycle.billing); }}>
                   Marcar factura enviada
                 </button>
               )}
@@ -507,8 +514,8 @@ export default function BillingCycleTab({
               <option value="">-- Seleccionar corte --</option>
               {availableCycleIds.filter(id => id !== movingOrder.fromCycleId).map(id => {
                 const [y, m] = id.split('-').map(Number);
-                const { cutDate: cd, period: per } = getCyclePeriodLabel(y, m);
-                return <option key={id} value={id}>Corte {cd} · {per}</option>;
+                const { cutDate: cd, period: per } = getCyclePeriodLabel(y, m, noCutDate);
+                return <option key={id} value={id}>{noCutDate ? cd : `Corte ${cd} · ${per}`}</option>;
               })}
             </select>
             <div style={{ display: 'flex', gap: '0.75rem' }}>
@@ -545,7 +552,7 @@ export default function BillingCycleTab({
               </button>
             </div>
             <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem', marginBottom: '1.25rem' }}>
-              Corte: <strong>{getCyclePeriodLabel(manualModal.year, manualModal.month).cutDate}</strong>
+              {noCutDate ? 'Mes' : 'Corte'}: <strong>{getCyclePeriodLabel(manualModal.year, manualModal.month, noCutDate).cutDate}</strong>
             </p>
 
             {[

@@ -58,6 +58,7 @@ export default function TechnicianView() {
   const [searchQuery, setSearchQuery] = useState('');
   const [viewingPastReport, setViewingPastReport] = useState(null);
   const [revisionCategories, setRevisionCategories] = useState(REVISION_CATEGORIES_DEFAULT);
+  const [pendingPriority, setPendingPriority] = useState(null); // { category, item }
 
   const fetchConfig = async () => {
     try {
@@ -95,21 +96,32 @@ export default function TechnicianView() {
     fetchConfig();
   }, []);
 
-  const handleItemStateChange = (category, item, state) => {
+  const handleItemStateChange = (category, item, state, prioridad) => {
+    if (state === 'Malo' && !prioridad) {
+      setPendingPriority({ category, item });
+      return;
+    }
+    setPendingPriority(null);
     setReportData(prev => {
       const key = `${category}-${item}`;
       const current = prev[key] || {};
-      if (current.state === state) {
+      if (current.state === state && !prioridad) {
         const next = { ...prev };
         delete next[key];
         return next;
       }
-      return { 
-        ...prev, 
-        [key]: { ...current, state, category, item, requiereRepuesto: state === 'Malo' ? true : current.requiereRepuesto } 
+      return {
+        ...prev,
+        [key]: { ...current, state, category, item, prioridad: prioridad || current.prioridad, requiereRepuesto: state === 'Malo' ? true : current.requiereRepuesto }
       };
     });
   };
+
+  const PRIORIDADES = [
+    { key: 'urgente',     label: 'Urgente',      color: '#ef4444', bg: 'rgba(239,68,68,0.15)',   border: 'rgba(239,68,68,0.5)' },
+    { key: 'plazo_medio', label: 'Plazo Medio',  color: '#f59e0b', bg: 'rgba(245,158,11,0.15)', border: 'rgba(245,158,11,0.5)' },
+    { key: 'plazo_largo', label: 'Plazo Largo',  color: '#10b981', bg: 'rgba(16,185,129,0.15)', border: 'rgba(16,185,129,0.5)' },
+  ];
 
   const handleDetail = (category, item, field, value) => {
     setReportData(prev => ({
@@ -354,15 +366,42 @@ export default function TechnicianView() {
                   const isGood = data?.state === 'Bueno';
                   const isWarn = data?.state === 'Regular';
                   const isBad = data?.state === 'Malo';
+                  const isPending = pendingPriority?.category === category && pendingPriority?.item === item;
+                  const curPrio = PRIORIDADES.find(p => p.key === data?.prioridad);
                   return (
                     <div key={item} style={{ marginBottom: '0.75rem', paddingBottom: '0.75rem', borderBottom: '1px solid rgba(255,255,255,0.03)' }}>
                       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.5rem', flexWrap: 'wrap' }}>
-                        <span style={{ fontSize: '1.1rem', fontWeight: 600 }}>{item}</span>
-                        <div style={{ display: 'flex', gap: '0.3rem' }}>
-                          <button type="button" className={isGood ? 'state-btn good' : 'state-btn'} style={{ padding: '0.3rem 0.6rem', fontSize: '0.85rem' }} onClick={() => handleItemStateChange(category, item, 'Bueno')}>Bueno</button>
-                          <button type="button" className={isWarn ? 'state-btn warn' : 'state-btn'} style={{ padding: '0.3rem 0.6rem', fontSize: '0.85rem' }} onClick={() => handleItemStateChange(category, item, 'Regular')}>Regular</button>
-                          <button type="button" className={isBad ? 'state-btn bad' : 'state-btn'} style={{ padding: '0.3rem 0.6rem', fontSize: '0.85rem' }} onClick={() => handleItemStateChange(category, item, 'Malo')}>Malo</button>
-                        </div>
+                        <span style={{ fontSize: '1.1rem', fontWeight: 600 }}>
+                          {item}
+                          {isBad && curPrio && (
+                            <span style={{ marginLeft: '0.5rem', fontSize: '0.72rem', fontWeight: 800, padding: '0.15rem 0.5rem', borderRadius: 8, background: curPrio.bg, color: curPrio.color, border: `1px solid ${curPrio.border}` }}>
+                              {curPrio.label}
+                            </span>
+                          )}
+                        </span>
+                        {isPending ? (
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', alignItems: 'flex-end' }}>
+                            <span style={{ fontSize: '0.8rem', fontWeight: 700, color: '#ef4444' }}>¿Qué tan urgente es?</span>
+                            <div style={{ display: 'flex', gap: '0.3rem' }}>
+                              {PRIORIDADES.map(p => (
+                                <button key={p.key} type="button"
+                                  style={{ padding: '0.3rem 0.65rem', fontSize: '0.82rem', fontWeight: 700, borderRadius: 8, border: `1.5px solid ${p.border}`, background: p.bg, color: p.color, cursor: 'pointer' }}
+                                  onClick={() => handleItemStateChange(category, item, 'Malo', p.key)}>
+                                  {p.label}
+                                </button>
+                              ))}
+                              <button type="button"
+                                style={{ padding: '0.3rem 0.5rem', fontSize: '0.82rem', borderRadius: 8, border: '1px solid var(--border)', background: 'transparent', color: 'var(--text-muted)', cursor: 'pointer' }}
+                                onClick={() => setPendingPriority(null)}>✕</button>
+                            </div>
+                          </div>
+                        ) : (
+                          <div style={{ display: 'flex', gap: '0.3rem' }}>
+                            <button type="button" className={isGood ? 'state-btn good' : 'state-btn'} style={{ padding: '0.3rem 0.6rem', fontSize: '0.85rem' }} onClick={() => handleItemStateChange(category, item, 'Bueno')}>Bueno</button>
+                            <button type="button" className={isWarn ? 'state-btn warn' : 'state-btn'} style={{ padding: '0.3rem 0.6rem', fontSize: '0.85rem' }} onClick={() => handleItemStateChange(category, item, 'Regular')}>Regular</button>
+                            <button type="button" className={isBad ? 'state-btn bad' : 'state-btn'} style={{ padding: '0.3rem 0.6rem', fontSize: '0.85rem' }} onClick={() => handleItemStateChange(category, item, 'Malo')}>Malo</button>
+                          </div>
+                        )}
                       </div>
                       {(isWarn || isBad) && (
                         <div style={{ marginTop: '0.75rem', padding: '0.75rem', background: 'var(--bg)', borderRadius: 10, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>

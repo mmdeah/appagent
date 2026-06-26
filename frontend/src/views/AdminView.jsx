@@ -761,6 +761,7 @@ export default function AdminView() {
                 onRefreshOrders={fetchOrders}
                 title={activeTab === 'ALD' ? 'Flotas (ALD / Ayvens)' : 'Consult Networks'}
                 emptyMsg={activeTab === 'ALD' ? 'No hay vehículos de flota entregados aún.' : 'No hay vehículos de Consult Networks entregados aún.'}
+                noCutDate={activeTab === 'ConsultNetworks'}
                 onOrderClick={setSelectedOrder}
               />
             )}
