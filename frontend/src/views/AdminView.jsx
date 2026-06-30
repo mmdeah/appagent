@@ -677,7 +677,7 @@ export default function AdminView() {
                       {filtradas.map(o => {
                         return (
                         <tr key={o.id}>
-                          <td style={{ fontWeight: 700 }}>{o.placa}{isALD && <span style={{ marginLeft: '0.4rem', fontSize: '0.75rem', fontWeight: 800, color: '#f59e0b', background: 'rgba(251,191,36,0.2)', padding: '0.1rem 0.4rem', borderRadius: 4 }}>ALD</span>}</td>
+                          <td style={{ fontWeight: 700 }}>{o.placa}</td>
                           <td>{o.cliente}</td>
                           <td>{o.marca} {o.modelo}</td>
                           <td style={{ color: 'var(--text-muted)', fontSize: '0.9rem' }}>
