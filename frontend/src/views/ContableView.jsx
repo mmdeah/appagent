@@ -2,7 +2,7 @@ import React, { useState, useEffect, useContext } from 'react';
 import { API_URL } from '../api';
 import { ThemeContext } from '../App';
 import OrderDetailsModal from './OrderDetailsModal';
-import { CreditCard, Building2, Banknote } from 'lucide-react';
+import { CreditCard, Building2, Banknote, ChevronRight } from 'lucide-react';
 import BillingCycleTab from './BillingCycleTab';
 
 const IS_FLOTA = (c) => /(ald|ayvens)/i.test(c || '');
@@ -45,6 +45,8 @@ export default function ContableView() {
 
   useEffect(() => { fetchAll(); }, []);
 
+  const [pagosFiltro, setPagosFiltro] = useState('Todos');
+
   // Compute balance per bank method: ingresos (delivered orders) - egresos (expenses)
   const bankBalances = BANK_METHODS.map(method => {
     const ingresos = orders
@@ -53,12 +55,13 @@ export default function ContableView() {
     const egresos = expenses
       .filter(g => g.metodoPago === method)
       .reduce((sum, g) => sum + (parseFloat(g.monto) || 0), 0);
-    const recentOrders = orders
-      .filter(o => o.estado === 'Entregado' && o.metodoPago === method)
-      .sort((a, b) => new Date(b.fecha) - new Date(a.fecha))
-      .slice(0, 10);
-    return { method, ingresos, egresos, balance: ingresos - egresos, recentOrders };
+    return { method, ingresos, egresos, balance: ingresos - egresos };
   });
+
+  const allBankOrders = orders
+    .filter(o => o.estado === 'Entregado' && BANK_METHODS.includes(o.metodoPago))
+    .filter(o => pagosFiltro === 'Todos' || o.metodoPago === pagosFiltro)
+    .sort((a, b) => new Date(b.fecha || 0) - new Date(a.fecha || 0));
 
   return (
     <div style={{ minHeight: '100vh', background: 'var(--bg)', color: 'var(--text)' }}>
@@ -119,64 +122,109 @@ export default function ContableView() {
 
         {activeTab === 'Pagos' && (
           <div>
-            <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: '1.5rem' }}>
-              Ingresos y egresos registrados por método de pago bancario.
-            </p>
-
             {/* Summary cards */}
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: '1rem', marginBottom: '2rem' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '1rem', marginBottom: '1.75rem' }}>
               {bankBalances.map(({ method, ingresos, egresos, balance }) => (
-                <div key={method} className="card" style={{ padding: '1.25rem', borderLeft: `4px solid ${balance >= 0 ? 'var(--success)' : 'var(--error)'}` }}>
-                  <div style={{ fontSize: '0.8rem', fontWeight: 700, textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: '0.75rem', letterSpacing: '0.05em' }}>{method}</div>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.88rem' }}>
-                      <span style={{ color: 'var(--text-muted)' }}>Ingresos</span>
-                      <span style={{ fontWeight: 700, color: 'var(--success)' }}>${fmt(ingresos)}</span>
+                <div
+                  key={method}
+                  className="card"
+                  onClick={() => setPagosFiltro(pagosFiltro === method ? 'Todos' : method)}
+                  style={{
+                    padding: '1.25rem 1.5rem',
+                    cursor: 'pointer',
+                    borderLeft: `4px solid ${balance >= 0 ? 'var(--success)' : 'var(--error)'}`,
+                    outline: pagosFiltro === method ? '2px solid var(--primary)' : 'none',
+                    transition: 'all 0.15s'
+                  }}
+                >
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+                    <span style={{ fontSize: '0.82rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--text-muted)' }}>{method}</span>
+                    {pagosFiltro === method && <span style={{ fontSize: '0.72rem', background: 'var(--primary)', color: '#fff', borderRadius: 99, padding: '0.1rem 0.5rem', fontWeight: 700 }}>activo</span>}
+                  </div>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem 1.5rem' }}>
+                    <div>
+                      <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: '0.15rem' }}>Ingresos</div>
+                      <div style={{ fontSize: '1.05rem', fontWeight: 800, color: 'var(--success)' }}>${fmt(ingresos)}</div>
                     </div>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.88rem' }}>
-                      <span style={{ color: 'var(--text-muted)' }}>Egresos</span>
-                      <span style={{ fontWeight: 700, color: 'var(--error)' }}>${fmt(egresos)}</span>
+                    <div>
+                      <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: '0.15rem' }}>Egresos</div>
+                      <div style={{ fontSize: '1.05rem', fontWeight: 800, color: 'var(--error)' }}>${fmt(egresos)}</div>
                     </div>
-                    <div style={{ borderTop: '1px solid var(--border)', marginTop: '0.4rem', paddingTop: '0.4rem', display: 'flex', justifyContent: 'space-between', fontSize: '1rem' }}>
-                      <span style={{ fontWeight: 700 }}>Balance</span>
-                      <span style={{ fontWeight: 800, color: balance >= 0 ? 'var(--success)' : 'var(--error)' }}>${fmt(balance)}</span>
+                    <div style={{ gridColumn: '1 / -1', borderTop: '1px solid var(--border)', paddingTop: '0.6rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <span style={{ fontSize: '0.82rem', fontWeight: 700, color: 'var(--text-muted)' }}>Balance neto</span>
+                      <span style={{ fontSize: '1.15rem', fontWeight: 900, color: balance >= 0 ? 'var(--success)' : 'var(--error)' }}>${fmt(balance)}</span>
                     </div>
                   </div>
                 </div>
               ))}
             </div>
 
-            {/* Recent orders per method */}
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '1.5rem' }}>
-              {bankBalances.map(({ method, recentOrders }) => (
-                <div key={method} className="card" style={{ padding: '1.25rem' }}>
-                  <h3 style={{ fontSize: '0.95rem', fontWeight: 700, marginBottom: '1rem' }}>Últimos pagos — {method}</h3>
-                  {recentOrders.length === 0 ? (
-                    <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>Sin registros.</p>
-                  ) : (
-                    <table className="data-table">
-                      <thead>
-                        <tr>
-                          <th>Fecha</th>
-                          <th>Placa</th>
-                          <th>Cliente</th>
-                          <th style={{ textAlign: 'right' }}>Total</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {recentOrders.map(o => (
-                          <tr key={o.id} style={{ cursor: 'pointer' }} onClick={() => setSelectedOrder(o)}>
-                            <td style={{ fontSize: '0.82rem' }}>{o.fecha ? new Date(o.fecha).toLocaleDateString('es-CO') : '—'}</td>
-                            <td style={{ fontWeight: 700 }}>{o.placa}</td>
-                            <td style={{ fontSize: '0.82rem', color: 'var(--text-muted)' }}>{o.cliente}</td>
-                            <td style={{ textAlign: 'right', fontWeight: 700, color: 'var(--success)' }}>${fmt(calcOrderTotal(o))}</td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  )}
+            {/* Unified orders table */}
+            <div className="card" style={{ padding: '1.5rem' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+                <h3 style={{ fontWeight: 700, fontSize: '1rem', margin: 0 }}>
+                  Pagos recibidos
+                  {pagosFiltro !== 'Todos' && <span style={{ marginLeft: '0.5rem', fontSize: '0.8rem', background: 'rgba(99,102,241,0.12)', color: 'var(--primary)', borderRadius: 99, padding: '0.15rem 0.6rem', fontWeight: 700 }}>{pagosFiltro}</span>}
+                </h3>
+                <div style={{ display: 'flex', gap: '0.4rem' }}>
+                  {['Todos', ...BANK_METHODS].map(m => (
+                    <button key={m} onClick={() => setPagosFiltro(m)}
+                      style={{ padding: '0.3rem 0.75rem', border: '1px solid var(--border)', borderRadius: 99, cursor: 'pointer', fontSize: '0.8rem', fontWeight: 600, background: pagosFiltro === m ? 'var(--primary)' : 'var(--card-bg)', color: pagosFiltro === m ? '#fff' : 'var(--text-muted)', transition: 'all 0.15s' }}>
+                      {m}
+                    </button>
+                  ))}
                 </div>
-              ))}
+              </div>
+
+              {allBankOrders.length === 0 ? (
+                <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem', textAlign: 'center', padding: '2rem 0' }}>Sin pagos registrados para este filtro.</p>
+              ) : (
+                <table className="data-table">
+                  <thead>
+                    <tr>
+                      <th>Fecha</th>
+                      <th>Placa</th>
+                      <th>Cliente</th>
+                      <th>Vehículo</th>
+                      <th>Servicio</th>
+                      <th>Método</th>
+                      <th style={{ textAlign: 'right' }}>Total</th>
+                      <th></th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {allBankOrders.map(o => (
+                      <tr key={o.id} onClick={() => setSelectedOrder(o)} style={{ cursor: 'pointer' }}>
+                        <td style={{ whiteSpace: 'nowrap', color: 'var(--text-muted)', fontSize: '0.85rem' }}>
+                          {o.fecha ? new Date(o.fecha).toLocaleDateString('es-CO') : '—'}
+                        </td>
+                        <td><span style={{ fontWeight: 800, fontSize: '0.95rem' }}>{o.placa}</span></td>
+                        <td style={{ maxWidth: 160 }}>
+                          <div style={{ fontWeight: 600, fontSize: '0.88rem' }}>{o.cliente}</div>
+                          {o.telefono && <div style={{ fontSize: '0.76rem', color: 'var(--text-muted)' }}>{o.telefono}</div>}
+                        </td>
+                        <td style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>
+                          {[o.marca, o.modelo, o.anio].filter(Boolean).join(' ')}
+                        </td>
+                        <td style={{ fontSize: '0.82rem', color: 'var(--text-muted)', maxWidth: 160 }}>
+                          {o.servicios || o.motivoIngreso || '—'}
+                        </td>
+                        <td>
+                          <span style={{ fontSize: '0.78rem', fontWeight: 700, background: 'rgba(99,102,241,0.1)', color: 'var(--primary)', padding: '0.2rem 0.55rem', borderRadius: 99 }}>
+                            {o.metodoPago}
+                          </span>
+                        </td>
+                        <td style={{ textAlign: 'right', fontWeight: 800, fontSize: '0.95rem', color: 'var(--success)', whiteSpace: 'nowrap' }}>
+                          ${fmt(calcOrderTotal(o))}
+                        </td>
+                        <td style={{ textAlign: 'center' }}>
+                          <ChevronRight size={15} color="var(--text-muted)" />
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
             </div>
           </div>
         )}
