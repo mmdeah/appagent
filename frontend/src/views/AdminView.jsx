@@ -475,6 +475,27 @@ export default function AdminView() {
 
   return (
     <div style={{ minHeight: '100vh', background: 'var(--bg)' }}>
+      <style>{`
+        .gasto-form-grid {
+          display: grid;
+          grid-template-columns: 150px 1fr 120px 170px auto;
+          gap: 0.75rem;
+          align-items: end;
+        }
+        .gasto-form-grid .gasto-submit-btn { width: auto; }
+        @media (max-width: 768px) {
+          .gasto-form-grid {
+            grid-template-columns: 1fr 1fr;
+          }
+          .gasto-form-grid .gasto-concepto { grid-column: 1 / -1; }
+          .gasto-form-grid .gasto-submit-btn { grid-column: 1 / -1; width: 100%; justify-content: center; }
+        }
+        .gasto-ai-btn { display: flex; align-items: center; gap: 0.4rem; }
+        @media (max-width: 480px) {
+          .gasto-header-row { flex-direction: column; align-items: flex-start !important; gap: 0.75rem !important; }
+          .gasto-ai-btn { width: 100%; justify-content: center; }
+        }
+      `}</style>
       {/* Top nav */}
       <div style={{ background: 'var(--bg-card)', borderBottom: '1px solid var(--border)', padding: '1rem 2rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', position: 'sticky', top: 0, zIndex: 50 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
@@ -909,29 +930,27 @@ export default function AdminView() {
 
                   {/* ── ROW 1: Quick entry + AI scan ─────────────────── */}
                   <div className="card" style={{ padding: '1.5rem' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem' }}>
+                    <div className="gasto-header-row" style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'1.25rem', gap:'0.75rem' }}>
                       <h2 style={{ fontSize: '1rem', fontWeight: 700, margin: 0 }}>Registro Rápido de Gasto</h2>
-                      <div style={{ display: 'flex', gap: '0.5rem' }}>
-                        <input type="file" accept="image/*" ref={expenseImageInputRef} style={{ display: 'none' }} onChange={e => { analyzeExpenseImage(e.target.files[0]); e.target.value=''; }} />
-                        <button type="button" onClick={() => expenseImageInputRef.current?.click()} disabled={analyzingExpense}
-                          style={{ display:'flex', alignItems:'center', gap:'0.4rem', padding:'0.45rem 1rem', background: analyzingExpense ? 'var(--bg)' : 'rgba(99,102,241,0.1)', color:'var(--primary)', border:'1.5px dashed var(--primary)', borderRadius:'var(--radius-sm)', cursor: analyzingExpense ? 'not-allowed' : 'pointer', fontWeight:700, fontSize:'0.83rem', opacity: analyzingExpense ? 0.7 : 1 }}>
-                          <Sparkles size={14} />{analyzingExpense ? 'Analizando...' : 'Escanear con IA'}
-                        </button>
-                      </div>
+                      <input type="file" accept="image/*" ref={expenseImageInputRef} style={{ display:'none' }} onChange={e => { analyzeExpenseImage(e.target.files[0]); e.target.value=''; }} />
+                      <button type="button" className="gasto-ai-btn" onClick={() => expenseImageInputRef.current?.click()} disabled={analyzingExpense}
+                        style={{ padding:'0.45rem 1rem', background: analyzingExpense ? 'var(--bg)' : 'rgba(99,102,241,0.1)', color:'var(--primary)', border:'1.5px dashed var(--primary)', borderRadius:'var(--radius-sm)', cursor: analyzingExpense ? 'not-allowed' : 'pointer', fontWeight:700, fontSize:'0.83rem', opacity: analyzingExpense ? 0.7 : 1, whiteSpace:'nowrap' }}>
+                        <Sparkles size={14} />{analyzingExpense ? 'Analizando...' : 'Escanear con IA'}
+                      </button>
                     </div>
                     <form onSubmit={handleExpenseSubmit}>
-                      <div style={{ display: 'grid', gridTemplateColumns: '160px 1fr 130px 180px auto', gap: '0.75rem', alignItems: 'end' }}>
+                      <div className="gasto-form-grid">
                         <div>
                           <label style={{ display:'block', fontSize:'0.78rem', fontWeight:600, color:'var(--text-muted)', marginBottom:'0.3rem' }}>Fecha</label>
                           <input type="date" required value={expenseForm.fecha} onChange={e => setExpenseForm({...expenseForm, fecha: e.target.value})} style={{ width:'100%' }} />
                         </div>
-                        <div>
+                        <div className="gasto-concepto">
                           <label style={{ display:'block', fontSize:'0.78rem', fontWeight:600, color:'var(--text-muted)', marginBottom:'0.3rem' }}>Concepto</label>
-                          <input type="text" required placeholder="Ej. Compra de repuestos, servicios..." value={expenseForm.concepto} onChange={e => setExpenseForm({...expenseForm, concepto: e.target.value})} style={{ width:'100%' }} />
+                          <input type="text" required placeholder="Ej. Compra de repuestos..." value={expenseForm.concepto} onChange={e => setExpenseForm({...expenseForm, concepto: e.target.value})} style={{ width:'100%' }} />
                         </div>
                         <div>
                           <label style={{ display:'block', fontSize:'0.78rem', fontWeight:600, color:'var(--text-muted)', marginBottom:'0.3rem' }}>Monto ($)</label>
-                          <input type="number" required placeholder="0" value={expenseForm.monto} onChange={e => setExpenseForm({...expenseForm, monto: e.target.value})} style={{ width:'100%' }} />
+                          <input type="number" required placeholder="0" inputMode="numeric" value={expenseForm.monto} onChange={e => setExpenseForm({...expenseForm, monto: e.target.value})} style={{ width:'100%' }} />
                         </div>
                         <div>
                           <label style={{ display:'block', fontSize:'0.78rem', fontWeight:600, color:'var(--text-muted)', marginBottom:'0.3rem' }}>Método de Pago</label>
@@ -939,7 +958,7 @@ export default function AdminView() {
                             {PAYMENT_METHODS.map(m => <option key={m} value={m}>{m}</option>)}
                           </select>
                         </div>
-                        <button type="submit" className="btn-primary" style={{ whiteSpace:'nowrap', height:38, padding:'0 1.25rem' }}>+ Guardar</button>
+                        <button type="submit" className="btn-primary gasto-submit-btn" style={{ height:38, padding:'0 1.25rem', whiteSpace:'nowrap' }}>+ Guardar</button>
                       </div>
                     </form>
                   </div>
