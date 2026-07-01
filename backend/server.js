@@ -151,8 +151,8 @@ server.post('/api/analyze-expense-image', async (req, res) => {
     const { imageBase64, mimeType } = req.body;
     if (!imageBase64) return res.status(400).json({ error: 'Se requiere imageBase64' });
 
-    const openRouterKey = process.env.OPENROUTER_API_KEY;
-    if (!openRouterKey) return res.status(500).json({ error: 'Falta OPENROUTER_API_KEY' });
+    const openRouterKey = process.env.OPENROUTER_EXPENSE_KEY || process.env.OPENROUTER_API_KEY;
+    if (!openRouterKey) return res.status(500).json({ error: 'Falta OPENROUTER_EXPENSE_KEY' });
 
     const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
       method: 'POST',
@@ -163,7 +163,7 @@ server.post('/api/analyze-expense-image', async (req, res) => {
         'X-Title': 'AppAgent'
       },
       body: JSON.stringify({
-        model: 'google/gemini-2.0-flash-001',
+        model: 'google/gemini-2.5-flash-preview-05-20',
         messages: [
           {
             role: 'user',
