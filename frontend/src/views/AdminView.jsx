@@ -48,6 +48,8 @@ export default function AdminView() {
   const [historialHasta, setHistorialHasta] = useState('');
   const [aldBillings, setAldBillings] = useState([]);
   const [cnBillings, setCnBillings] = useState([]);
+  const [analyzingExpense, setAnalyzingExpense] = useState(false);
+  const expenseImageInputRef = React.useRef(null);
 
   const MESES = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
   const IS_FLOTA = (cliente) => /(ald|ayvens)/i.test(cliente || '');
@@ -381,6 +383,37 @@ export default function AdminView() {
       fetchOrders();
     } catch (e) {
       setFormStatus({ text: 'Error al crear la orden', type: 'error' });
+    }
+  };
+
+  const analyzeExpenseImage = async (file) => {
+    if (!file) return;
+    setAnalyzingExpense(true);
+    try {
+      const base64 = await new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result.split(',')[1]);
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+      });
+      const res = await fetch(`${BACKEND_URL}/api/analyze-expense-image`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ imageBase64: base64, mimeType: file.type })
+      });
+      if (!res.ok) throw new Error('Error del servidor');
+      const data = await res.json();
+      setExpenseForm(prev => ({
+        ...prev,
+        ...(data.fecha ? { fecha: data.fecha } : {}),
+        ...(data.concepto ? { concepto: data.concepto } : {}),
+        ...(data.monto ? { monto: String(data.monto) } : {}),
+        ...(data.metodoPago ? { metodoPago: data.metodoPago } : {}),
+      }));
+    } catch (err) {
+      alert('No se pudo analizar la imagen: ' + err.message);
+    } finally {
+      setAnalyzingExpense(false);
     }
   };
 
@@ -917,6 +950,42 @@ export default function AdminView() {
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
                       <div className="card" style={{ padding: '1.5rem' }}>
                         <h2 style={{ fontSize: '1rem', marginBottom: '1rem', fontWeight: 700 }}>Registrar Gasto</h2>
+
+                        {/* AI image scan button */}
+                        <input
+                          type="file"
+                          accept="image/*"
+                          ref={expenseImageInputRef}
+                          style={{ display: 'none' }}
+                          onChange={e => { analyzeExpenseImage(e.target.files[0]); e.target.value = ''; }}
+                        />
+                        <button
+                          type="button"
+                          onClick={() => expenseImageInputRef.current?.click()}
+                          disabled={analyzingExpense}
+                          style={{
+                            width: '100%',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            gap: '0.5rem',
+                            padding: '0.65rem',
+                            marginBottom: '1rem',
+                            background: analyzingExpense ? 'var(--bg)' : 'rgba(99,102,241,0.1)',
+                            color: 'var(--primary)',
+                            border: '1.5px dashed var(--primary)',
+                            borderRadius: 'var(--radius-sm)',
+                            cursor: analyzingExpense ? 'not-allowed' : 'pointer',
+                            fontWeight: 600,
+                            fontSize: '0.88rem',
+                            opacity: analyzingExpense ? 0.7 : 1,
+                            transition: 'all 0.2s'
+                          }}
+                        >
+                          <Sparkles size={16} />
+                          {analyzingExpense ? 'Analizando imagen...' : 'Escanear recibo con IA'}
+                        </button>
+
                         <form onSubmit={handleExpenseSubmit}>
                           <div style={{ marginBottom: '1rem' }}>
                             <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-muted)', marginBottom: '0.4rem' }}>Fecha</label>

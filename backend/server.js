@@ -145,6 +145,69 @@ server.post('/api/migrate-ai-reports', (req, res) => {
   }
 });
 
+// Analyze expense image with AI vision
+server.post('/api/analyze-expense-image', async (req, res) => {
+  try {
+    const { imageBase64, mimeType } = req.body;
+    if (!imageBase64) return res.status(400).json({ error: 'Se requiere imageBase64' });
+
+    const openRouterKey = process.env.OPENROUTER_API_KEY;
+    if (!openRouterKey) return res.status(500).json({ error: 'Falta OPENROUTER_API_KEY' });
+
+    const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${openRouterKey}`,
+        'Content-Type': 'application/json',
+        'HTTP-Referer': 'https://appagent.up.railway.app',
+        'X-Title': 'AppAgent'
+      },
+      body: JSON.stringify({
+        model: 'google/gemini-2.0-flash-001',
+        messages: [
+          {
+            role: 'user',
+            content: [
+              {
+                type: 'image_url',
+                image_url: { url: `data:${mimeType || 'image/jpeg'};base64,${imageBase64}` }
+              },
+              {
+                type: 'text',
+                text: `Analiza esta imagen de un recibo, factura o comprobante de gasto. Extrae los datos y responde SOLO con un objeto JSON válido con estas claves exactas:
+{
+  "fecha": "YYYY-MM-DD o null si no se ve",
+  "concepto": "descripción breve del gasto (ej: Compra aceite motor, Repuestos frenos)",
+  "monto": número entero sin símbolos ni puntos ni comas (ej: 45000),
+  "metodoPago": "Efectivo" o "Nequi" o "Bancolombia" o "Banco de Bogota" o "Tarjeta" (infiere si puedes, sino "Efectivo")
+}
+No incluyas texto adicional, solo el JSON.`
+              }
+            ]
+          }
+        ],
+        temperature: 0.1
+      })
+    });
+
+    if (!response.ok) {
+      const err = await response.text();
+      return res.status(502).json({ error: 'Error de OpenRouter', details: err });
+    }
+
+    const result = await response.json();
+    let content = result.choices?.[0]?.message?.content?.trim() || '';
+    if (content.startsWith('```')) {
+      content = content.replace(/^```json?/, '').replace(/```$/, '').trim();
+    }
+
+    const data = JSON.parse(content);
+    res.json(data);
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
 // Custom routes can be added here
 server.post('/api/generate-ai-report', async (req, res) => {
   try {
