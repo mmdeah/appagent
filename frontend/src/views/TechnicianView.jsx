@@ -76,9 +76,9 @@ export default function TechnicianView() {
     setLoading(true);
     fetch(`${API_URL}/orders?_embed=quotes`)
       .then(res => res.json())
-      .then(data => { 
-        setOrders(data.filter(o => o.estado !== 'Entregado')); 
-        setLoading(false); 
+      .then(data => {
+        setOrders(data.filter(o => o.estado !== 'Entregado'));
+        setLoading(false);
       })
       .catch(() => setLoading(false));
   };
