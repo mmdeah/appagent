@@ -663,10 +663,10 @@ export default function AdminView() {
                         {isOpen && (
                           <div style={{
                             position: 'absolute', top: 'calc(100% + 6px)', left: 0,
-                            background: 'var(--card-bg)', border: '1px solid var(--border)',
+                            background: 'var(--bg-card)', border: '1px solid var(--border)',
                             borderRadius: 10, padding: '0.3rem',
-                            minWidth: 190, zIndex: 100,
-                            boxShadow: '0 8px 24px rgba(0,0,0,0.18)',
+                            minWidth: 190, zIndex: 200,
+                            boxShadow: '0 8px 32px rgba(0,0,0,0.35)',
                           }}>
                             {group.items.map(item => (
                               <button key={item.id}
