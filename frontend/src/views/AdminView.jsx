@@ -692,6 +692,11 @@ export default function AdminView() {
                             <Clock size={10} /> Ingreso: {new Date(o.fecha).toLocaleDateString('es-CO')}
                           </div>
                         )}
+                        {o.cotizacionAprobadaFlota && (
+                          <div style={{ fontSize: '0.72rem', fontWeight: 700, color: '#10b981', marginTop: '0.3rem', display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
+                            ✅ Aprobado por {o.cotizacionAprobadaPor}
+                          </div>
+                        )}
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '0.5rem' }}>
                           <span style={{ fontSize: '0.82rem', color: 'var(--text-muted)' }}>{o.cliente}</span>
                           <div style={{ display: 'flex', gap: '0.4rem', alignItems: 'center' }}>
