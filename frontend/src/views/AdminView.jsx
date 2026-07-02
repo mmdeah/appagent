@@ -1,9 +1,9 @@
-import React, { useState, useEffect, useContext } from 'react';
+import React, { useState, useEffect, useContext, useRef } from 'react';
 import { API_URL, BACKEND_URL, getPicoYPlaca } from '../api';
 import OrderDetailsModal from './OrderDetailsModal';
 import PhotoUploadModal from './PhotoUploadModal';
 import { ThemeContext } from '../App';
-import { PlusCircle, BarChart3, Camera, X, Car, Trash2, Zap, LayoutDashboard, History, Receipt, CheckCircle, AlertTriangle, ClipboardList, Save, Settings, FileText, Plus, Sparkles, CreditCard, Clock, BadgeCheck, Ban, Search } from 'lucide-react';
+import { PlusCircle, BarChart3, Camera, X, Car, Trash2, Zap, LayoutDashboard, History, Receipt, CheckCircle, AlertTriangle, ClipboardList, Save, Settings, FileText, Plus, Sparkles, CreditCard, Clock, BadgeCheck, Ban, Search, ChevronDown } from 'lucide-react';
 import BillingCycleTab from './BillingCycleTab';
 
 const fmt = (n) => (parseFloat(n) || 0).toLocaleString('es-CO', { minimumFractionDigits: 0 });
@@ -26,6 +26,8 @@ export default function AdminView() {
   const [form, setForm] = useState(emptyForm);
   const [photos, setPhotos] = useState([]);
   const [activeTab, setActiveTab] = useState('Kanban');
+  const [openMenu, setOpenMenu] = useState(null);
+  const navRef = useRef(null);
   const [expenses, setExpenses] = useState([]);
   const [expenseForm, setExpenseForm] = useState({ fecha: new Date().toISOString().split('T')[0], concepto: '', monto: '', metodoPago: 'Efectivo' });
   const [quickOrderForm, setQuickOrderForm] = useState({ placa: '', cliente: '', marca: '', modelo: '', anio: '', servicios: '' });
@@ -338,6 +340,11 @@ export default function AdminView() {
   };
 
   useEffect(() => { fetchOrders(); fetchExpenses(); fetchTodos(); fetchConfig(); fetchAldBillings(); fetchCnBillings(); fetchFleetUsers(); }, []);
+  useEffect(() => {
+    const handler = (e) => { if (navRef.current && !navRef.current.contains(e.target)) setOpenMenu(null); };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, []);
 
   const deleteOrder = (id) => {
     setOrderToDelete(id);
@@ -601,25 +608,89 @@ export default function AdminView() {
           </div>
         </div>
 
-        {/* Navigation Tabs */}
-            <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1.5rem', borderBottom: '1px solid var(--border)', paddingBottom: '0.5rem', overflowX: 'auto' }}>
-              {[
-                { id: 'Kanban', icon: <LayoutDashboard size={16} />, label: 'Kanban' },
-                { id: 'Historial', icon: <History size={16} />, label: 'Historial' },
-                { id: 'Gastos', icon: <Receipt size={16} />, label: 'Gastos' },
-                { id: 'Ingresos Rápidos', icon: <Zap size={16} />, label: 'Ingresos Rápidos' },
-                { id: 'Informes', icon: <FileText size={16} />, label: 'Generar Informe' },
-                { id: 'Formulario', icon: <Settings size={16} />, label: 'Formulario Técnico' },
-                { id: 'ALD', icon: <CreditCard size={16} />, label: 'ALD / Ayvens' },
-                { id: 'ConsultNetworks', icon: <CreditCard size={16} />, label: 'Consult Networks' },
-                { id: 'UsuariosFlota', icon: <Car size={16} />, label: 'Usuarios Flota' }
-              ].map(t => (
-                <button key={t.id} onClick={() => setActiveTab(t.id)}
-                  style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', padding: '0.5rem 1rem', background: activeTab === t.id ? 'var(--primary)' : 'transparent', color: activeTab === t.id ? 'white' : 'var(--text-muted)', border: 'none', borderRadius: 'var(--radius-sm)', cursor: 'pointer', fontWeight: 600, fontSize: '1rem', transition: 'all 0.2s', whiteSpace: 'nowrap' }}>
-                  {t.icon} {t.label}
-                </button>
-              ))}
-            </div>
+        {/* Navigation — grouped dropdowns */}
+            {(() => {
+              const NAV_GROUPS = [
+                {
+                  id: 'operaciones', label: 'Operaciones', icon: <LayoutDashboard size={15} />,
+                  items: [
+                    { id: 'Kanban',           icon: <LayoutDashboard size={14} />, label: 'Kanban' },
+                    { id: 'Historial',        icon: <History size={14} />,         label: 'Historial' },
+                    { id: 'Ingresos Rápidos', icon: <Zap size={14} />,             label: 'Ingresos Rápidos' },
+                  ]
+                },
+                {
+                  id: 'finanzas', label: 'Finanzas', icon: <Receipt size={15} />,
+                  items: [
+                    { id: 'Gastos',           icon: <Receipt size={14} />,    label: 'Gastos' },
+                    { id: 'ALD',              icon: <CreditCard size={14} />, label: 'ALD / Ayvens' },
+                    { id: 'ConsultNetworks',  icon: <CreditCard size={14} />, label: 'Consult Networks' },
+                  ]
+                },
+                {
+                  id: 'herramientas', label: 'Herramientas', icon: <Settings size={15} />,
+                  items: [
+                    { id: 'Informes',      icon: <FileText size={14} />,     label: 'Generar Informe' },
+                    { id: 'Formulario',    icon: <ClipboardList size={14} />, label: 'Formulario Técnico' },
+                    { id: 'UsuariosFlota', icon: <Car size={14} />,           label: 'Usuarios Flota' },
+                  ]
+                },
+              ];
+              return (
+                <div ref={navRef} style={{ display: 'flex', gap: '0.4rem', marginBottom: '1.5rem', borderBottom: '1px solid var(--border)', paddingBottom: '0.75rem' }}>
+                  {NAV_GROUPS.map(group => {
+                    const activeItem = group.items.find(i => i.id === activeTab);
+                    const isGroupActive = !!activeItem;
+                    const isOpen = openMenu === group.id;
+                    return (
+                      <div key={group.id} style={{ position: 'relative' }}>
+                        <button
+                          onClick={() => setOpenMenu(isOpen ? null : group.id)}
+                          style={{
+                            display: 'flex', alignItems: 'center', gap: '0.4rem',
+                            padding: '0.45rem 0.9rem',
+                            background: isGroupActive ? 'var(--primary)' : 'transparent',
+                            color: isGroupActive ? 'white' : 'var(--text-muted)',
+                            border: isGroupActive ? 'none' : '1px solid var(--border)',
+                            borderRadius: 'var(--radius-sm)', cursor: 'pointer',
+                            fontWeight: 700, fontSize: '0.88rem', transition: 'all 0.15s',
+                            whiteSpace: 'nowrap',
+                          }}>
+                          {activeItem ? activeItem.icon : group.icon}
+                          {activeItem ? activeItem.label : group.label}
+                          <ChevronDown size={13} style={{ opacity: 0.7, transform: isOpen ? 'rotate(180deg)' : 'none', transition: 'transform 0.15s' }} />
+                        </button>
+                        {isOpen && (
+                          <div style={{
+                            position: 'absolute', top: 'calc(100% + 6px)', left: 0,
+                            background: 'var(--card-bg)', border: '1px solid var(--border)',
+                            borderRadius: 10, padding: '0.3rem',
+                            minWidth: 190, zIndex: 100,
+                            boxShadow: '0 8px 24px rgba(0,0,0,0.18)',
+                          }}>
+                            {group.items.map(item => (
+                              <button key={item.id}
+                                onClick={() => { setActiveTab(item.id); setOpenMenu(null); }}
+                                style={{
+                                  display: 'flex', alignItems: 'center', gap: '0.5rem',
+                                  width: '100%', padding: '0.5rem 0.75rem',
+                                  background: activeTab === item.id ? 'var(--primary)' : 'transparent',
+                                  color: activeTab === item.id ? 'white' : 'var(--text)',
+                                  border: 'none', borderRadius: 7,
+                                  cursor: 'pointer', fontWeight: 600, fontSize: '0.88rem',
+                                  textAlign: 'left', transition: 'background 0.1s',
+                                }}>
+                                {item.icon} {item.label}
+                              </button>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              );
+            })()}
 
             {/* Tab Content */}
             {activeTab === 'Kanban' && (() => {
