@@ -11,7 +11,7 @@ const fmt = (n) => (parseFloat(n) || 0).toLocaleString('es-CO', { minimumFractio
 const COLUMNS = ['Recepción', 'Proceso', 'Calidad', 'Ingresos Rápidos'];
 const PAYMENT_METHODS = ['Efectivo', 'Nequi', 'Bancolombia', 'Banco de Bogota', 'Tarjeta'];
 
-const emptyForm = { placa: '', cliente: '', telefono: '', correo: '', marca: '', modelo: '', anio: '', kilometraje: '', servicios: '', notas: '' };
+const emptyForm = { placa: '', cliente: '', documento: '', telefono: '', correo: '', marca: '', modelo: '', anio: '', kilometraje: '', servicios: '', notas: '' };
 
 const REVISION_CATEGORIES_FALLBACK = ["Suspensión", "Frenos", "Dirección", "Transmisión", "Fugas", "Batería / Eléctrico", "Chequeo Visual Motor", "Niveles", "Otros", "Insumos", "Servicios Especializados"];
 
@@ -1589,8 +1589,9 @@ export default function AdminView() {
               <p className="section-title">Cliente</p>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem', marginBottom: '1.25rem' }}>
                 <input required placeholder="Nombre completo" value={form.cliente} onChange={e => setForm({...form, cliente: e.target.value})} />
+                <input placeholder="CC / NIT" value={form.documento} onChange={e => setForm({...form, documento: e.target.value})} />
                 <input required placeholder="Teléfono" value={form.telefono} onChange={e => setForm({...form, telefono: e.target.value})} />
-                <input placeholder="Correo electrónico" type="email" value={form.correo} onChange={e => setForm({...form, correo: e.target.value})} style={{ gridColumn: '1 / -1' }} />
+                <input placeholder="Correo electrónico" type="email" value={form.correo} onChange={e => setForm({...form, correo: e.target.value})} />
               </div>
 
               <p className="section-title">Servicio</p>

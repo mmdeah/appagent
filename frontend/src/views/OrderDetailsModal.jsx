@@ -184,6 +184,7 @@ export default function OrderDetailsModal({ order, onClose, fleetMode = false, i
         <div class="info-block">
           <h3>Datos del Cliente</h3>
           <div class="info-row"><span>Nombre:</span> <span>${order.cliente}</span></div>
+          ${order.documento ? `<div class="info-row"><span>CC / NIT:</span> <span>${order.documento}</span></div>` : ''}
           <div class="info-row"><span>Teléfono:</span> <span>${order.telefono}</span></div>
           <div class="info-row"><span>Email:</span> <span>${order.correo || 'N/A'}</span></div>
         </div>
@@ -322,6 +323,7 @@ export default function OrderDetailsModal({ order, onClose, fleetMode = false, i
         <div class="info-block">
           <h3>Datos del Cliente</h3>
           <div class="info-row"><span>Nombre:</span> <span>${order.cliente}</span></div>
+          ${order.documento ? `<div class="info-row"><span>CC / NIT:</span> <span>${order.documento}</span></div>` : ''}
           <div class="info-row"><span>Teléfono:</span> <span>${order.telefono}</span></div>
           <div class="info-row"><span>Email:</span> <span>${order.correo || 'N/A'}</span></div>
         </div>
@@ -586,6 +588,7 @@ export default function OrderDetailsModal({ order, onClose, fleetMode = false, i
               <div className="info-grid" style={{ marginBottom: '1.5rem' }}>
                 {[
                   ['Cliente', 'cliente'],
+                  ['CC / NIT', 'documento'],
                   ['Teléfono', 'telefono'],
                   ['Correo', 'correo'],
                 ].map(([label, field]) => (
