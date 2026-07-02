@@ -227,6 +227,7 @@ export default function FleetView() {
         <OrderDetailsModal
           order={selectedOrder}
           onClose={() => setSelectedOrder(null)}
+          fleetMode={true}
           onUpdate={() => {
             setSelectedOrder(null);
             fetch(`${API_URL}/orders?_embed=quotes&_embed=reports`)

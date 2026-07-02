@@ -6,7 +6,7 @@ const fmt = (n) => (parseFloat(n) || 0).toLocaleString('es-CO', { minimumFractio
 
 const PAYMENT_METHODS = ['Efectivo', 'Nequi', 'Bancolombia', 'Banco de Bogota', 'Tarjeta'];
 
-export default function OrderDetailsModal({ order, onClose }) {
+export default function OrderDetailsModal({ order, onClose, fleetMode = false }) {
   const [activeTab, setActiveTab] = useState('info');
   const [reportData, setReportData] = useState(order.reports?.[0] || null);
   const [quoteItems, setQuoteItems] = useState(
@@ -546,7 +546,7 @@ export default function OrderDetailsModal({ order, onClose }) {
           {/* ── INFO TAB ── */}
           {activeTab === 'info' && (
             <div>
-              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.5rem', marginBottom: '1rem' }} className="hide-on-print">
+              {!fleetMode && <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.5rem', marginBottom: '1rem' }} className="hide-on-print">
                 {isEditingInfo && (
                   <button 
                     onClick={() => { setIsEditingInfo(false); setEditedOrder({ ...order }); }}
@@ -563,7 +563,7 @@ export default function OrderDetailsModal({ order, onClose }) {
                 >
                   {isEditingInfo ? <><Save size={14} /> Guardar</> : <><Edit2 size={14} /> Editar</>}
                 </button>
-              </div>
+              </div>}
 
               <p className="section-title">Datos del Cliente</p>
               <div className="info-grid" style={{ marginBottom: '1.5rem' }}>
@@ -684,7 +684,7 @@ export default function OrderDetailsModal({ order, onClose }) {
                 </div>
               )}
 
-              <div className="hide-on-print" style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap', marginTop: '1.5rem' }}>
+              {!fleetMode && <div className="hide-on-print" style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap', marginTop: '1.5rem' }}>
                 <a href={`https://wa.me/${order.telefono}?text=Hola%20${encodeURIComponent(order.cliente || '')},%20te%20escribimos%20del%20Taller%20Automotriz%20sobre%20tu%20veh%C3%ADculo%20${order.placa}`}
                   target="_blank" rel="noreferrer"
                   className="btn-success" style={{ textDecoration: 'none' }}>
@@ -700,7 +700,7 @@ export default function OrderDetailsModal({ order, onClose }) {
                 <button onClick={() => setShowConfirm(true)} className="btn-success" style={{ marginLeft: 'auto' }}>
                   <CheckCircle size={16} /> Entregar Vehículo
                 </button>
-              </div>
+              </div>}
             </div>
           )}
 
@@ -709,10 +709,10 @@ export default function OrderDetailsModal({ order, onClose }) {
             <div>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
                 <p className="section-title" style={{ margin: 0 }}>Reporte Técnico del Técnico</p>
-                <button className="btn-primary hide-on-print" style={{ fontSize: '0.82rem', padding: '0.4rem 0.9rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}
+                {!fleetMode && <button className="btn-primary hide-on-print" style={{ fontSize: '0.82rem', padding: '0.4rem 0.9rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}
                   onClick={() => setShowAddItem(v => !v)}>
                   <Plus size={14} /> Añadir ítem
-                </button>
+                </button>}
               </div>
 
               {/* Form to add new item */}
@@ -841,10 +841,10 @@ export default function OrderDetailsModal({ order, onClose }) {
                           <td>
                             {it.state === 'Bueno' ? <span style={{ color: 'var(--text-muted)' }}>—</span> : (
                               <>
-                                <span className="show-on-print">{it.manoObra ? `$${fmt(it.manoObra)}` : '—'}</span>
-                                <input className="hide-on-print price-input" type="text" placeholder="0" value={it.manoObra ? fmt(it.manoObra) : ''}
+                                <span className={fleetMode ? undefined : 'show-on-print'}>{it.manoObra ? `$${fmt(it.manoObra)}` : '—'}</span>
+                                {!fleetMode && <input className="hide-on-print price-input" type="text" placeholder="0" value={it.manoObra ? fmt(it.manoObra) : ''}
                                   onChange={e => handleReportPrice(idx, 'manoObra', e.target.value.replace(/\D/g, ''))}
-                                  style={{ width: 100, fontSize: '0.82rem' }} />
+                                  style={{ width: 100, fontSize: '0.82rem' }} />}
                               </>
                             )}
                           </td>
@@ -852,11 +852,11 @@ export default function OrderDetailsModal({ order, onClose }) {
                             {it.requiereRepuesto ? (
                                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
                                  <span style={{ fontWeight: 600, color: 'var(--warning)' }}>✓ Requiere</span>
-                                 <div className="hide-on-print" style={{ display: 'flex', gap: '0.4rem' }}>
+                                 {!fleetMode && <div className="hide-on-print" style={{ display: 'flex', gap: '0.4rem' }}>
                                     <input type="number" step="any" min="0.1" placeholder="Cant" value={it.cantidadRepuesto || 1} onChange={e => handleReportPrice(idx, 'cantidadRepuesto', parseFloat(e.target.value.replace(',','.'))||1)} style={{ width: 55, fontSize: '0.8rem', padding: '0.4rem' }} />
                                     <input type="text" className="price-input" placeholder="$ Valor" value={it.valorRepuesto ? fmt(it.valorRepuesto) : ''} onChange={e => handleReportPrice(idx, 'valorRepuesto', e.target.value.replace(/\D/g, ''))} style={{ width: 90, fontSize: '0.8rem', padding: '0.4rem' }} />
-                                 </div>
-                                 <span className="show-on-print">
+                                 </div>}
+                                 <span className={fleetMode ? undefined : 'show-on-print'}>
                                     {it.cantidadRepuesto || 1}x {it.valorRepuesto ? `$${fmt(it.valorRepuesto)}` : 'Pendiente'}
                                  </span>
                                </div>
@@ -865,20 +865,20 @@ export default function OrderDetailsModal({ order, onClose }) {
                           <td>
                             {it.recibeReparacion ? (
                               <>
-                                <span className="show-on-print">{it.valorReparacion ? `$${fmt(it.valorReparacion)}` : 'Pendiente'}</span>
-                                <input className="hide-on-print price-input" type="text" placeholder="Pendiente"
+                                <span className={fleetMode ? undefined : 'show-on-print'}>{it.valorReparacion ? `$${fmt(it.valorReparacion)}` : 'Pendiente'}</span>
+                                {!fleetMode && <input className="hide-on-print price-input" type="text" placeholder="Pendiente"
                                   value={it.valorReparacion ? fmt(it.valorReparacion) : ''}
                                   onChange={e => handleReportPrice(idx, 'valorReparacion', e.target.value.replace(/\D/g, ''))}
-                                  style={{ width: 110, fontSize: '0.82rem' }} />
+                                  style={{ width: 110, fontSize: '0.82rem' }} />}
                               </>
                             ) : <span style={{ color: 'var(--text-muted)' }}>—</span>}
                           </td>
                           <td className="hide-on-print" style={{ textAlign: 'center' }}>
-                            <button onClick={() => handleDeleteReportItem(idx)}
+                            {!fleetMode && <button onClick={() => handleDeleteReportItem(idx)}
                               style={{ background: 'none', border: 'none', color: 'var(--error)', cursor: 'pointer', padding: '0.2rem', borderRadius: 6, opacity: 0.7 }}
                               title="Eliminar ítem">
                               <Trash2 size={14} />
-                            </button>
+                            </button>}
                           </td>
                         </tr>
                       ))}
@@ -900,11 +900,11 @@ export default function OrderDetailsModal({ order, onClose }) {
                   )}
 
                   <div className="hide-on-print" style={{ display: 'flex', gap: '0.75rem', marginTop: '1rem' }}>
-                    <button onClick={saveReport} className="btn-primary">Guardar Precios</button>
-                    <button onClick={transferToQuote} className="btn-success" style={{ marginLeft: 'auto' }}>
+                    {!fleetMode && <button onClick={saveReport} className="btn-primary">Guardar Precios</button>}
+                    {!fleetMode && <button onClick={transferToQuote} className="btn-success" style={{ marginLeft: 'auto' }}>
                       Pasar valores a Cotización
-                    </button>
-                    <button onClick={printReport} className="btn-secondary"><Printer size={16} /> Imprimir Reporte</button>
+                    </button>}
+                    <button onClick={printReport} className="btn-secondary" style={fleetMode ? { marginLeft: 'auto' } : undefined}><Printer size={16} /> Imprimir Reporte</button>
                   </div>
                 </>
               )}
@@ -934,10 +934,10 @@ export default function OrderDetailsModal({ order, onClose }) {
                     return (
                       <tr key={idx}>
                         <td>
-                          <input className="hide-on-print" type="text" placeholder="Descripción" value={it.descripcion}
+                          {!fleetMode && <input className="hide-on-print" type="text" placeholder="Descripción" value={it.descripcion}
                             onChange={e => { const q=[...quoteItems]; q[idx].descripcion=e.target.value; setQuoteItems(q); }}
-                            style={{ fontSize: '0.85rem' }} />
-                          <span className="show-on-print">{it.descripcion}</span>
+                            style={{ fontSize: '0.85rem' }} />}
+                          <span className={fleetMode ? undefined : 'show-on-print'}>{it.descripcion}</span>
                         </td>
                         <td style={{ textAlign: 'center', whiteSpace: 'nowrap' }}>
                           {(() => {
@@ -950,43 +950,43 @@ export default function OrderDetailsModal({ order, onClose }) {
                             const p = prioridades.find(p => p.key === current) || prioridades[0];
                             return (
                               <>
-                                <select
+                                {!fleetMode && <select
                                   className="hide-on-print"
                                   value={current}
                                   onChange={e => { const q=[...quoteItems]; q[idx].prioridad=e.target.value; setQuoteItems(q); }}
                                   style={{ fontSize: '0.78rem', fontWeight: 700, padding: '0.25rem 0.4rem', borderRadius: 8, border: `1.5px solid ${p.border}`, background: p.bg, color: p.color, cursor: 'pointer', outline: 'none' }}
                                 >
                                   {prioridades.map(op => <option key={op.key} value={op.key}>{op.label}</option>)}
-                                </select>
-                                <span className="show-on-print" style={{ fontSize: '0.78rem', fontWeight: 700, padding: '2px 7px', borderRadius: 6, background: p.bg, color: p.color }}>{p.label}</span>
+                                </select>}
+                                <span className={fleetMode ? undefined : 'show-on-print'} style={{ fontSize: '0.78rem', fontWeight: 700, padding: '2px 7px', borderRadius: 6, background: p.bg, color: p.color }}>{p.label}</span>
                               </>
                             );
                           })()}
                         </td>
                         <td style={{ textAlign: 'center' }}>
-                          <input className="hide-on-print" type="number" step="any" min="0.1" value={it.cantidad}
+                          {!fleetMode && <input className="hide-on-print" type="number" step="any" min="0.1" value={it.cantidad}
                             onChange={e => { const q=[...quoteItems]; q[idx].cantidad=parseFloat(e.target.value.replace(',','.'))||1; setQuoteItems(q); }}
-                            style={{ width: 80, textAlign: 'center', fontSize: '0.9rem', padding: '0.2rem' }} />
-                          <span className="show-on-print">{it.cantidad}</span>
+                            style={{ width: 80, textAlign: 'center', fontSize: '0.9rem', padding: '0.2rem' }} />}
+                          <span className={fleetMode ? undefined : 'show-on-print'}>{it.cantidad}</span>
                         </td>
                         <td style={{ textAlign: 'center' }}>
-                          <input className="hide-on-print price-input" type="text" placeholder="0" value={it.precio ? fmt(it.precio) : ''}
+                          {!fleetMode && <input className="hide-on-print price-input" type="text" placeholder="0" value={it.precio ? fmt(it.precio) : ''}
                             onChange={e => { const q=[...quoteItems]; q[idx].precio=parseFloat(e.target.value.replace(/\D/g, ''))||0; setQuoteItems(q); }}
-                            style={{ width: 140, textAlign: 'right', fontSize: '0.9rem', padding: '0.2rem' }} />
-                          <span className="show-on-print">${fmt(it.precio)}</span>
+                            style={{ width: 140, textAlign: 'right', fontSize: '0.9rem', padding: '0.2rem' }} />}
+                          <span className={fleetMode ? undefined : 'show-on-print'}>${fmt(it.precio)}</span>
                         </td>
                         <td style={{ textAlign: 'center' }}>
-                          <input className="hide-on-print" type="checkbox"
+                          {!fleetMode && <input className="hide-on-print" type="checkbox"
                             checked={it.aplicaIva}
-                            onChange={e => { const q=[...quoteItems]; q[idx].aplicaIva=e.target.checked; setQuoteItems(q); }} />
-                          <span className="show-on-print">{it.aplicaIva ? 'Sí' : 'No'}</span>
+                            onChange={e => { const q=[...quoteItems]; q[idx].aplicaIva=e.target.checked; setQuoteItems(q); }} />}
+                          <span className={fleetMode ? undefined : 'show-on-print'}>{it.aplicaIva ? 'Sí' : 'No'}</span>
                         </td>
                         <td style={{ textAlign: 'right', fontWeight: 700 }} className="price">${fmt(total)}</td>
                         <td className="hide-on-print" style={{ textAlign: 'center' }}>
-                          <button onClick={() => setQuoteItems(quoteItems.filter((_, i) => i !== idx))}
+                          {!fleetMode && <button onClick={() => setQuoteItems(quoteItems.filter((_, i) => i !== idx))}
                             style={{ background: 'none', border: 'none', color: 'var(--danger)', cursor: 'pointer' }}>
                             <Trash2 size={16} />
-                          </button>
+                          </button>}
                         </td>
                       </tr>
                     );
@@ -994,11 +994,11 @@ export default function OrderDetailsModal({ order, onClose }) {
                 </tbody>
               </table>
 
-              <div className="hide-on-print" style={{ marginTop: '0.75rem', marginBottom: '1.5rem' }}>
+              {!fleetMode && <div className="hide-on-print" style={{ marginTop: '0.75rem', marginBottom: '1.5rem' }}>
                 <button className="btn-secondary" style={{ fontSize: '0.82rem' }} onClick={() => setQuoteItems([...quoteItems, { descripcion: '', cantidad: 1, precio: 0, aplicaIva: false, prioridad: 'urgente' }])}>
                   <Plus size={14} /> Añadir ítem
                 </button>
-              </div>
+              </div>}
 
               {/* Totals box */}
               <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '1.5rem' }}>
@@ -1017,7 +1017,7 @@ export default function OrderDetailsModal({ order, onClose }) {
                 </div>
               </div>
 
-              <div className="hide-on-print" style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', marginBottom: '1rem', padding: '0.65rem 1rem', background: 'rgba(255,255,255,0.03)', border: '1px solid var(--border)', borderRadius: 10 }}>
+              {!fleetMode && <div className="hide-on-print" style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', marginBottom: '1rem', padding: '0.65rem 1rem', background: 'rgba(255,255,255,0.03)', border: '1px solid var(--border)', borderRadius: 10 }}>
                 <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)', fontWeight: 600 }}>Mostrar prioridades en PDF de cotización:</span>
                 <button
                   onClick={() => {
@@ -1038,14 +1038,14 @@ export default function OrderDetailsModal({ order, onClose }) {
                   </span>
                   {showPriority ? 'Activado' : 'Desactivado'}
                 </button>
-              </div>
+              </div>}
 
               <div className="hide-on-print" style={{ display: 'flex', gap: '0.75rem' }}>
-                <button onClick={saveQuote} className="btn-secondary">Guardar Borrador</button>
-                <button onClick={authorizeQuote} className="btn-primary" style={{ background: 'var(--success)', borderColor: 'var(--success)' }}>
+                {!fleetMode && <button onClick={saveQuote} className="btn-secondary">Guardar Borrador</button>}
+                {!fleetMode && <button onClick={authorizeQuote} className="btn-primary" style={{ background: 'var(--success)', borderColor: 'var(--success)' }}>
                   <CheckCircle size={16} /> Autorizar y Empezar Trabajo
-                </button>
-                <div style={{ marginLeft: 'auto', display: 'flex', gap: '0.5rem' }}>
+                </button>}
+                <div style={{ marginLeft: fleetMode ? 0 : 'auto', display: 'flex', gap: '0.5rem' }}>
                   <button onClick={() => printQuote('COTIZACIÓN')} className="btn-secondary"><Printer size={16} /> Cotización PDF</button>
                   <button onClick={() => printQuote('CUENTA DE COBRO')} className="btn-secondary"><Printer size={16} /> Cta. Cobro PDF</button>
                 </div>
@@ -1100,10 +1100,10 @@ export default function OrderDetailsModal({ order, onClose }) {
                         style={{ display: 'inline-flex', alignItems: 'center', gap: '0.3rem', padding: '0.35rem 0.75rem', background: 'rgba(99,102,241,0.12)', color: 'var(--primary)', border: '1px solid rgba(99,102,241,0.3)', borderRadius: 6, fontSize: '0.82rem', fontWeight: 600, textDecoration: 'none', flexShrink: 0 }}>
                         <Download size={13}/> Descargar
                       </a>
-                      <button onClick={() => deletePdf(pdf)}
+                      {!fleetMode && <button onClick={() => deletePdf(pdf)}
                         style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', padding: '0.2rem', flexShrink: 0 }}>
                         <Trash2 size={16}/>
-                      </button>
+                      </button>}
                     </div>
                   ))}
                 </div>
