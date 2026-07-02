@@ -8,7 +8,7 @@ import BillingCycleTab from './BillingCycleTab';
 
 const fmt = (n) => (parseFloat(n) || 0).toLocaleString('es-CO', { minimumFractionDigits: 0 });
 
-const COLUMNS = ['Recepción', 'Proceso', 'Calidad', 'Docs Rápidos'];
+const COLUMNS = ['Recepción', 'Proceso', 'Calidad', 'Ingresos Rápidos'];
 const PAYMENT_METHODS = ['Efectivo', 'Nequi', 'Bancolombia', 'Banco de Bogota', 'Tarjeta'];
 
 const emptyForm = { placa: '', cliente: '', telefono: '', correo: '', marca: '', modelo: '', anio: '', kilometraje: '', servicios: '', notas: '' };
@@ -483,7 +483,7 @@ export default function AdminView() {
       const payload = {
         ...quickOrderForm,
         placa: quickOrderForm.placa.toUpperCase(),
-        estado: 'Docs Rápidos',
+        estado: 'Ingresos Rápidos',
         fecha: new Date().toISOString(),
         fotos: []
       };
@@ -499,8 +499,8 @@ export default function AdminView() {
     } catch (e) { console.error(e); }
   };
 
-  const colColor = { 'Recepción': '#6366f1', 'Proceso': '#f59e0b', 'Calidad': '#10b981', 'Docs Rápidos': '#ec4899' };
-  const colBg   = { 'Recepción': 'rgba(99,102,241,0.08)', 'Proceso': 'rgba(245,158,11,0.08)', 'Calidad': 'rgba(16,185,129,0.08)', 'Docs Rápidos': 'rgba(236,72,153,0.08)' };
+  const colColor = { 'Recepción': '#6366f1', 'Proceso': '#f59e0b', 'Calidad': '#10b981', 'Ingresos Rápidos': '#ec4899' };
+  const colBg   = { 'Recepción': 'rgba(99,102,241,0.08)', 'Proceso': 'rgba(245,158,11,0.08)', 'Calidad': 'rgba(16,185,129,0.08)', 'Ingresos Rápidos': 'rgba(236,72,153,0.08)' };
 
   return (
     <div style={{ minHeight: '100vh', background: 'var(--bg)' }}>
@@ -607,7 +607,7 @@ export default function AdminView() {
                 { id: 'Kanban', icon: <LayoutDashboard size={16} />, label: 'Kanban' },
                 { id: 'Historial', icon: <History size={16} />, label: 'Historial' },
                 { id: 'Gastos', icon: <Receipt size={16} />, label: 'Gastos' },
-                { id: 'Docs Rápidos', icon: <Zap size={16} />, label: 'Docs Rápidos' },
+                { id: 'Ingresos Rápidos', icon: <Zap size={16} />, label: 'Ingresos Rápidos' },
                 { id: 'Informes', icon: <FileText size={16} />, label: 'Generar Informe' },
                 { id: 'Formulario', icon: <Settings size={16} />, label: 'Formulario Técnico' },
                 { id: 'ALD', icon: <CreditCard size={16} />, label: 'ALD / Ayvens' },
@@ -1237,7 +1237,7 @@ export default function AdminView() {
               );
             })()}
 
-            {activeTab === 'Docs Rápidos' && (
+            {activeTab === 'Ingresos Rápidos' && (
               <div className="card" style={{ padding: '1.5rem', maxWidth: 600, margin: '0 auto' }}>
                 <div style={{ textAlign: 'center', marginBottom: '1.5rem' }}>
                   <div style={{ background: 'rgba(99,102,241,0.1)', color: 'var(--primary)', width: 48, height: 48, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 0.5rem' }}>

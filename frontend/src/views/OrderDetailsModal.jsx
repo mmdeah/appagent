@@ -250,7 +250,7 @@ export default function OrderDetailsModal({ order, onClose, fleetMode = false, i
 
   const printQuote = (forcedTitle = null) => {
     const sub = totals.sub, iva = totals.iva, total = totals.total;
-    const mainTitle = forcedTitle || ((order.estado === 'Entregado' || order.estado === 'Docs Rápidos') ? 'CUENTA DE COBRO' : 'COTIZACIÓN');
+    const mainTitle = forcedTitle || ((order.estado === 'Entregado' || order.estado === 'Ingresos Rápidos') ? 'CUENTA DE COBRO' : 'COTIZACIÓN');
     const isCuentaCobro = mainTitle === 'CUENTA DE COBRO' || !showPriority;
     const prioOrder = ['urgente', 'plazo_medio', 'plazo_largo'];
     const prioMap = {

@@ -17,10 +17,10 @@ const ESTADO_COLOR = {
   'Recepción':    { bg: 'rgba(99,102,241,0.12)',  color: '#818cf8' },
   'Proceso':      { bg: 'rgba(245,158,11,0.12)',  color: '#f59e0b' },
   'Calidad':      { bg: 'rgba(16,185,129,0.12)',  color: '#10b981' },
-  'Docs Rápidos': { bg: 'rgba(139,92,246,0.12)',  color: '#a78bfa' },
+  'Ingresos Rápidos': { bg: 'rgba(139,92,246,0.12)',  color: '#a78bfa' },
   'Entregado':    { bg: 'rgba(16,185,129,0.12)',  color: '#10b981' },
 };
-const KANBAN_COLS = ['Recepción', 'Proceso', 'Calidad', 'Docs Rápidos'];
+const KANBAN_COLS = ['Recepción', 'Proceso', 'Calidad', 'Ingresos Rápidos'];
 
 const calcTotal = (o) => {
   if (!o.quotes?.length) return 0;
