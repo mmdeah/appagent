@@ -43,6 +43,21 @@ try {
   console.error("Error checking/updating db.json structure:", e);
 }
 
+// Migrate "Docs Rápidos" -> "Ingresos Rápidos"
+try {
+  const dbData = JSON.parse(fs.readFileSync(dbFile, 'utf8'));
+  let migrated = 0;
+  (dbData.orders || []).forEach(o => {
+    if (o.estado === 'Docs Rápidos') { o.estado = 'Ingresos Rápidos'; migrated++; }
+  });
+  if (migrated > 0) {
+    fs.writeFileSync(dbFile, JSON.stringify(dbData, null, 2));
+    console.log(`Migrated ${migrated} order(s) from "Docs Rápidos" to "Ingresos Rápidos".`);
+  }
+} catch (e) {
+  console.error("Error running Docs Rápidos migration:", e);
+}
+
 const router = jsonServer.router(dbFile);
 
 // PDF uploads directory (persists via Railway volume)
