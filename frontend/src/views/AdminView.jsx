@@ -50,6 +50,9 @@ export default function AdminView() {
   const [cnBillings, setCnBillings] = useState([]);
   const [analyzingExpense, setAnalyzingExpense] = useState(false);
   const expenseImageInputRef = React.useRef(null);
+  const [fleetUsers, setFleetUsers] = useState([]);
+  const [fleetUserForm, setFleetUserForm] = useState({ nombre: '', empresa: 'ald', usuario: '', password: '' });
+  const [fleetUserStatus, setFleetUserStatus] = useState('');
   const [gastosSearch, setGastosSearch] = useState('');
   const [gastosDesde, setGastosDesde] = useState('');
   const [gastosHasta, setGastosHasta] = useState('');
@@ -334,7 +337,7 @@ export default function AdminView() {
     }
   };
 
-  useEffect(() => { fetchOrders(); fetchExpenses(); fetchTodos(); fetchConfig(); fetchAldBillings(); fetchCnBillings(); }, []);
+  useEffect(() => { fetchOrders(); fetchExpenses(); fetchTodos(); fetchConfig(); fetchAldBillings(); fetchCnBillings(); fetchFleetUsers(); }, []);
 
   const deleteOrder = (id) => {
     setOrderToDelete(id);
@@ -445,6 +448,32 @@ export default function AdminView() {
       setDeleteExpenseId(null);
       fetchExpenses();
     } catch (e) { console.error(e); }
+  };
+
+  const fetchFleetUsers = () => {
+    fetch(`${API_URL}/fleet_users`)
+      .then(r => r.json()).then(d => setFleetUsers(Array.isArray(d) ? d : [])).catch(() => {});
+  };
+
+  const handleFleetUserSubmit = async (e) => {
+    e.preventDefault();
+    if (!fleetUserForm.nombre || !fleetUserForm.usuario || !fleetUserForm.password) return;
+    try {
+      await fetch(`${API_URL}/fleet_users`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ...fleetUserForm, id: Date.now() })
+      });
+      setFleetUserForm({ nombre: '', empresa: 'ald', usuario: '', password: '' });
+      setFleetUserStatus('Usuario creado correctamente.');
+      setTimeout(() => setFleetUserStatus(''), 3000);
+      fetchFleetUsers();
+    } catch (e) { console.error(e); }
+  };
+
+  const handleDeleteFleetUser = async (id) => {
+    await fetch(`${API_URL}/fleet_users/${id}`, { method: 'DELETE' });
+    fetchFleetUsers();
   };
 
   const handleQuickOrder = async (e) => {
@@ -582,7 +611,8 @@ export default function AdminView() {
                 { id: 'Informes', icon: <FileText size={16} />, label: 'Generar Informe' },
                 { id: 'Formulario', icon: <Settings size={16} />, label: 'Formulario Técnico' },
                 { id: 'ALD', icon: <CreditCard size={16} />, label: 'ALD / Ayvens' },
-                { id: 'ConsultNetworks', icon: <CreditCard size={16} />, label: 'Consult Networks' }
+                { id: 'ConsultNetworks', icon: <CreditCard size={16} />, label: 'Consult Networks' },
+                { id: 'UsuariosFlota', icon: <Car size={16} />, label: 'Usuarios Flota' }
               ].map(t => (
                 <button key={t.id} onClick={() => setActiveTab(t.id)}
                   style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', padding: '0.5rem 1rem', background: activeTab === t.id ? 'var(--primary)' : 'transparent', color: activeTab === t.id ? 'white' : 'var(--text-muted)', border: 'none', borderRadius: 'var(--radius-sm)', cursor: 'pointer', fontWeight: 600, fontSize: '1rem', transition: 'all 0.2s', whiteSpace: 'nowrap' }}>
@@ -657,6 +687,11 @@ export default function AdminView() {
                             {o.reports?.length > 0 ? '✓ Revisado' : '⏳ Pdte'}
                           </span>
                         </div>
+                        {o.fecha && (
+                          <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginTop: '0.4rem', display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
+                            <Clock size={10} /> Ingreso: {new Date(o.fecha).toLocaleDateString('es-CO')}
+                          </div>
+                        )}
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '0.5rem' }}>
                           <span style={{ fontSize: '0.82rem', color: 'var(--text-muted)' }}>{o.cliente}</span>
                           <div style={{ display: 'flex', gap: '0.4rem', alignItems: 'center' }}>
@@ -733,14 +768,15 @@ export default function AdminView() {
                         <th>Placa</th>
                         <th>Cliente</th>
                         <th>Vehículo</th>
-                        <th>Fecha</th>
+                        <th>Ingreso</th>
+                        <th>Entrega</th>
                         <th>Método Pago</th>
                         <th>Acciones</th>
                       </tr>
                     </thead>
                     <tbody>
                       {filtradas.length === 0 && (
-                        <tr><td colSpan="6" style={{ textAlign: 'center', color: 'var(--text-muted)' }}>
+                        <tr><td colSpan="7" style={{ textAlign: 'center', color: 'var(--text-muted)' }}>
                           {entregadas.length === 0 ? 'No hay órdenes entregadas.' : 'Sin resultados para los filtros aplicados.'}
                         </td></tr>
                       )}
@@ -750,8 +786,13 @@ export default function AdminView() {
                           <td style={{ fontWeight: 700 }}>{o.placa}</td>
                           <td>{o.cliente}</td>
                           <td>{o.marca} {o.modelo}</td>
-                          <td style={{ color: 'var(--text-muted)', fontSize: '0.9rem' }}>
+                          <td style={{ color: 'var(--text-muted)', fontSize: '0.9rem', whiteSpace: 'nowrap' }}>
                             {o.fecha ? new Date(o.fecha).toLocaleDateString('es-CO') : '—'}
+                          </td>
+                          <td style={{ fontSize: '0.9rem', whiteSpace: 'nowrap' }}>
+                            {o.fechaEntrega
+                              ? <span style={{ color: '#10b981', fontWeight: 700 }}>{new Date(o.fechaEntrega).toLocaleDateString('es-CO')}</span>
+                              : <span style={{ color: 'var(--text-muted)' }}>—</span>}
                           </td>
                           <td><span className="badge badge-blue" style={{ background: 'rgba(99,102,241,0.1)', color: 'var(--primary)', border: 'none' }}>{o.metodoPago || 'Efectivo'}</span></td>
                           <td>
@@ -867,6 +908,79 @@ export default function AdminView() {
                 noCutDate={activeTab === 'ConsultNetworks'}
                 onOrderClick={setSelectedOrder}
               />
+            )}
+
+            {activeTab === 'UsuariosFlota' && (
+              <div style={{ maxWidth: 860, display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+                {/* Add user form */}
+                <div className="card" style={{ padding: '1.5rem' }}>
+                  <h2 style={{ fontSize: '1rem', fontWeight: 700, marginBottom: '1.25rem' }}>Nuevo usuario de flota</h2>
+                  {fleetUserStatus && <div className="toast toast-success" style={{ marginBottom: '1rem' }}>{fleetUserStatus}</div>}
+                  <form onSubmit={handleFleetUserSubmit}>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '0.75rem', alignItems: 'end' }}>
+                      <div>
+                        <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 600, color: 'var(--text-muted)', marginBottom: '0.3rem' }}>Nombre</label>
+                        <input required placeholder="Ej. Ayvens Manager" value={fleetUserForm.nombre} onChange={e => setFleetUserForm({...fleetUserForm, nombre: e.target.value})} style={{ width: '100%' }} />
+                      </div>
+                      <div>
+                        <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 600, color: 'var(--text-muted)', marginBottom: '0.3rem' }}>Empresa</label>
+                        <select value={fleetUserForm.empresa} onChange={e => setFleetUserForm({...fleetUserForm, empresa: e.target.value})} style={{ width: '100%' }}>
+                          <option value="ald">ALD / Ayvens</option>
+                          <option value="cn">Consult Networks</option>
+                          <option value="both">Ambas</option>
+                        </select>
+                      </div>
+                      <div>
+                        <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 600, color: 'var(--text-muted)', marginBottom: '0.3rem' }}>Usuario</label>
+                        <input required placeholder="usuario_login" value={fleetUserForm.usuario} onChange={e => setFleetUserForm({...fleetUserForm, usuario: e.target.value.toLowerCase().replace(/\s/g, '_')})} style={{ width: '100%' }} />
+                      </div>
+                      <div>
+                        <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 600, color: 'var(--text-muted)', marginBottom: '0.3rem' }}>Contraseña</label>
+                        <input required type="password" placeholder="••••••" value={fleetUserForm.password} onChange={e => setFleetUserForm({...fleetUserForm, password: e.target.value})} style={{ width: '100%' }} />
+                      </div>
+                      <button type="submit" className="btn-primary" style={{ height: 38, whiteSpace: 'nowrap' }}>+ Crear usuario</button>
+                    </div>
+                  </form>
+                </div>
+
+                {/* Users table */}
+                <div className="card" style={{ padding: '1.5rem' }}>
+                  <h2 style={{ fontSize: '1rem', fontWeight: 700, marginBottom: '1rem' }}>Usuarios activos ({fleetUsers.length})</h2>
+                  {fleetUsers.length === 0 ? (
+                    <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem' }}>No hay usuarios de flota configurados.</p>
+                  ) : (
+                    <table className="data-table">
+                      <thead>
+                        <tr><th>Nombre</th><th>Empresa</th><th>Usuario</th><th>Contraseña</th><th></th></tr>
+                      </thead>
+                      <tbody>
+                        {fleetUsers.map(u => (
+                          <tr key={u.id}>
+                            <td style={{ fontWeight: 600 }}>{u.nombre}</td>
+                            <td>
+                              <span style={{ fontSize: '0.78rem', fontWeight: 700, padding: '0.2rem 0.55rem', borderRadius: 99,
+                                background: u.empresa === 'ald' ? 'rgba(245,158,11,0.15)' : u.empresa === 'cn' ? 'rgba(99,102,241,0.12)' : 'rgba(16,185,129,0.12)',
+                                color: u.empresa === 'ald' ? '#f59e0b' : u.empresa === 'cn' ? 'var(--primary)' : '#10b981' }}>
+                                {u.empresa === 'ald' ? 'ALD / Ayvens' : u.empresa === 'cn' ? 'Consult Networks' : 'Ambas'}
+                              </span>
+                            </td>
+                            <td style={{ fontFamily: 'monospace', fontWeight: 700 }}>{u.usuario}</td>
+                            <td style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>{'•'.repeat(Math.min((u.password||'').length, 8))}</td>
+                            <td>
+                              <button onClick={() => handleDeleteFleetUser(u.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--error)', display: 'flex', padding: '0.2rem' }} title="Eliminar usuario">
+                                <Trash2 size={15} />
+                              </button>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  )}
+                  <div style={{ marginTop: '1rem', padding: '0.75rem 1rem', background: 'var(--bg)', borderRadius: 'var(--radius-sm)', fontSize: '0.82rem', color: 'var(--text-muted)' }}>
+                    <strong>Acceso:</strong> Los usuarios de flota ingresan por la pantalla de login seleccionando "Portal Flotas" con su usuario y contraseña.
+                  </div>
+                </div>
+              </div>
             )}
 
             {activeTab === 'Gastos' && (() => {

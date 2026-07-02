@@ -1,7 +1,8 @@
 import React, { useState, useContext } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Shield, Wrench, Car, ArrowLeft, Lock, Building2 } from 'lucide-react';
+import { Shield, Wrench, Car, ArrowLeft, Lock, Building2, Users } from 'lucide-react';
 import { ThemeContext } from '../App';
+import { BACKEND_URL } from '../api';
 
 const roles = [
   {
@@ -39,6 +40,15 @@ const roles = [
     iconBg: 'rgba(245,158,11,0.15)',
     pass: 'cliente123',
     path: '/cliente'
+  },
+  {
+    id: 'flota',
+    label: 'Portal Flotas',
+    desc: 'Ayvens · Consult Networks — gestión de flota',
+    icon: <Users size={22} color="#34d399" />,
+    iconBg: 'rgba(16,185,129,0.15)',
+    pass: null,
+    path: '/flota'
   }
 ];
 
@@ -46,12 +56,40 @@ export default function LoginView() {
   const { theme, toggleTheme } = useContext(ThemeContext);
   const [selected, setSelected] = useState(null);
   const [password, setPassword] = useState('');
+  const [fleetUser, setFleetUser] = useState('');
   const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
 
-  const handleLogin = (e) => {
+  const handleLogin = async (e) => {
     e.preventDefault();
     setError('');
+
+    // Fleet portal: authenticate against backend
+    if (selected.id === 'flota') {
+      setLoading(true);
+      try {
+        const res = await fetch(`${BACKEND_URL}/api/fleet-login`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ usuario: fleetUser, password })
+        });
+        if (!res.ok) {
+          setError('Usuario o contraseña incorrectos.');
+          return;
+        }
+        const user = await res.json();
+        localStorage.setItem('fleetUser', JSON.stringify(user));
+        navigate('/flota');
+      } catch {
+        setError('Error de conexión con el servidor.');
+      } finally {
+        setLoading(false);
+      }
+      return;
+    }
+
+    // Standard roles
     if (password === selected.pass) {
       navigate(selected.path);
     } else {
@@ -59,10 +97,12 @@ export default function LoginView() {
     }
   };
 
+  const reset = () => { setSelected(null); setPassword(''); setFleetUser(''); setError(''); };
+
   return (
     <div className="login-page">
       <div className="login-box">
-        {/* Logo / Header */}
+        {/* Header */}
         <div style={{ textAlign: 'center', marginBottom: '2rem' }}>
           <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '0.75rem' }}>
             <button onClick={toggleTheme} className="theme-toggle" title="Cambiar tema" />
@@ -90,7 +130,7 @@ export default function LoginView() {
           </div>
         ) : (
           <form onSubmit={handleLogin}>
-            <button type="button" onClick={() => { setSelected(null); setPassword(''); setError(''); }}
+            <button type="button" onClick={reset}
               style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.85rem', marginBottom: '1.5rem', padding: 0 }}>
               <ArrowLeft size={16} /> Cambiar perfil
             </button>
@@ -103,6 +143,27 @@ export default function LoginView() {
               </div>
             </div>
 
+            {/* Fleet: show username + password */}
+            {selected.id === 'flota' && (
+              <div style={{ marginBottom: '1rem' }}>
+                <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '0.4rem' }}>
+                  Usuario
+                </label>
+                <div style={{ position: 'relative' }}>
+                  <Users size={16} style={{ position: 'absolute', left: '0.85rem', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
+                  <input
+                    type="text"
+                    placeholder="Tu usuario de flota"
+                    value={fleetUser}
+                    onChange={e => { setFleetUser(e.target.value); setError(''); }}
+                    style={{ paddingLeft: '2.5rem' }}
+                    autoFocus
+                    required
+                  />
+                </div>
+              </div>
+            )}
+
             <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '0.4rem' }}>
               Contraseña
             </label>
@@ -114,16 +175,15 @@ export default function LoginView() {
                 value={password}
                 onChange={e => { setPassword(e.target.value); setError(''); }}
                 style={{ paddingLeft: '2.5rem' }}
-                autoFocus
+                autoFocus={selected.id !== 'flota'}
+                required
               />
             </div>
 
-            {error && (
-              <div className="toast toast-error" style={{ marginBottom: '1rem' }}>{error}</div>
-            )}
+            {error && <div className="toast toast-error" style={{ marginBottom: '1rem' }}>{error}</div>}
 
-            <button type="submit" className="btn-primary" style={{ width: '100%', justifyContent: 'center', padding: '0.8rem' }}>
-              Ingresar
+            <button type="submit" className="btn-primary" style={{ width: '100%', justifyContent: 'center', padding: '0.8rem' }} disabled={loading}>
+              {loading ? 'Verificando...' : 'Ingresar'}
             </button>
           </form>
         )}

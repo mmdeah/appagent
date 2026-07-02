@@ -8,6 +8,10 @@
   "todos": [],
   "ald_billings": [],
   "cn_billings": [],
+  "fleet_users": [
+    { "id": 1, "nombre": "Ayvens Fleet", "empresa": "ald", "usuario": "ayvens", "password": "ayvens123" },
+    { "id": 2, "nombre": "Consult Networks Fleet", "empresa": "cn", "usuario": "consult", "password": "cn123" }
+  ],
   "settings": [
     {
       "id": "revision_form",

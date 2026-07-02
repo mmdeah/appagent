@@ -27,7 +27,7 @@ if (dataDir !== __dirname && !fs.existsSync(dbFile)) {
 // Ensure all required collections exist
 try {
   const dbData = JSON.parse(fs.readFileSync(dbFile, 'utf8'));
-  const requiredKeys = ['orders', 'quotes', 'reports', 'expenses', 'archived_orders', 'ai_reports', 'todos', 'ald_billings', 'cn_billings'];
+  const requiredKeys = ['orders', 'quotes', 'reports', 'expenses', 'archived_orders', 'ai_reports', 'todos', 'ald_billings', 'cn_billings', 'fleet_users'];
   let modified = false;
   requiredKeys.forEach(key => {
     if (!dbData[key]) {
@@ -140,6 +140,21 @@ server.post('/api/migrate-ai-reports', (req, res) => {
     db.set('reports', clean).write();
 
     res.json({ message: `Se movieron ${corrupt.length} reporte(s) de IA a ai_reports.`, moved: corrupt.length });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// Fleet user login
+server.post('/api/fleet-login', (req, res) => {
+  try {
+    const { usuario, password } = req.body;
+    if (!usuario || !password) return res.status(400).json({ error: 'Faltan credenciales' });
+    const db = router.db;
+    const user = db.get('fleet_users').find(u => u.usuario === usuario && u.password === password).value();
+    if (!user) return res.status(401).json({ error: 'Credenciales incorrectas' });
+    const { password: _pw, ...safeUser } = user;
+    res.json(safeUser);
   } catch (e) {
     res.status(500).json({ error: e.message });
   }
