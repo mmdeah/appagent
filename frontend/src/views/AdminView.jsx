@@ -692,11 +692,18 @@ export default function AdminView() {
                             <Clock size={10} /> Ingreso: {new Date(o.fecha).toLocaleDateString('es-CO')}
                           </div>
                         )}
-                        {o.cotizacionAprobadaFlota && (
-                          <div style={{ fontSize: '0.72rem', fontWeight: 700, color: '#10b981', marginTop: '0.3rem', display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
-                            ✅ Aprobado por {o.cotizacionAprobadaPor}
-                          </div>
-                        )}
+                        {(() => {
+                          const items = o.quotes?.[0]?.items || [];
+                          const ap = items.filter(it => it.aprobadoFlota === true).length;
+                          const rech = items.filter(it => it.aprobadoFlota === false).length;
+                          if (ap === 0 && rech === 0) return null;
+                          return (
+                            <div style={{ fontSize: '0.72rem', fontWeight: 700, marginTop: '0.3rem', display: 'flex', gap: '0.35rem', flexWrap: 'wrap' }}>
+                              {ap > 0 && <span style={{ color: '#10b981' }}>✅ {ap} ap.</span>}
+                              {rech > 0 && <span style={{ color: '#ef4444' }}>❌ {rech} rech.</span>}
+                            </div>
+                          );
+                        })()}
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '0.5rem' }}>
                           <span style={{ fontSize: '0.82rem', color: 'var(--text-muted)' }}>{o.cliente}</span>
                           <div style={{ display: 'flex', gap: '0.4rem', alignItems: 'center' }}>

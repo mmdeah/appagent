@@ -6,8 +6,8 @@ const fmt = (n) => (parseFloat(n) || 0).toLocaleString('es-CO', { minimumFractio
 
 const PAYMENT_METHODS = ['Efectivo', 'Nequi', 'Bancolombia', 'Banco de Bogota', 'Tarjeta'];
 
-export default function OrderDetailsModal({ order, onClose, fleetMode = false }) {
-  const [activeTab, setActiveTab] = useState('info');
+export default function OrderDetailsModal({ order, onClose, fleetMode = false, initialTab = 'info', onUpdate }) {
+  const [activeTab, setActiveTab] = useState(initialTab);
   const [reportData, setReportData] = useState(order.reports?.[0] || null);
   const [quoteItems, setQuoteItems] = useState(
     order.quotes?.[0]?.items || [{ descripcion: '', cantidad: 1, precio: 0, aplicaIva: false }]
@@ -22,9 +22,26 @@ export default function OrderDetailsModal({ order, onClose, fleetMode = false })
   const [editedOrder, setEditedOrder] = useState({ ...order });
   const [showAddItem, setShowAddItem] = useState(false);
   const [newItem, setNewItem] = useState({ category: '', item: '', state: 'Malo', manoObra: '', requiereRepuesto: false, cantidadRepuesto: 1, valorRepuesto: '', recibeReparacion: false, valorReparacion: '' });
+  const [savingApprovals, setSavingApprovals] = useState(false);
 
   const REPORT_CATEGORIES = ['Suspensión','Frenos','Dirección','Transmisión','Fugas','Batería / Eléctrico','Chequeo Visual Motor','Niveles','Otros','Insumos','Servicios Especializados'];
   const ITEM_STATES = ['Bueno','Regular','Malo'];
+
+  const handleSaveApprovals = async () => {
+    const quote = order.quotes?.[0];
+    if (!quote) return;
+    setSavingApprovals(true);
+    try {
+      await fetch(`${API_URL}/quotes/${quote.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ items: quoteItems }),
+      });
+      showStatus('Aprobaciones guardadas');
+      onUpdate && onUpdate();
+    } catch (e) { console.error(e); }
+    finally { setSavingApprovals(false); }
+  };
 
   const handleAddReportItem = async () => {
     if (!newItem.category || !newItem.item) return;
@@ -924,7 +941,7 @@ export default function OrderDetailsModal({ order, onClose, fleetMode = false })
                     <th style={{ textAlign: 'center' }}>Vr. Unitario</th>
                     <th style={{ textAlign: 'center' }}>+IVA 19%</th>
                     <th style={{ textAlign: 'right' }}>Total</th>
-                    <th className="hide-on-print" style={{ width: 40 }}></th>
+                    <th className={fleetMode ? undefined : 'hide-on-print'} style={{ width: fleetMode ? 90 : 40, textAlign: 'center' }}>{fleetMode ? 'Aprobación' : ''}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -982,11 +999,28 @@ export default function OrderDetailsModal({ order, onClose, fleetMode = false })
                           <span className={fleetMode ? undefined : 'show-on-print'}>{it.aplicaIva ? 'Sí' : 'No'}</span>
                         </td>
                         <td style={{ textAlign: 'right', fontWeight: 700 }} className="price">${fmt(total)}</td>
-                        <td className="hide-on-print" style={{ textAlign: 'center' }}>
-                          {!fleetMode && <button onClick={() => setQuoteItems(quoteItems.filter((_, i) => i !== idx))}
-                            style={{ background: 'none', border: 'none', color: 'var(--danger)', cursor: 'pointer' }}>
-                            <Trash2 size={16} />
-                          </button>}
+                        <td className={fleetMode ? undefined : 'hide-on-print'} style={{ textAlign: 'center' }}>
+                          {fleetMode ? (
+                            <div style={{ display: 'flex', gap: '0.3rem', justifyContent: 'center' }}>
+                              <button title="Aprobar"
+                                onClick={() => { const q=[...quoteItems]; q[idx]={...q[idx], aprobadoFlota: q[idx].aprobadoFlota === true ? null : true}; setQuoteItems(q); }}
+                                style={{ padding: '0.25rem 0.55rem', borderRadius: 6, border: '1.5px solid', fontSize: '0.85rem', fontWeight: 900, cursor: 'pointer',
+                                  borderColor: it.aprobadoFlota === true ? '#10b981' : 'var(--border)',
+                                  background: it.aprobadoFlota === true ? 'rgba(16,185,129,0.15)' : 'transparent',
+                                  color: it.aprobadoFlota === true ? '#10b981' : 'var(--text-muted)' }}>✓</button>
+                              <button title="Rechazar"
+                                onClick={() => { const q=[...quoteItems]; q[idx]={...q[idx], aprobadoFlota: q[idx].aprobadoFlota === false ? null : false}; setQuoteItems(q); }}
+                                style={{ padding: '0.25rem 0.55rem', borderRadius: 6, border: '1.5px solid', fontSize: '0.85rem', fontWeight: 900, cursor: 'pointer',
+                                  borderColor: it.aprobadoFlota === false ? '#ef4444' : 'var(--border)',
+                                  background: it.aprobadoFlota === false ? 'rgba(239,68,68,0.15)' : 'transparent',
+                                  color: it.aprobadoFlota === false ? '#ef4444' : 'var(--text-muted)' }}>✗</button>
+                            </div>
+                          ) : (
+                            <button onClick={() => setQuoteItems(quoteItems.filter((_, i) => i !== idx))}
+                              style={{ background: 'none', border: 'none', color: 'var(--danger)', cursor: 'pointer' }}>
+                              <Trash2 size={16} />
+                            </button>
+                          )}
                         </td>
                       </tr>
                     );
@@ -1040,11 +1074,16 @@ export default function OrderDetailsModal({ order, onClose, fleetMode = false })
                 </button>
               </div>}
 
-              <div className="hide-on-print" style={{ display: 'flex', gap: '0.75rem' }}>
+              <div className="hide-on-print" style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap', alignItems: 'center' }}>
                 {!fleetMode && <button onClick={saveQuote} className="btn-secondary">Guardar Borrador</button>}
                 {!fleetMode && <button onClick={authorizeQuote} className="btn-primary" style={{ background: 'var(--success)', borderColor: 'var(--success)' }}>
                   <CheckCircle size={16} /> Autorizar y Empezar Trabajo
                 </button>}
+                {fleetMode && (
+                  <button onClick={handleSaveApprovals} disabled={savingApprovals} className="btn-primary">
+                    {savingApprovals ? 'Guardando...' : '✓ Guardar aprobaciones'}
+                  </button>
+                )}
                 <div style={{ marginLeft: fleetMode ? 0 : 'auto', display: 'flex', gap: '0.5rem' }}>
                   <button onClick={() => printQuote('COTIZACIÓN')} className="btn-secondary"><Printer size={16} /> Cotización PDF</button>
                   <button onClick={() => printQuote('CUENTA DE COBRO')} className="btn-secondary"><Printer size={16} /> Cta. Cobro PDF</button>

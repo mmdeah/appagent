@@ -45,10 +45,9 @@ export default function FleetView() {
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selectedOrder, setSelectedOrder] = useState(null);
+  const [modalInitialTab, setModalInitialTab] = useState('info');
   const [activeTab, setActiveTab] = useState('resumen');
   const [search, setSearch] = useState('');
-  const [approvingId, setApprovingId] = useState(null);
-
   // Budget config
   const [budget, setBudget] = useState({ enabled: false, amount: 0 });
   const [budgetInput, setBudgetInput] = useState('');
@@ -108,27 +107,6 @@ export default function FleetView() {
   const handleLogout = () => {
     localStorage.removeItem('fleetUser');
     navigate('/flota-login');
-  };
-
-  const handleApprove = async (orderId) => {
-    setApprovingId(orderId);
-    try {
-      await fetch(`${API_URL}/orders/${orderId}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          cotizacionAprobadaFlota: true,
-          cotizacionAprobadaPor: user.nombre,
-          cotizacionAprobadaFecha: new Date().toISOString(),
-        }),
-      });
-      setOrders(prev => prev.map(o =>
-        o.id === orderId
-          ? { ...o, cotizacionAprobadaFlota: true, cotizacionAprobadaPor: user.nombre }
-          : o
-      ));
-    } catch (e) { console.error(e); }
-    finally { setApprovingId(null); }
   };
 
   const saveBudget = () => {
@@ -470,9 +448,13 @@ export default function FleetView() {
                             const overDays = dias !== null && dias > daysThreshold;
                             const total = calcTotal(o);
                             const hasQuote = o.quotes?.length > 0 && (o.quotes[0].items || []).length > 0;
-                            const approved = o.cotizacionAprobadaFlota;
+                            const quoteItems = o.quotes?.[0]?.items || [];
+                            const aprobados  = quoteItems.filter(it => it.aprobadoFlota === true).length;
+                            const rechazados = quoteItems.filter(it => it.aprobadoFlota === false).length;
+                            const pendientes = quoteItems.filter(it => it.aprobadoFlota == null).length;
+                            const openModal = (tab = 'info') => { setModalInitialTab(tab); setSelectedOrder(o); };
                             return (
-                              <div key={o.id} className="card card-hover" onClick={() => setSelectedOrder(o)}
+                              <div key={o.id} className="card card-hover" onClick={() => openModal('info')}
                                 style={{ padding: '0.9rem', cursor: 'pointer', borderLeft: overDays ? '3px solid #ef4444' : undefined }}>
                                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '0.35rem' }}>
                                   <span style={{ fontWeight: 900, fontSize: '1rem', letterSpacing: 1 }}>{o.placa}</span>
@@ -489,15 +471,21 @@ export default function FleetView() {
 
                                 {hasQuote && (
                                   <div onClick={e => e.stopPropagation()}>
-                                    {approved ? (
-                                      <div style={{ fontSize: '0.78rem', fontWeight: 700, color: '#10b981', display: 'flex', alignItems: 'center', gap: '0.3rem', padding: '0.3rem 0.5rem', background: 'rgba(16,185,129,0.1)', borderRadius: 7 }}>
-                                        ✅ Aprobado por {o.cotizacionAprobadaPor}
-                                      </div>
-                                    ) : (
-                                      <button disabled={approvingId === o.id} onClick={() => handleApprove(o.id)}
-                                        style={{ width: '100%', padding: '0.35rem', borderRadius: 7, border: '1.5px solid #10b981', background: 'rgba(16,185,129,0.08)', color: '#10b981', fontWeight: 700, fontSize: '0.8rem', cursor: 'pointer' }}>
-                                        {approvingId === o.id ? 'Aprobando...' : '✓ Aprobar cotización'}
+                                    {aprobados === 0 && rechazados === 0 ? (
+                                      <button onClick={() => openModal('cotizacion')}
+                                        style={{ width: '100%', padding: '0.35rem', borderRadius: 7, border: '1.5px solid var(--primary)', background: 'rgba(99,102,241,0.08)', color: 'var(--primary)', fontWeight: 700, fontSize: '0.8rem', cursor: 'pointer' }}>
+                                        📋 Revisar {quoteItems.length} ítem{quoteItems.length !== 1 ? 's' : ''}
                                       </button>
+                                    ) : (
+                                      <div style={{ display: 'flex', gap: '0.4rem', alignItems: 'center', flexWrap: 'wrap', padding: '0.3rem 0.5rem', background: 'var(--bg)', borderRadius: 7 }}>
+                                        {aprobados > 0 && <span style={{ fontSize: '0.78rem', fontWeight: 700, color: '#10b981' }}>✅ {aprobados} ap.</span>}
+                                        {rechazados > 0 && <span style={{ fontSize: '0.78rem', fontWeight: 700, color: '#ef4444' }}>❌ {rechazados} rech.</span>}
+                                        {pendientes > 0 && <span style={{ fontSize: '0.78rem', fontWeight: 700, color: '#f59e0b' }}>⏳ {pendientes} pdte.</span>}
+                                        <button onClick={() => openModal('cotizacion')}
+                                          style={{ fontSize: '0.72rem', color: 'var(--primary)', background: 'none', border: 'none', cursor: 'pointer', padding: 0, fontWeight: 700, marginLeft: 'auto' }}>
+                                          Editar →
+                                        </button>
+                                      </div>
                                     )}
                                   </div>
                                 )}
@@ -581,6 +569,7 @@ export default function FleetView() {
           order={selectedOrder}
           onClose={() => setSelectedOrder(null)}
           fleetMode={true}
+          initialTab={modalInitialTab}
           onUpdate={() => { setSelectedOrder(null); refreshOrders(); }}
         />
       )}
