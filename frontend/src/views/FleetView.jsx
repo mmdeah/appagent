@@ -40,7 +40,7 @@ export default function FleetView() {
 
   useEffect(() => {
     const stored = localStorage.getItem('fleetUser');
-    if (!stored) { navigate('/'); return; }
+    if (!stored) { navigate('/flota-login'); return; }
     const u = JSON.parse(stored);
     setUser(u);
 
@@ -61,7 +61,7 @@ export default function FleetView() {
 
   const handleLogout = () => {
     localStorage.removeItem('fleetUser');
-    navigate('/');
+    navigate('/flota-login');
   };
 
   if (!user) return null;
