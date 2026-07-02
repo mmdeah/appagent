@@ -996,7 +996,11 @@ export default function OrderDetailsModal({ order, onClose, fleetMode = false, i
                           {!fleetMode && <input className="hide-on-print" type="checkbox"
                             checked={it.aplicaIva}
                             onChange={e => { const q=[...quoteItems]; q[idx].aplicaIva=e.target.checked; setQuoteItems(q); }} />}
-                          <span className={fleetMode ? undefined : 'show-on-print'}>{it.aplicaIva ? 'Sí' : 'No'}</span>
+                          <span className={fleetMode ? undefined : 'show-on-print'}>
+                            {fleetMode
+                              ? (it.aplicaIva ? `$${fmt((it.precio || 0) * (it.cantidad || 1) * 0.19)}` : '—')
+                              : (it.aplicaIva ? 'Sí' : 'No')}
+                          </span>
                         </td>
                         <td style={{ textAlign: 'right', fontWeight: 700 }} className="price">${fmt(total)}</td>
                         <td className={fleetMode ? undefined : 'hide-on-print'} style={{ textAlign: 'center' }}>
