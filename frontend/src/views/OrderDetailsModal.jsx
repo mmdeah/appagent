@@ -1100,10 +1100,10 @@ export default function OrderDetailsModal({ order, onClose, fleetMode = false })
                         style={{ display: 'inline-flex', alignItems: 'center', gap: '0.3rem', padding: '0.35rem 0.75rem', background: 'rgba(99,102,241,0.12)', color: 'var(--primary)', border: '1px solid rgba(99,102,241,0.3)', borderRadius: 6, fontSize: '0.82rem', fontWeight: 600, textDecoration: 'none', flexShrink: 0 }}>
                         <Download size={13}/> Descargar
                       </a>
-                      {!fleetMode && <button onClick={() => deletePdf(pdf)}
+                      <button onClick={() => deletePdf(pdf)}
                         style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', padding: '0.2rem', flexShrink: 0 }}>
                         <Trash2 size={16}/>
-                      </button>}
+                      </button>
                     </div>
                   ))}
                 </div>
