@@ -1358,7 +1358,7 @@ export default function AdminView() {
                     Generador de Informe Técnico con IA
                   </h2>
                   <p style={{ color: 'var(--text-muted)', marginTop: '0.5rem', fontSize: '0.98rem' }}>
-                    Redacta diagnósticos automotrices de alta precisión mediante la IA **GPT-OSS 120B** y descárgalos en una plantilla premium de PDF.
+                    Redacta diagnósticos automotrices de alta precisión mediante IA y descárgalos en una plantilla premium de PDF.
                   </p>
                 </div>
 
