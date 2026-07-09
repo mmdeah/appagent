@@ -142,7 +142,7 @@ export default function AdminView() {
         let errMsg = 'Error al generar el informe';
         try {
           const err = await res.json();
-          errMsg = err.error || err.details || errMsg;
+          errMsg = [err.error, err.details].filter(Boolean).join(' — ') || errMsg;
         } catch (_) {}
         throw new Error(errMsg);
       }

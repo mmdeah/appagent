@@ -363,18 +363,24 @@ Genera el informe técnico formal en español enfocado en los ítems seleccionad
     }
 
     let contentText = aiResult.choices[0].message.content.trim();
-    
-    // Clean JSON formatting from markdown codeblocks if present
-    if (contentText.startsWith("```")) {
-      contentText = contentText.replace(/^```json/, "").replace(/```$/, "").trim();
-    }
+
+    // Strip markdown code fences
+    contentText = contentText.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, '').trim();
 
     let reportJson;
     try {
       reportJson = JSON.parse(contentText);
-    } catch (parseError) {
-      console.error("Failed to parse AI content as JSON. Content:", contentText);
-      return res.status(500).json({ error: "La IA no devolvió un formato JSON válido", details: contentText });
+    } catch (_) {
+      // Try to extract the first { ... } block from the response
+      const match = contentText.match(/\{[\s\S]*\}/);
+      if (match) {
+        try { reportJson = JSON.parse(match[0]); } catch (e2) { reportJson = null; }
+      }
+    }
+
+    if (!reportJson) {
+      console.error("Failed to parse AI content as JSON. Content:", contentText.slice(0, 500));
+      return res.status(500).json({ error: "La IA no devolvió JSON válido", details: contentText.slice(0, 400) });
     }
 
     // Build the data structure for the PDF generator script
