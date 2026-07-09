@@ -330,7 +330,7 @@ Genera el informe técnico formal en español enfocado en los ítems seleccionad
       return res.status(500).json({ error: "Falta configurar la variable de entorno OPENROUTER_API_KEY en el servidor." });
     }
 
-    console.log("Calling OpenRouter with model: meta-llama/llama-3.1-8b-instruct:free...");
+    console.log("Calling OpenRouter with model: deepseek/deepseek-r1:free...");
 
     const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
       method: "POST",
@@ -341,7 +341,7 @@ Genera el informe técnico formal en español enfocado en los ítems seleccionad
         "X-Title": "AppAgent"
       },
       body: JSON.stringify({
-        model: "meta-llama/llama-3.1-8b-instruct:free",
+        model: "deepseek/deepseek-r1:free",
         messages: [
           { role: "system", content: systemPrompt },
           { role: "user", content: userPrompt }
@@ -364,6 +364,8 @@ Genera el informe técnico formal en español enfocado en los ítems seleccionad
 
     let contentText = aiResult.choices[0].message.content.trim();
 
+    // Strip DeepSeek R1 thinking tokens
+    contentText = contentText.replace(/<think>[\s\S]*?<\/think>/gi, '').trim();
     // Strip markdown code fences
     contentText = contentText.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, '').trim();
 
