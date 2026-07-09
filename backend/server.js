@@ -330,7 +330,7 @@ Genera el informe técnico formal en español enfocado en los ítems seleccionad
       return res.status(500).json({ error: "Falta configurar la variable de entorno OPENROUTER_API_KEY en el servidor." });
     }
 
-    console.log("Calling OpenRouter with model: nvidia/nemotron-3-ultra-550b-a55b:free...");
+    console.log("Calling OpenRouter with model: meta-llama/llama-3.3-70b-instruct:free...");
 
     const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
       method: "POST",
@@ -341,7 +341,7 @@ Genera el informe técnico formal en español enfocado en los ítems seleccionad
         "X-Title": "AppAgent"
       },
       body: JSON.stringify({
-        model: "nvidia/nemotron-3-ultra-550b-a55b:free",
+        model: "meta-llama/llama-3.3-70b-instruct:free",
         messages: [
           { role: "system", content: systemPrompt },
           { role: "user", content: userPrompt }
