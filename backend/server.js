@@ -330,25 +330,32 @@ Genera el informe técnico formal en español enfocado en los ítems seleccionad
       return res.status(500).json({ error: "Falta configurar la variable de entorno OPENROUTER_API_KEY en el servidor." });
     }
 
-    console.log("Calling OpenRouter with model: google/gemma-4-31b-it:free...");
-
-    const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        "Authorization": `Bearer ${openRouterKey}`,
-        "Content-Type": "application/json",
-        "HTTP-Referer": "https://appagent.up.railway.app",
-        "X-Title": "AppAgent"
-      },
-      body: JSON.stringify({
-        model: "google/gemma-4-31b-it:free",
-        messages: [
-          { role: "system", content: systemPrompt },
-          { role: "user", content: userPrompt }
-        ],
-        temperature: 0.3
-      })
+    const MODEL = "google/gemma-4-31b-it:free";
+    const orBody = JSON.stringify({
+      model: MODEL,
+      messages: [
+        { role: "system", content: systemPrompt },
+        { role: "user", content: userPrompt }
+      ],
+      temperature: 0.3
     });
+    const orHeaders = {
+      "Authorization": `Bearer ${openRouterKey}`,
+      "Content-Type": "application/json",
+      "HTTP-Referer": "https://appagent.up.railway.app",
+      "X-Title": "AppAgent"
+    };
+
+    let response;
+    for (let attempt = 1; attempt <= 3; attempt++) {
+      console.log(`Calling OpenRouter (${MODEL}) — attempt ${attempt}...`);
+      response = await fetch("https://openrouter.ai/api/v1/chat/completions", { method: "POST", headers: orHeaders, body: orBody });
+      if (response.status !== 429) break;
+      if (attempt < 3) {
+        console.log("Rate limited (429), retrying in 4s...");
+        await new Promise(r => setTimeout(r, 4000));
+      }
+    }
 
     if (!response.ok) {
       const errorText = await response.text();
