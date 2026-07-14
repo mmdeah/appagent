@@ -330,7 +330,7 @@ Genera el informe técnico formal en español enfocado en los ítems seleccionad
       return res.status(500).json({ error: "Falta configurar la variable de entorno OPENROUTER_API_KEY en el servidor." });
     }
 
-    const MODEL = "google/gemma-4-31b-it:free";
+    const MODEL = "qwen/qwen3-14b:free";
     const orBody = JSON.stringify({
       model: MODEL,
       messages: [
