@@ -330,56 +330,31 @@ Genera el informe técnico formal en español enfocado en los ítems seleccionad
       return res.status(500).json({ error: "Falta configurar la variable de entorno OPENROUTER_API_KEY en el servidor." });
     }
 
-    const MODELS = [
-      "deepseek/deepseek-chat-v3-0324:free",
-      "qwen/qwen3-14b:free",
-      "deepseek/deepseek-r1:free",
-      "google/gemma-4-31b-it:free",
-    ];
-    const orHeaders = {
-      "Authorization": `Bearer ${openRouterKey}`,
-      "Content-Type": "application/json",
-      "HTTP-Referer": "https://appagent.up.railway.app",
-      "X-Title": "AppAgent"
-    };
+    const geminiKey = process.env.GEMINI_API_KEY;
+    if (!geminiKey) return res.status(500).json({ error: "Falta configurar GEMINI_API_KEY en Railway." });
 
-    let response;
-    let lastError = '';
-    for (const model of MODELS) {
-      console.log(`Trying model: ${model}...`);
-      response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+    console.log("Calling Gemini 2.0 Flash...");
+    const geminiRes = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${geminiKey}`,
+      {
         method: "POST",
-        headers: orHeaders,
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          model,
-          messages: [
-            { role: "system", content: systemPrompt },
-            { role: "user", content: userPrompt }
-          ],
-          temperature: 0.3
+          contents: [{ parts: [{ text: systemPrompt + "\n\n" + userPrompt }] }],
+          generationConfig: { temperature: 0.3 }
         })
-      });
-      if (response.ok) break;
-      lastError = await response.text();
-      console.warn(`Model ${model} failed (${response.status}):`, lastError);
-      if (response.status !== 429 && response.status !== 404) break; // non-recoverable
-      await new Promise(r => setTimeout(r, 2000));
+      }
+    );
+
+    if (!geminiRes.ok) {
+      const err = await geminiRes.text();
+      console.error("Gemini API error:", err);
+      return res.status(502).json({ error: "Error de Gemini API", details: err });
     }
 
-    if (!response.ok) {
-      return res.status(502).json({ error: "Error de OpenRouter API", details: lastError });
-    }
-
-    const aiResult = await response.json();
-    if (!aiResult.choices || aiResult.choices.length === 0) {
-      console.error("Unexpected OpenRouter response:", aiResult);
-      return res.status(502).json({ error: "Respuesta inesperada de OpenRouter", details: JSON.stringify(aiResult) });
-    }
-
-    let contentText = aiResult.choices[0].message.content.trim();
-
-    // Strip DeepSeek R1 thinking tokens
-    contentText = contentText.replace(/<think>[\s\S]*?<\/think>/gi, '').trim();
+    const geminiData = await geminiRes.json();
+    let contentText = geminiData?.candidates?.[0]?.content?.parts?.[0]?.text?.trim() || '';
+    if (!contentText) return res.status(502).json({ error: "Gemini no devolvió contenido", details: JSON.stringify(geminiData) });
     // Strip markdown code fences
     contentText = contentText.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, '').trim();
 
