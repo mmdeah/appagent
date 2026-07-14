@@ -330,31 +330,37 @@ Genera el informe técnico formal en español enfocado en los ítems seleccionad
       return res.status(500).json({ error: "Falta configurar la variable de entorno OPENROUTER_API_KEY en el servidor." });
     }
 
-    const geminiKey = process.env.GEMINI_API_KEY;
-    if (!geminiKey) return res.status(500).json({ error: "Falta configurar GEMINI_API_KEY en Railway." });
+    const openRouterKey = process.env.OPENROUTER_API_KEY;
+    if (!openRouterKey) return res.status(500).json({ error: "Falta configurar OPENROUTER_API_KEY en Railway." });
 
-    console.log("Calling Gemini 2.0 Flash...");
-    const geminiRes = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${geminiKey}`,
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          contents: [{ parts: [{ text: systemPrompt + "\n\n" + userPrompt }] }],
-          generationConfig: { temperature: 0.3 }
-        })
-      }
-    );
+    console.log("Calling OpenRouter with model: nvidia/nemotron-3-ultra-550b-a55b:free...");
+    const orRes = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${openRouterKey}`,
+        "Content-Type": "application/json",
+        "HTTP-Referer": "https://appagent.up.railway.app",
+        "X-Title": "AppAgent"
+      },
+      body: JSON.stringify({
+        model: "nvidia/nemotron-3-ultra-550b-a55b:free",
+        messages: [
+          { role: "system", content: systemPrompt },
+          { role: "user", content: userPrompt }
+        ],
+        temperature: 0.3
+      })
+    });
 
-    if (!geminiRes.ok) {
-      const err = await geminiRes.text();
-      console.error("Gemini API error:", err);
-      return res.status(502).json({ error: "Error de Gemini API", details: err });
+    if (!orRes.ok) {
+      const err = await orRes.text();
+      console.error("OpenRouter API error:", err);
+      return res.status(502).json({ error: "Error de OpenRouter API", details: err });
     }
 
-    const geminiData = await geminiRes.json();
-    let contentText = geminiData?.candidates?.[0]?.content?.parts?.[0]?.text?.trim() || '';
-    if (!contentText) return res.status(502).json({ error: "Gemini no devolvió contenido", details: JSON.stringify(geminiData) });
+    const orData = await orRes.json();
+    let contentText = orData?.choices?.[0]?.message?.content?.trim() || '';
+    if (!contentText) return res.status(502).json({ error: "OpenRouter no devolvió contenido", details: JSON.stringify(orData) });
     // Strip markdown code fences
     contentText = contentText.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, '').trim();
 
