@@ -58,6 +58,21 @@ try {
   console.error("Error running Docs Rápidos migration:", e);
 }
 
+// Auto-backup on startup: save a timestamped copy of db.json
+try {
+  const backupDir = path.join(dataDir, 'backups');
+  if (!fs.existsSync(backupDir)) fs.mkdirSync(backupDir, { recursive: true });
+  const stamp = new Date().toISOString().replace(/[:.]/g, '-');
+  const backupFile = path.join(backupDir, `db_${stamp}.json`);
+  fs.copyFileSync(dbFile, backupFile);
+  // Keep only the last 10 backups
+  const backups = fs.readdirSync(backupDir).sort();
+  if (backups.length > 10) backups.slice(0, backups.length - 10).forEach(f => fs.unlinkSync(path.join(backupDir, f)));
+  console.log(`Backup created: ${backupFile}`);
+} catch (e) {
+  console.error("Backup error:", e.message);
+}
+
 const router = jsonServer.router(dbFile);
 
 // PDF uploads directory (persists via Railway volume)
@@ -132,6 +147,19 @@ server.delete('/api/orders/:orderId/pdfs/:fileId', (req, res) => {
     const pdfs = (order.pdfs || []).filter(p => String(p.id) !== String(fileId));
     db.get('orders').find(o => String(o.id) === String(orderId)).assign({ pdfs }).write();
     res.json({ ok: true });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// Download full database backup
+server.get('/api/backup-db', (req, res) => {
+  try {
+    const data = fs.readFileSync(dbFile, 'utf8');
+    const stamp = new Date().toISOString().split('T')[0];
+    res.setHeader('Content-Disposition', `attachment; filename="db_backup_${stamp}.json"`);
+    res.setHeader('Content-Type', 'application/json');
+    res.send(data);
   } catch (e) {
     res.status(500).json({ error: e.message });
   }
