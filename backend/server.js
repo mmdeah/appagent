@@ -330,15 +330,12 @@ Genera el informe técnico formal en español enfocado en los ítems seleccionad
       return res.status(500).json({ error: "Falta configurar la variable de entorno OPENROUTER_API_KEY en el servidor." });
     }
 
-    const MODEL = "qwen/qwen3-14b:free";
-    const orBody = JSON.stringify({
-      model: MODEL,
-      messages: [
-        { role: "system", content: systemPrompt },
-        { role: "user", content: userPrompt }
-      ],
-      temperature: 0.3
-    });
+    const MODELS = [
+      "deepseek/deepseek-chat-v3-0324:free",
+      "qwen/qwen3-14b:free",
+      "deepseek/deepseek-r1:free",
+      "google/gemma-4-31b-it:free",
+    ];
     const orHeaders = {
       "Authorization": `Bearer ${openRouterKey}`,
       "Content-Type": "application/json",
@@ -347,20 +344,30 @@ Genera el informe técnico formal en español enfocado en los ítems seleccionad
     };
 
     let response;
-    for (let attempt = 1; attempt <= 3; attempt++) {
-      console.log(`Calling OpenRouter (${MODEL}) — attempt ${attempt}...`);
-      response = await fetch("https://openrouter.ai/api/v1/chat/completions", { method: "POST", headers: orHeaders, body: orBody });
-      if (response.status !== 429) break;
-      if (attempt < 3) {
-        console.log("Rate limited (429), retrying in 4s...");
-        await new Promise(r => setTimeout(r, 4000));
-      }
+    let lastError = '';
+    for (const model of MODELS) {
+      console.log(`Trying model: ${model}...`);
+      response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+        method: "POST",
+        headers: orHeaders,
+        body: JSON.stringify({
+          model,
+          messages: [
+            { role: "system", content: systemPrompt },
+            { role: "user", content: userPrompt }
+          ],
+          temperature: 0.3
+        })
+      });
+      if (response.ok) break;
+      lastError = await response.text();
+      console.warn(`Model ${model} failed (${response.status}):`, lastError);
+      if (response.status !== 429 && response.status !== 404) break; // non-recoverable
+      await new Promise(r => setTimeout(r, 2000));
     }
 
     if (!response.ok) {
-      const errorText = await response.text();
-      console.error("OpenRouter API error:", errorText);
-      return res.status(502).json({ error: "Error de OpenRouter API", details: errorText });
+      return res.status(502).json({ error: "Error de OpenRouter API", details: lastError });
     }
 
     const aiResult = await response.json();
