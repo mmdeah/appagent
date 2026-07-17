@@ -1332,7 +1332,7 @@ export default function AdminView() {
                     </div>
 
                     {/* KPI cards */}
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(155px, 1fr))', gap: '1rem' }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(175px, 1fr))', gap: '1rem' }}>
                       {[
                         { label: 'Vehículos atendidos', value: ordenesPeriodo.length, prev: ordenesPrev.length, color: 'var(--primary)', display: n => n },
                         { label: 'Ingresos', value: ingresosPeriodo, prev: ingresosPrev, color: '#10b981', display: n => `$${fmt(n)}` },
@@ -1348,7 +1348,7 @@ export default function AdminView() {
                         return (
                           <div key={s.label} className="card" style={{ padding: '1rem 1.25rem', minWidth: 0 }}>
                             <div style={{ fontSize: '0.72rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing:'0.05em', marginBottom: '0.4rem' }}>{s.label}</div>
-                            <div style={{ fontSize: displayVal.length > 12 ? '1.1rem' : '1.45rem', fontWeight: 900, color: s.color, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={displayVal}>{displayVal}</div>
+                            <div style={{ fontSize: displayVal.length > 13 ? '0.98rem' : displayVal.length > 10 ? '1.18rem' : '1.45rem', fontWeight: 900, color: s.color, whiteSpace: 'nowrap' }} title={displayVal}>{displayVal}</div>
                             {d != null && (
                               <div style={{ fontSize: '0.72rem', fontWeight: 700, marginTop: '0.3rem', color: good ? '#10b981' : '#ef4444' }}>
                                 {d >= 0 ? '▲' : '▼'} {Math.abs(d).toFixed(0)}% vs período anterior
@@ -1435,9 +1435,9 @@ export default function AdminView() {
                       <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'flex-end', height: 130 }}>
                         {monthlyData.map(m => (
                           <div key={m.label} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.2rem' }}>
-                            <div style={{ fontSize:'0.62rem', fontWeight:700, display:'flex', gap:'0.4rem', minHeight:'0.9rem' }}>
-                              {m.ingresos > 0 && <span style={{ color:'#10b981' }}>{fmtCompact(m.ingresos)}</span>}
-                              {m.gastos > 0 && <span style={{ color:'#ef4444' }}>{fmtCompact(m.gastos)}</span>}
+                            <div style={{ fontSize:'0.6rem', fontWeight:700, display:'flex', flexDirection:'column', alignItems:'center', lineHeight:1.25, minHeight:'1.5rem', justifyContent:'flex-end' }}>
+                              {m.ingresos > 0 && <span style={{ color:'#10b981', whiteSpace:'nowrap' }}>{fmtCompact(m.ingresos)}</span>}
+                              {m.gastos > 0 && <span style={{ color:'#ef4444', whiteSpace:'nowrap' }}>{fmtCompact(m.gastos)}</span>}
                             </div>
                             <div style={{ width:'100%', display:'flex', gap:'2px', alignItems:'flex-end', height:100 }}>
                               <div title={`Ingresos: $${fmt(m.ingresos)}`} style={{ flex:1, background:'#10b981', borderRadius:'3px 3px 0 0', height:`${(m.ingresos/maxVal)*100}%`, minHeight: m.ingresos>0?3:0, transition:'height 0.3s' }} />
