@@ -6,7 +6,13 @@ import { ThemeContext } from '../App';
 import { PlusCircle, BarChart3, Camera, X, Car, Trash2, Zap, LayoutDashboard, History, Receipt, CheckCircle, AlertTriangle, ClipboardList, Save, Settings, FileText, Plus, Sparkles, CreditCard, Clock, BadgeCheck, Ban, Search, ChevronDown } from 'lucide-react';
 import BillingCycleTab from './BillingCycleTab';
 
-const fmt = (n) => (parseFloat(n) || 0).toLocaleString('es-CO', { minimumFractionDigits: 0 });
+const fmt = (n) => Math.round(parseFloat(n) || 0).toLocaleString('es-CO');
+const fmtCompact = (n) => {
+  const v = Math.round(parseFloat(n) || 0);
+  if (Math.abs(v) >= 1e6) return `${(v / 1e6).toLocaleString('es-CO', { maximumFractionDigits: 1 })}M`;
+  if (Math.abs(v) >= 1e3) return `${Math.round(v / 1e3)}K`;
+  return String(v);
+};
 
 const COLUMNS = ['Recepción', 'Proceso', 'Calidad', 'Ingresos Rápidos'];
 const PAYMENT_METHODS = ['Efectivo', 'Nequi', 'Bancolombia', 'Banco de Bogota', 'Tarjeta'];
@@ -469,6 +475,17 @@ export default function AdminView() {
     } catch (e) { console.error(e); }
   };
 
+  const updateExpenseCategoria = async (id, categoria) => {
+    try {
+      await fetch(`${API_URL}/expenses/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ categoria }),
+      });
+      fetchExpenses();
+    } catch (e) { console.error(e); }
+  };
+
   const fetchFleetUsers = () => {
     fetch(`${API_URL}/fleet_users`)
       .then(r => r.json()).then(d => setFleetUsers(Array.isArray(d) ? d : [])).catch(() => {});
@@ -573,7 +590,9 @@ export default function AdminView() {
           const mIni = new Date(now.getFullYear(), now.getMonth(), 1);
           const mFin = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999);
           const pIni = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-          const pFin = new Date(now.getFullYear(), now.getMonth(), 0, 23, 59, 59, 999);
+          // Fair comparison: previous month cut at the same day we are today
+          const prevMonthDays = new Date(now.getFullYear(), now.getMonth(), 0).getDate();
+          const pFin = new Date(now.getFullYear(), now.getMonth() - 1, Math.min(now.getDate(), prevMonthDays), 23, 59, 59, 999);
           const enRango = (f, a, b) => { if (!f) return false; const d = new Date(f); return d >= a && d <= b; };
 
           const factMes  = orders.filter(o => o.estado === 'Entregado' && enRango(o.fecha, mIni, mFin)).reduce((s, o) => s + calcOrderTotal(o), 0);
@@ -591,7 +610,7 @@ export default function AdminView() {
             const good = invert ? !up : up;
             return (
               <div className="sub" style={{ color: good ? '#10b981' : '#ef4444', fontWeight: 700 }}>
-                {up ? '▲' : '▼'} {Math.abs(pct).toFixed(0)}% vs mes anterior
+                {up ? '▲' : '▼'} {Math.abs(pct).toFixed(0)}% vs mismo punto del mes pasado
               </div>
             );
           };
@@ -1146,8 +1165,12 @@ export default function AdminView() {
               // ── Previous period (for % deltas) ────────────────────────
               const getPrevGastosRange = () => {
                 const now2 = new Date();
-                if (gastosStatsPeriod === 'mes') return { desde: new Date(now2.getFullYear(), now2.getMonth()-1, 1), hasta: new Date(now2.getFullYear(), now2.getMonth(), 0, 23,59,59,999) };
-                if (gastosStatsPeriod === 'año') return { desde: new Date(now2.getFullYear()-1, 0, 1), hasta: new Date(now2.getFullYear()-1, 11, 31, 23,59,59,999) };
+                if (gastosStatsPeriod === 'mes') {
+                  // Compare against the same elapsed portion of the previous month
+                  const prevDays = new Date(now2.getFullYear(), now2.getMonth(), 0).getDate();
+                  return { desde: new Date(now2.getFullYear(), now2.getMonth()-1, 1), hasta: new Date(now2.getFullYear(), now2.getMonth()-1, Math.min(now2.getDate(), prevDays), 23,59,59,999) };
+                }
+                if (gastosStatsPeriod === 'año') return { desde: new Date(now2.getFullYear()-1, 0, 1), hasta: new Date(now2.getFullYear()-1, now2.getMonth(), now2.getDate(), 23,59,59,999) };
                 if (gastosStatsPeriod === 'semana' && sDesde) { const d = new Date(sDesde); d.setDate(d.getDate()-7); const h = new Date(sDesde.getTime()-1); return { desde: d, hasta: h }; }
                 if (sDesde && sHasta) { const len = sHasta - sDesde; return { desde: new Date(sDesde.getTime()-len-1), hasta: new Date(sDesde.getTime()-1) }; }
                 return { desde: null, hasta: null };
@@ -1166,10 +1189,16 @@ export default function AdminView() {
               const catList = Object.entries(catTotals).sort((a, b) => b[1] - a[1]);
               const catMax = catList.length > 0 ? catList[0][1] : 1;
 
-              // ── Top clients & services ────────────────────────────────
+              // ── Top clients & services (accent/case-insensitive merge) ─
+              const normKey = s => (s || '').trim().toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
               const clienteTotals = {};
-              ordenesPeriodo.forEach(o => { const c = (o.cliente || '—').trim(); clienteTotals[c] = (clienteTotals[c] || 0) + calcOrderTotal(o); });
-              const topClientes = Object.entries(clienteTotals).sort((a, b) => b[1] - a[1]).slice(0, 5);
+              ordenesPeriodo.forEach(o => {
+                const name = (o.cliente || '—').trim();
+                const k = normKey(name);
+                if (!clienteTotals[k]) clienteTotals[k] = { name, total: 0 };
+                clienteTotals[k].total += calcOrderTotal(o);
+              });
+              const topClientes = Object.values(clienteTotals).sort((a, b) => b.total - a.total).slice(0, 5).map(c => [c.name, c.total]);
 
               const servTotals = {};
               ordenesPeriodo.forEach(o => {
@@ -1177,12 +1206,13 @@ export default function AdminView() {
                 (q?.items || []).forEach(it => {
                   const d = (it.descripcion || '').trim();
                   if (!d) return;
-                  if (!servTotals[d]) servTotals[d] = { count: 0, total: 0 };
-                  servTotals[d].count += Number(it.cantidad) || 1;
-                  servTotals[d].total += (Number(it.precio) || 0) * (Number(it.cantidad) || 1);
+                  const k = normKey(d);
+                  if (!servTotals[k]) servTotals[k] = { name: d, count: 0, total: 0 };
+                  servTotals[k].count += Number(it.cantidad) || 1;
+                  servTotals[k].total += (Number(it.precio) || 0) * (Number(it.cantidad) || 1);
                 });
               });
-              const topServicios = Object.entries(servTotals).sort((a, b) => b[1].total - a[1].total).slice(0, 5);
+              const topServicios = Object.values(servTotals).sort((a, b) => b.total - a.total).slice(0, 5).map(s => [s.name, s]);
 
               const deltaPct = (cur, prev) => (prev && prev !== 0) ? ((cur - prev) / Math.abs(prev)) * 100 : null;
 
@@ -1314,10 +1344,11 @@ export default function AdminView() {
                       ].map(s => {
                         const d = s.prev !== undefined ? deltaPct(s.value, s.prev) : null;
                         const good = d != null ? (s.invert ? d < 0 : d >= 0) : null;
+                        const displayVal = String(s.display(s.value));
                         return (
-                          <div key={s.label} className="card" style={{ padding: '1rem 1.25rem' }}>
+                          <div key={s.label} className="card" style={{ padding: '1rem 1.25rem', minWidth: 0 }}>
                             <div style={{ fontSize: '0.72rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing:'0.05em', marginBottom: '0.4rem' }}>{s.label}</div>
-                            <div style={{ fontSize: '1.45rem', fontWeight: 900, color: s.color }}>{s.display(s.value)}</div>
+                            <div style={{ fontSize: displayVal.length > 12 ? '1.1rem' : '1.45rem', fontWeight: 900, color: s.color, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={displayVal}>{displayVal}</div>
                             {d != null && (
                               <div style={{ fontSize: '0.72rem', fontWeight: 700, marginTop: '0.3rem', color: good ? '#10b981' : '#ef4444' }}>
                                 {d >= 0 ? '▲' : '▼'} {Math.abs(d).toFixed(0)}% vs período anterior
@@ -1404,12 +1435,16 @@ export default function AdminView() {
                       <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'flex-end', height: 130 }}>
                         {monthlyData.map(m => (
                           <div key={m.label} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.2rem' }}>
+                            <div style={{ fontSize:'0.62rem', fontWeight:700, display:'flex', gap:'0.4rem', minHeight:'0.9rem' }}>
+                              {m.ingresos > 0 && <span style={{ color:'#10b981' }}>{fmtCompact(m.ingresos)}</span>}
+                              {m.gastos > 0 && <span style={{ color:'#ef4444' }}>{fmtCompact(m.gastos)}</span>}
+                            </div>
                             <div style={{ width:'100%', display:'flex', gap:'2px', alignItems:'flex-end', height:100 }}>
                               <div title={`Ingresos: $${fmt(m.ingresos)}`} style={{ flex:1, background:'#10b981', borderRadius:'3px 3px 0 0', height:`${(m.ingresos/maxVal)*100}%`, minHeight: m.ingresos>0?3:0, transition:'height 0.3s' }} />
                               <div title={`Gastos: $${fmt(m.gastos)}`}   style={{ flex:1, background:'#ef4444', borderRadius:'3px 3px 0 0', height:`${(m.gastos/maxVal)*100}%`,   minHeight: m.gastos>0?3:0,   transition:'height 0.3s' }} />
                             </div>
                             <div style={{ fontSize:'0.68rem', color:'var(--text-muted)', fontWeight:600, whiteSpace:'nowrap' }}>{m.label}</div>
-                            <div style={{ fontSize:'0.65rem', color:'var(--text-muted)' }}>{m.vehiculos}v</div>
+                            <div style={{ fontSize:'0.65rem', color:'var(--text-muted)' }}>{m.vehiculos} veh.</div>
                           </div>
                         ))}
                       </div>
@@ -1466,12 +1501,12 @@ export default function AdminView() {
                         <label style={{ fontSize:'0.78rem', fontWeight:600, color:'var(--text-muted)', whiteSpace:'nowrap' }}>Hasta</label>
                         <input type="date" value={gastosHasta} onChange={e => setGastosHasta(e.target.value)} style={{ width:135 }} />
                       </div>
-                      <select value={gastosCategoria} onChange={e => setGastosCategoria(e.target.value)} style={{ fontSize:'0.82rem' }}>
+                      <select value={gastosCategoria} onChange={e => setGastosCategoria(e.target.value)} style={{ fontSize:'0.82rem', width:'auto', maxWidth:190, flex:'0 0 auto' }}>
                         <option value="Todas">Todas las categorías</option>
                         {EXPENSE_CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
                         <option value="Sin categoría">Sin categoría</option>
                       </select>
-                      <button onClick={exportGastosCsv} style={{ display:'flex', alignItems:'center', gap:'0.35rem', fontSize:'0.8rem', fontWeight:600, padding:'0.4rem 0.8rem', background:'var(--bg)', border:'1px solid var(--border)', borderRadius:8, cursor:'pointer', color:'var(--text)' }}>
+                      <button onClick={exportGastosCsv} style={{ display:'flex', alignItems:'center', gap:'0.35rem', fontSize:'0.8rem', fontWeight:600, padding:'0.4rem 0.8rem', background:'var(--bg)', border:'1px solid var(--border)', borderRadius:8, cursor:'pointer', color:'var(--text)', whiteSpace:'nowrap', flex:'0 0 auto' }}>
                         <FileText size={13} /> Exportar CSV
                       </button>
                     </div>
@@ -1495,7 +1530,17 @@ export default function AdminView() {
                           <tr key={g.id}>
                             <td style={{ whiteSpace:'nowrap', color:'var(--text-muted)', fontSize:'0.85rem' }}>{g.fecha ? new Date(g.fecha).toLocaleDateString('es-CO') : '—'}</td>
                             <td style={{ fontWeight:600 }}>{g.concepto}</td>
-                            <td><span style={{ fontSize:'0.76rem', fontWeight:700, background:'rgba(239,68,68,0.1)', color:'#ef4444', padding:'0.2rem 0.55rem', borderRadius:99, whiteSpace:'nowrap' }}>{g.categoria || 'Sin categoría'}</span></td>
+                            <td>
+                              <select value={g.categoria || ''} onChange={e => updateExpenseCategoria(g.id, e.target.value)}
+                                title="Cambiar categoría"
+                                style={{ fontSize:'0.76rem', fontWeight:700, padding:'0.2rem 0.4rem', borderRadius:8, whiteSpace:'nowrap', cursor:'pointer', width:'auto', maxWidth:150,
+                                  background: g.categoria ? 'rgba(245,158,11,0.1)' : 'var(--bg)',
+                                  color: g.categoria ? '#f59e0b' : 'var(--text-muted)',
+                                  border: g.categoria ? '1px solid rgba(245,158,11,0.3)' : '1px dashed var(--border)' }}>
+                                <option value="" disabled>Sin categoría</option>
+                                {EXPENSE_CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
+                              </select>
+                            </td>
                             <td><span style={{ fontSize:'0.78rem', fontWeight:700, background:'rgba(99,102,241,0.1)', color:'var(--primary)', padding:'0.2rem 0.55rem', borderRadius:99 }}>{g.metodoPago}</span></td>
                             <td style={{ textAlign:'right', fontWeight:800, color:'var(--error)', whiteSpace:'nowrap' }}>${fmt(g.monto)}</td>
                             <td style={{ textAlign:'center' }}>
