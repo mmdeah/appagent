@@ -165,6 +165,48 @@ server.get('/api/backup-db', (req, res) => {
   }
 });
 
+// Storage diagnostics: is the volume mounted? which backups exist and what do they contain?
+server.get('/api/storage-info', (req, res) => {
+  try {
+    const backupDir = path.join(dataDir, 'backups');
+    const backups = fs.existsSync(backupDir) ? fs.readdirSync(backupDir).sort().reverse().map(f => {
+      let orders = null, expensesCount = null;
+      try {
+        const b = JSON.parse(fs.readFileSync(path.join(backupDir, f), 'utf8'));
+        orders = (b.orders || []).length;
+        expensesCount = (b.expenses || []).length;
+      } catch (_) {}
+      return { file: f, size: fs.statSync(path.join(backupDir, f)).size, orders, expenses: expensesCount };
+    }) : [];
+    const dbData = JSON.parse(fs.readFileSync(dbFile, 'utf8'));
+    res.json({
+      volumeMounted: !!process.env.RAILWAY_VOLUME_MOUNT_PATH,
+      volumePath: process.env.RAILWAY_VOLUME_MOUNT_PATH || null,
+      dataDir,
+      counts: Object.fromEntries(Object.entries(dbData).map(([k, v]) => [k, Array.isArray(v) ? v.length : 'obj'])),
+      backups,
+    });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// Restore the database from a backup file (keeps a safety copy of the current state)
+server.post('/api/restore-backup', (req, res) => {
+  try {
+    const { filename } = req.body || {};
+    if (!filename || filename.includes('..') || filename.includes('/') || filename.includes('\\')) {
+      return res.status(400).json({ error: 'filename inválido' });
+    }
+    const backupPath = path.join(dataDir, 'backups', filename);
+    if (!fs.existsSync(backupPath)) return res.status(404).json({ error: 'Backup no encontrado' });
+    const data = JSON.parse(fs.readFileSync(backupPath, 'utf8'));
+    const stamp = new Date().toISOString().replace(/[:.]/g, '-');
+    fs.copyFileSync(dbFile, path.join(dataDir, 'backups', `pre-restore_${stamp}.json`));
+    fs.writeFileSync(dbFile, JSON.stringify(data, null, 2));
+    if (router.db && typeof router.db.setState === 'function') { router.db.setState(data); }
+    res.json({ message: `Base de datos restaurada desde ${filename}`, orders: (data.orders || []).length, expenses: (data.expenses || []).length });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
 // One-time cleanup: move AI reports (no items field) from reports → ai_reports
 server.post('/api/migrate-ai-reports', (req, res) => {
   try {
