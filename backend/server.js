@@ -237,7 +237,8 @@ server.post('/api/analyze-expense-image', async (req, res) => {
   "fecha": "YYYY-MM-DD o null si no se ve",
   "concepto": "descripción breve del gasto (ej: Compra aceite motor, Repuestos frenos)",
   "monto": número entero sin símbolos ni puntos ni comas (ej: 45000),
-  "metodoPago": "Efectivo" o "Nequi" o "Bancolombia" o "Banco de Bogota" o "Tarjeta" (infiere si puedes, sino "Efectivo")
+  "metodoPago": "Efectivo" o "Nequi" o "Bancolombia" o "Banco de Bogota" o "Tarjeta" (infiere si puedes, sino "Efectivo"),
+  "categoria": "Repuestos" o "Insumos" o "Nómina" o "Arriendo" o "Servicios Públicos" o "Herramientas" o "Impuestos" o "Otros" (clasifica según el contenido del recibo)
 }
 No incluyas texto adicional, solo el JSON.`
               }

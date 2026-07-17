@@ -10,6 +10,7 @@ const fmt = (n) => (parseFloat(n) || 0).toLocaleString('es-CO', { minimumFractio
 
 const COLUMNS = ['Recepción', 'Proceso', 'Calidad', 'Ingresos Rápidos'];
 const PAYMENT_METHODS = ['Efectivo', 'Nequi', 'Bancolombia', 'Banco de Bogota', 'Tarjeta'];
+const EXPENSE_CATEGORIES = ['Repuestos', 'Insumos', 'Nómina', 'Arriendo', 'Servicios Públicos', 'Herramientas', 'Impuestos', 'Otros'];
 
 const emptyForm = { placa: '', cliente: '', documento: '', telefono: '', correo: '', marca: '', modelo: '', anio: '', kilometraje: '', servicios: '', notas: '' };
 
@@ -29,7 +30,7 @@ export default function AdminView() {
   const [openMenu, setOpenMenu] = useState(null);
   const navRef = useRef(null);
   const [expenses, setExpenses] = useState([]);
-  const [expenseForm, setExpenseForm] = useState({ fecha: new Date().toISOString().split('T')[0], concepto: '', monto: '', metodoPago: 'Efectivo' });
+  const [expenseForm, setExpenseForm] = useState({ fecha: new Date().toISOString().split('T')[0], concepto: '', monto: '', metodoPago: 'Efectivo', categoria: 'Repuestos' });
   const [quickOrderForm, setQuickOrderForm] = useState({ placa: '', cliente: '', marca: '', modelo: '', anio: '', servicios: '' });
   const [formStatus, setFormStatus] = useState({ text: '', type: '' });
   const [orderToDelete, setOrderToDelete] = useState(null);
@@ -59,6 +60,7 @@ export default function AdminView() {
   const [gastosDesde, setGastosDesde] = useState('');
   const [gastosHasta, setGastosHasta] = useState('');
   const [gastosMetodo, setGastosMetodo] = useState('Todos');
+  const [gastosCategoria, setGastosCategoria] = useState('Todas');
   const [gastosStatsPeriod, setGastosStatsPeriod] = useState('mes');
   const [gastosStatsDesde, setGastosStatsDesde] = useState('');
   const [gastosStatsHasta, setGastosStatsHasta] = useState('');
@@ -87,6 +89,15 @@ export default function AdminView() {
     return (q.items || []).reduce((sum, i) => {
       const lt = (Number(i.precio) || 0) * (Number(i.cantidad) || 1);
       return sum + lt + (i.aplicaIva ? lt * 0.19 : 0);
+    }, 0);
+  };
+
+  const calcOrderIva = (o) => {
+    const q = o.quotes?.find(q => q.autorizada) || o.quotes?.[0];
+    if (!q) return 0;
+    return (q.items || []).reduce((sum, i) => {
+      const lt = (Number(i.precio) || 0) * (Number(i.cantidad) || 1);
+      return sum + (i.aplicaIva ? lt * 0.19 : 0);
     }, 0);
   };
 
@@ -427,6 +438,7 @@ export default function AdminView() {
         ...(data.concepto ? { concepto: data.concepto } : {}),
         ...(data.monto ? { monto: String(data.monto) } : {}),
         ...(data.metodoPago ? { metodoPago: data.metodoPago } : {}),
+        ...(data.categoria && EXPENSE_CATEGORIES.includes(data.categoria) ? { categoria: data.categoria } : {}),
       }));
     } catch (err) {
       alert('No se pudo analizar la imagen: ' + err.message);
@@ -444,7 +456,7 @@ export default function AdminView() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ ...expenseForm, monto: parseInt(expenseForm.monto) })
       });
-      setExpenseForm({ fecha: new Date().toISOString().split('T')[0], concepto: '', monto: '', metodoPago: 'Efectivo' });
+      setExpenseForm({ fecha: new Date().toISOString().split('T')[0], concepto: '', monto: '', metodoPago: 'Efectivo', categoria: 'Repuestos' });
       fetchExpenses();
     } catch (e) { console.error(e); }
   };
@@ -555,29 +567,65 @@ export default function AdminView() {
       </div>
 
       <div style={{ maxWidth: 1400, margin: '0 auto', padding: '1.5rem 1.5rem 4rem' }}>
-        {/* Stats row */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '1rem', marginBottom: '1.75rem' }}>
-          <div className="stat-card">
-            <div className="label">Órdenes Activas</div>
-            <div className="value" style={{ color: '#818cf8' }}>{stats.active}</div>
-            <div className="sub">En progreso actualmente</div>
-          </div>
-          <div className="stat-card">
-            <div className="label">Total Facturado</div>
-            <div className="value">${fmt(stats.total)}</div>
-            <div className="sub">De órdenes entregadas</div>
-          </div>
-          <div className="stat-card">
-            <div className="label">Gastos Registrados</div>
-            <div className="value" style={{ color: 'var(--error)' }}>${fmt(expenses.reduce((acc, g) => acc + (parseFloat(g.monto) || 0), 0))}</div>
-            <div className="sub">Salidas de dinero</div>
-          </div>
-          <div className="stat-card">
-            <div className="label">Ganancia Neta</div>
-            <div className="value" style={{ color: '#10b981' }}>${fmt(stats.total - expenses.reduce((acc, g) => acc + (parseFloat(g.monto) || 0), 0))}</div>
-            <div className="sub">Facturado - Gastos</div>
-          </div>
-        </div>
+        {/* Stats row — current month with delta vs previous month */}
+        {(() => {
+          const now = new Date();
+          const mIni = new Date(now.getFullYear(), now.getMonth(), 1);
+          const mFin = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999);
+          const pIni = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+          const pFin = new Date(now.getFullYear(), now.getMonth(), 0, 23, 59, 59, 999);
+          const enRango = (f, a, b) => { if (!f) return false; const d = new Date(f); return d >= a && d <= b; };
+
+          const factMes  = orders.filter(o => o.estado === 'Entregado' && enRango(o.fecha, mIni, mFin)).reduce((s, o) => s + calcOrderTotal(o), 0);
+          const factPrev = orders.filter(o => o.estado === 'Entregado' && enRango(o.fecha, pIni, pFin)).reduce((s, o) => s + calcOrderTotal(o), 0);
+          const gastMes  = expenses.filter(g => enRango(g.fecha, mIni, mFin)).reduce((s, g) => s + (parseFloat(g.monto) || 0), 0);
+          const gastPrev = expenses.filter(g => enRango(g.fecha, pIni, pFin)).reduce((s, g) => s + (parseFloat(g.monto) || 0), 0);
+          const ganMes = factMes - gastMes;
+          const ganPrev = factPrev - gastPrev;
+          const porFacturar = orders.filter(o => o.estado !== 'Entregado').reduce((s, o) => s + calcOrderTotal(o), 0);
+
+          const Delta = ({ cur, prev, invert = false }) => {
+            if (!prev) return <div className="sub">Sin datos del mes pasado</div>;
+            const pct = ((cur - prev) / Math.abs(prev)) * 100;
+            const up = pct >= 0;
+            const good = invert ? !up : up;
+            return (
+              <div className="sub" style={{ color: good ? '#10b981' : '#ef4444', fontWeight: 700 }}>
+                {up ? '▲' : '▼'} {Math.abs(pct).toFixed(0)}% vs mes anterior
+              </div>
+            );
+          };
+
+          return (
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '1rem', marginBottom: '1.75rem' }}>
+              <div className="stat-card">
+                <div className="label">Órdenes Activas</div>
+                <div className="value" style={{ color: '#818cf8' }}>{stats.active}</div>
+                <div className="sub">En progreso actualmente</div>
+              </div>
+              <div className="stat-card">
+                <div className="label">Facturado ({MESES[now.getMonth()]})</div>
+                <div className="value">${fmt(factMes)}</div>
+                <Delta cur={factMes} prev={factPrev} />
+              </div>
+              <div className="stat-card">
+                <div className="label">Gastos ({MESES[now.getMonth()]})</div>
+                <div className="value" style={{ color: 'var(--error)' }}>${fmt(gastMes)}</div>
+                <Delta cur={gastMes} prev={gastPrev} invert />
+              </div>
+              <div className="stat-card">
+                <div className="label">Ganancia ({MESES[now.getMonth()]})</div>
+                <div className="value" style={{ color: ganMes >= 0 ? '#10b981' : '#ef4444' }}>${fmt(ganMes)}</div>
+                <Delta cur={ganMes} prev={ganPrev} />
+              </div>
+              <div className="stat-card">
+                <div className="label">Por Facturar</div>
+                <div className="value" style={{ color: '#f59e0b' }}>${fmt(porFacturar)}</div>
+                <div className="sub">Dinero en el taller (órdenes activas)</div>
+              </div>
+            </div>
+          );
+        })()}
 
         {/* Compact To-Do List Row */}
         <div className="card" style={{ padding: '1rem 1.5rem', marginBottom: '1.75rem', display: 'flex', alignItems: 'center', gap: '2rem', overflow: 'hidden' }}>
@@ -1092,6 +1140,51 @@ export default function AdminView() {
               const gastosTotalPeriodo= gastosPeriodo.reduce((s, g) => s + (parseFloat(g.monto)||0), 0);
               const ganancia          = ingresosPeriodo - gastosTotalPeriodo;
               const ticketProm        = ordenesPeriodo.length > 0 ? ingresosPeriodo / ordenesPeriodo.length : 0;
+              const ivaPeriodo        = ordenesPeriodo.reduce((s, o) => s + calcOrderIva(o), 0);
+              const margenPct         = ingresosPeriodo > 0 ? (ganancia / ingresosPeriodo) * 100 : null;
+
+              // ── Previous period (for % deltas) ────────────────────────
+              const getPrevGastosRange = () => {
+                const now2 = new Date();
+                if (gastosStatsPeriod === 'mes') return { desde: new Date(now2.getFullYear(), now2.getMonth()-1, 1), hasta: new Date(now2.getFullYear(), now2.getMonth(), 0, 23,59,59,999) };
+                if (gastosStatsPeriod === 'año') return { desde: new Date(now2.getFullYear()-1, 0, 1), hasta: new Date(now2.getFullYear()-1, 11, 31, 23,59,59,999) };
+                if (gastosStatsPeriod === 'semana' && sDesde) { const d = new Date(sDesde); d.setDate(d.getDate()-7); const h = new Date(sDesde.getTime()-1); return { desde: d, hasta: h }; }
+                if (sDesde && sHasta) { const len = sHasta - sDesde; return { desde: new Date(sDesde.getTime()-len-1), hasta: new Date(sDesde.getTime()-1) }; }
+                return { desde: null, hasta: null };
+              };
+              const { desde: pDesde, hasta: pHasta } = getPrevGastosRange();
+              const inPrevRange = f => { if (!f || !pDesde || !pHasta) return false; const d = new Date(f); return d >= pDesde && d <= pHasta; };
+              const ordenesPrev  = orders.filter(o => o.estado === 'Entregado' && inPrevRange(o.fecha));
+              const ingresosPrev = ordenesPrev.reduce((s, o) => s + calcOrderTotal(o), 0);
+              const gastosPrev   = expenses.filter(g => inPrevRange(g.fecha)).reduce((s, g) => s + (parseFloat(g.monto)||0), 0);
+              const gananciaPrev = ingresosPrev - gastosPrev;
+              const ticketPrev   = ordenesPrev.length > 0 ? ingresosPrev / ordenesPrev.length : 0;
+
+              // ── Breakdown by category ─────────────────────────────────
+              const catTotals = {};
+              gastosPeriodo.forEach(g => { const c = g.categoria || 'Sin categoría'; catTotals[c] = (catTotals[c] || 0) + (parseFloat(g.monto) || 0); });
+              const catList = Object.entries(catTotals).sort((a, b) => b[1] - a[1]);
+              const catMax = catList.length > 0 ? catList[0][1] : 1;
+
+              // ── Top clients & services ────────────────────────────────
+              const clienteTotals = {};
+              ordenesPeriodo.forEach(o => { const c = (o.cliente || '—').trim(); clienteTotals[c] = (clienteTotals[c] || 0) + calcOrderTotal(o); });
+              const topClientes = Object.entries(clienteTotals).sort((a, b) => b[1] - a[1]).slice(0, 5);
+
+              const servTotals = {};
+              ordenesPeriodo.forEach(o => {
+                const q = o.quotes?.find(q => q.autorizada) || o.quotes?.[0];
+                (q?.items || []).forEach(it => {
+                  const d = (it.descripcion || '').trim();
+                  if (!d) return;
+                  if (!servTotals[d]) servTotals[d] = { count: 0, total: 0 };
+                  servTotals[d].count += Number(it.cantidad) || 1;
+                  servTotals[d].total += (Number(it.precio) || 0) * (Number(it.cantidad) || 1);
+                });
+              });
+              const topServicios = Object.entries(servTotals).sort((a, b) => b[1].total - a[1].total).slice(0, 5);
+
+              const deltaPct = (cur, prev) => (prev && prev !== 0) ? ((cur - prev) / Math.abs(prev)) * 100 : null;
 
               // ── Monthly chart ─────────────────────────────────────────
               const monthlyData = [];
@@ -1110,6 +1203,7 @@ export default function AdminView() {
               const qG = gastosSearch.trim().toLowerCase();
               const filteredExpenses = expenses
                 .filter(g => gastosMetodo === 'Todos' || g.metodoPago === gastosMetodo)
+                .filter(g => gastosCategoria === 'Todas' || (g.categoria || 'Sin categoría') === gastosCategoria)
                 .filter(g => !qG || (g.concepto||'').toLowerCase().includes(qG))
                 .filter(g => {
                   if (!g.fecha) return !gastosDesde && !gastosHasta;
@@ -1120,7 +1214,28 @@ export default function AdminView() {
                 })
                 .sort((a,b) => new Date(b.fecha||0) - new Date(a.fecha||0));
               const filteredTotal = filteredExpenses.reduce((s,g) => s+(parseFloat(g.monto)||0), 0);
-              const hasGastoFilters = qG || gastosDesde || gastosHasta || gastosMetodo !== 'Todos';
+              const hasGastoFilters = qG || gastosDesde || gastosHasta || gastosMetodo !== 'Todos' || gastosCategoria !== 'Todas';
+
+              const exportGastosCsv = () => {
+                const rows = [
+                  ['Fecha', 'Concepto', 'Categoría', 'Método de Pago', 'Monto'],
+                  ...filteredExpenses.map(g => [
+                    g.fecha ? new Date(g.fecha).toLocaleDateString('es-CO') : '',
+                    (g.concepto || '').replace(/"/g, '""'),
+                    g.categoria || 'Sin categoría',
+                    g.metodoPago || '',
+                    parseFloat(g.monto) || 0,
+                  ]),
+                ];
+                const csv = '﻿' + rows.map(r => r.map(c => `"${c}"`).join(';')).join('\n');
+                const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `gastos_${new Date().toISOString().split('T')[0]}.csv`;
+                a.click();
+                URL.revokeObjectURL(url);
+              };
 
               return (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '1.75rem' }}>
@@ -1148,6 +1263,12 @@ export default function AdminView() {
                         <div>
                           <label style={{ display:'block', fontSize:'0.78rem', fontWeight:600, color:'var(--text-muted)', marginBottom:'0.3rem' }}>Monto ($)</label>
                           <input type="number" required placeholder="0" inputMode="numeric" value={expenseForm.monto} onChange={e => setExpenseForm({...expenseForm, monto: e.target.value})} style={{ width:'100%' }} />
+                        </div>
+                        <div>
+                          <label style={{ display:'block', fontSize:'0.78rem', fontWeight:600, color:'var(--text-muted)', marginBottom:'0.3rem' }}>Categoría</label>
+                          <select value={expenseForm.categoria} onChange={e => setExpenseForm({...expenseForm, categoria: e.target.value})} style={{ width:'100%' }}>
+                            {EXPENSE_CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
+                          </select>
                         </div>
                         <div>
                           <label style={{ display:'block', fontSize:'0.78rem', fontWeight:600, color:'var(--text-muted)', marginBottom:'0.3rem' }}>Método de Pago</label>
@@ -1183,17 +1304,98 @@ export default function AdminView() {
                     {/* KPI cards */}
                     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(155px, 1fr))', gap: '1rem' }}>
                       {[
-                        { label: 'Vehículos atendidos', value: ordenesPeriodo.length, color: 'var(--primary)', display: n => n },
-                        { label: 'Ingresos', value: ingresosPeriodo, color: '#10b981', display: n => `$${fmt(n)}` },
-                        { label: 'Gastos', value: gastosTotalPeriodo, color: '#ef4444', display: n => `$${fmt(n)}` },
-                        { label: 'Ganancia neta', value: ganancia, color: ganancia >= 0 ? '#10b981' : '#ef4444', display: n => `$${fmt(n)}` },
-                        { label: 'Ticket promedio', value: ticketProm, color: '#f59e0b', display: n => `$${fmt(n)}` },
-                      ].map(s => (
-                        <div key={s.label} className="card" style={{ padding: '1rem 1.25rem' }}>
-                          <div style={{ fontSize: '0.72rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing:'0.05em', marginBottom: '0.4rem' }}>{s.label}</div>
-                          <div style={{ fontSize: '1.45rem', fontWeight: 900, color: s.color }}>{s.display(s.value)}</div>
+                        { label: 'Vehículos atendidos', value: ordenesPeriodo.length, prev: ordenesPrev.length, color: 'var(--primary)', display: n => n },
+                        { label: 'Ingresos', value: ingresosPeriodo, prev: ingresosPrev, color: '#10b981', display: n => `$${fmt(n)}` },
+                        { label: 'Gastos', value: gastosTotalPeriodo, prev: gastosPrev, invert: true, color: '#ef4444', display: n => `$${fmt(n)}` },
+                        { label: 'Ganancia neta', value: ganancia, prev: gananciaPrev, color: ganancia >= 0 ? '#10b981' : '#ef4444', display: n => `$${fmt(n)}` },
+                        { label: 'Margen', value: margenPct, color: (margenPct ?? 0) >= 0 ? '#10b981' : '#ef4444', display: n => n == null ? '—' : `${n.toFixed(0)}%` },
+                        { label: 'Ticket promedio', value: ticketProm, prev: ticketPrev, color: '#f59e0b', display: n => `$${fmt(n)}` },
+                        { label: 'IVA generado', value: ivaPeriodo, color: '#818cf8', display: n => `$${fmt(n)}`, sub: 'Para declaración DIAN' },
+                      ].map(s => {
+                        const d = s.prev !== undefined ? deltaPct(s.value, s.prev) : null;
+                        const good = d != null ? (s.invert ? d < 0 : d >= 0) : null;
+                        return (
+                          <div key={s.label} className="card" style={{ padding: '1rem 1.25rem' }}>
+                            <div style={{ fontSize: '0.72rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing:'0.05em', marginBottom: '0.4rem' }}>{s.label}</div>
+                            <div style={{ fontSize: '1.45rem', fontWeight: 900, color: s.color }}>{s.display(s.value)}</div>
+                            {d != null && (
+                              <div style={{ fontSize: '0.72rem', fontWeight: 700, marginTop: '0.3rem', color: good ? '#10b981' : '#ef4444' }}>
+                                {d >= 0 ? '▲' : '▼'} {Math.abs(d).toFixed(0)}% vs período anterior
+                              </div>
+                            )}
+                            {d == null && s.sub && (
+                              <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginTop: '0.3rem' }}>{s.sub}</div>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+
+                    {/* Category breakdown + balances by payment method */}
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '1rem' }}>
+                      <div className="card" style={{ padding: '1.5rem' }}>
+                        <h3 style={{ fontSize: '0.95rem', fontWeight: 700, marginBottom: '1rem' }}>¿En qué se va la plata? <span style={{ fontWeight: 500, color: 'var(--text-muted)', fontSize: '0.8rem' }}>(gastos del período)</span></h3>
+                        {catList.length === 0 && <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>Sin gastos en este período.</p>}
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
+                          {catList.map(([cat, total]) => (
+                            <div key={cat}>
+                              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem', marginBottom: '0.2rem' }}>
+                                <span style={{ fontWeight: 600 }}>{cat}</span>
+                                <span style={{ fontWeight: 700, color: 'var(--error)' }}>${fmt(total)} <span style={{ color: 'var(--text-muted)', fontWeight: 500 }}>({gastosTotalPeriodo > 0 ? ((total/gastosTotalPeriodo)*100).toFixed(0) : 0}%)</span></span>
+                              </div>
+                              <div style={{ height: 8, background: 'var(--bg)', borderRadius: 4, overflow: 'hidden' }}>
+                                <div style={{ height: '100%', width: `${(total/catMax)*100}%`, background: '#ef4444', borderRadius: 4, transition: 'width 0.3s' }} />
+                              </div>
+                            </div>
+                          ))}
                         </div>
-                      ))}
+                      </div>
+                      <div className="card" style={{ padding: '1.5rem' }}>
+                        <h3 style={{ fontSize: '0.95rem', fontWeight: 700, marginBottom: '1rem' }}>Saldos por método de pago <span style={{ fontWeight: 500, color: 'var(--text-muted)', fontSize: '0.8rem' }}>(histórico total)</span></h3>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                          {PAYMENT_METHODS.map(m => {
+                            const saldo = balancesByMethod[m] || 0;
+                            return (
+                              <div key={m} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0.55rem 0.8rem', background: 'var(--bg)', borderRadius: 8, border: '1px solid var(--border)' }}>
+                                <span style={{ fontSize: '0.85rem', fontWeight: 600 }}>{m}</span>
+                                <span style={{ fontSize: '0.95rem', fontWeight: 800, color: saldo >= 0 ? '#10b981' : '#ef4444' }}>${fmt(saldo)}</span>
+                              </div>
+                            );
+                          })}
+                        </div>
+                        <p style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginTop: '0.75rem' }}>Ingresos de órdenes entregadas menos gastos, según método de pago registrado.</p>
+                      </div>
+                    </div>
+
+                    {/* Top clients + top services */}
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '1rem' }}>
+                      <div className="card" style={{ padding: '1.5rem' }}>
+                        <h3 style={{ fontSize: '0.95rem', fontWeight: 700, marginBottom: '1rem' }}>Top clientes <span style={{ fontWeight: 500, color: 'var(--text-muted)', fontSize: '0.8rem' }}>(ingresos del período)</span></h3>
+                        {topClientes.length === 0 && <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>Sin órdenes entregadas en este período.</p>}
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                          {topClientes.map(([cliente, total], i) => (
+                            <div key={cliente} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0.55rem 0.8rem', background: 'var(--bg)', borderRadius: 8, border: '1px solid var(--border)' }}>
+                              <span style={{ fontSize: '0.85rem', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                                <span style={{ width: 20, height: 20, borderRadius: '50%', background: i === 0 ? '#f59e0b' : 'var(--border)', color: i === 0 ? '#fff' : 'var(--text-muted)', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.7rem', fontWeight: 800 }}>{i+1}</span>
+                                {cliente}
+                              </span>
+                              <span style={{ fontSize: '0.9rem', fontWeight: 800, color: '#10b981' }}>${fmt(total)}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                      <div className="card" style={{ padding: '1.5rem' }}>
+                        <h3 style={{ fontSize: '0.95rem', fontWeight: 700, marginBottom: '1rem' }}>Servicios más vendidos <span style={{ fontWeight: 500, color: 'var(--text-muted)', fontSize: '0.8rem' }}>(del período)</span></h3>
+                        {topServicios.length === 0 && <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>Sin datos en este período.</p>}
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                          {topServicios.map(([serv, data]) => (
+                            <div key={serv} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.75rem', padding: '0.55rem 0.8rem', background: 'var(--bg)', borderRadius: 8, border: '1px solid var(--border)' }}>
+                              <span style={{ fontSize: '0.82rem', fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{serv}</span>
+                              <span style={{ fontSize: '0.85rem', fontWeight: 800, color: '#10b981', whiteSpace: 'nowrap' }}>${fmt(data.total)} <span style={{ color: 'var(--text-muted)', fontWeight: 500, fontSize: '0.72rem' }}>×{data.count}</span></span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
                     </div>
 
                     {/* Bar chart */}
@@ -1227,7 +1429,7 @@ export default function AdminView() {
                           {filteredExpenses.length} registro{filteredExpenses.length!==1?'s':''} · <span style={{ color:'var(--error)', fontWeight:700 }}>${fmt(filteredTotal)}</span>
                         </span>
                         {hasGastoFilters && (
-                          <button onClick={() => { setGastosSearch(''); setGastosDesde(''); setGastosHasta(''); setGastosMetodo('Todos'); }}
+                          <button onClick={() => { setGastosSearch(''); setGastosDesde(''); setGastosHasta(''); setGastosMetodo('Todos'); setGastosCategoria('Todas'); }}
                             style={{ display:'flex', alignItems:'center', gap:'0.25rem', fontSize:'0.76rem', color:'var(--text-muted)', background:'var(--bg)', border:'1px solid var(--border)', borderRadius:99, padding:'0.2rem 0.55rem', cursor:'pointer', fontWeight:600 }}>
                             <X size={11} /> Limpiar
                           </button>
@@ -1264,6 +1466,14 @@ export default function AdminView() {
                         <label style={{ fontSize:'0.78rem', fontWeight:600, color:'var(--text-muted)', whiteSpace:'nowrap' }}>Hasta</label>
                         <input type="date" value={gastosHasta} onChange={e => setGastosHasta(e.target.value)} style={{ width:135 }} />
                       </div>
+                      <select value={gastosCategoria} onChange={e => setGastosCategoria(e.target.value)} style={{ fontSize:'0.82rem' }}>
+                        <option value="Todas">Todas las categorías</option>
+                        {EXPENSE_CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
+                        <option value="Sin categoría">Sin categoría</option>
+                      </select>
+                      <button onClick={exportGastosCsv} style={{ display:'flex', alignItems:'center', gap:'0.35rem', fontSize:'0.8rem', fontWeight:600, padding:'0.4rem 0.8rem', background:'var(--bg)', border:'1px solid var(--border)', borderRadius:8, cursor:'pointer', color:'var(--text)' }}>
+                        <FileText size={13} /> Exportar CSV
+                      </button>
                     </div>
 
                     <table className="data-table">
@@ -1271,6 +1481,7 @@ export default function AdminView() {
                         <tr>
                           <th>Fecha</th>
                           <th>Concepto</th>
+                          <th>Categoría</th>
                           <th>Método</th>
                           <th style={{ textAlign:'right' }}>Monto</th>
                           <th></th>
@@ -1278,12 +1489,13 @@ export default function AdminView() {
                       </thead>
                       <tbody>
                         {filteredExpenses.length === 0 && (
-                          <tr><td colSpan="5" style={{ textAlign:'center', color:'var(--text-muted)', padding:'2rem 0' }}>Sin gastos para este filtro.</td></tr>
+                          <tr><td colSpan="6" style={{ textAlign:'center', color:'var(--text-muted)', padding:'2rem 0' }}>Sin gastos para este filtro.</td></tr>
                         )}
                         {filteredExpenses.map(g => (
                           <tr key={g.id}>
                             <td style={{ whiteSpace:'nowrap', color:'var(--text-muted)', fontSize:'0.85rem' }}>{g.fecha ? new Date(g.fecha).toLocaleDateString('es-CO') : '—'}</td>
                             <td style={{ fontWeight:600 }}>{g.concepto}</td>
+                            <td><span style={{ fontSize:'0.76rem', fontWeight:700, background:'rgba(239,68,68,0.1)', color:'#ef4444', padding:'0.2rem 0.55rem', borderRadius:99, whiteSpace:'nowrap' }}>{g.categoria || 'Sin categoría'}</span></td>
                             <td><span style={{ fontSize:'0.78rem', fontWeight:700, background:'rgba(99,102,241,0.1)', color:'var(--primary)', padding:'0.2rem 0.55rem', borderRadius:99 }}>{g.metodoPago}</span></td>
                             <td style={{ textAlign:'right', fontWeight:800, color:'var(--error)', whiteSpace:'nowrap' }}>${fmt(g.monto)}</td>
                             <td style={{ textAlign:'center' }}>
