@@ -71,6 +71,10 @@ export default function AdminView() {
   const [gastosStatsDesde, setGastosStatsDesde] = useState('');
   const [gastosStatsHasta, setGastosStatsHasta] = useState('');
   const [deleteExpenseId, setDeleteExpenseId] = useState(null);
+  const [chatMessages, setChatMessages] = useState([]);
+  const [chatInput, setChatInput] = useState('');
+  const [chatLoading, setChatLoading] = useState(false);
+  const chatEndRef = useRef(null);
 
   const MESES = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
   const IS_FLOTA = (cliente) => /(ald|ayvens)/i.test(cliente || '');
@@ -475,6 +479,31 @@ export default function AdminView() {
     } catch (e) { console.error(e); }
   };
 
+  const handleChatSend = async (text) => {
+    const msg = (text ?? chatInput).trim();
+    if (!msg || chatLoading) return;
+    const newMessages = [...chatMessages, { role: 'user', content: msg }];
+    setChatMessages(newMessages);
+    setChatInput('');
+    setChatLoading(true);
+    try {
+      const res = await fetch(`${BACKEND_URL}/api/chat-analytics`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ messages: newMessages }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error([data.error, data.details].filter(Boolean).join(' — ') || 'Error del servidor');
+      setChatMessages([...newMessages, { role: 'assistant', content: data.reply }]);
+    } catch (e) {
+      setChatMessages([...newMessages, { role: 'assistant', content: '⚠ Error: ' + e.message }]);
+    } finally {
+      setChatLoading(false);
+    }
+  };
+
+  useEffect(() => { chatEndRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [chatMessages, chatLoading]);
+
   const updateExpenseCategoria = async (id, categoria) => {
     try {
       await fetch(`${API_URL}/expenses/${id}`, {
@@ -692,6 +721,7 @@ export default function AdminView() {
                     { id: 'Gastos',           icon: <Receipt size={14} />,    label: 'Gastos' },
                     { id: 'ALD',              icon: <CreditCard size={14} />, label: 'ALD / Ayvens' },
                     { id: 'ConsultNetworks',  icon: <CreditCard size={14} />, label: 'Consult Networks' },
+                    { id: 'AsistenteIA',      icon: <Sparkles size={14} />,   label: 'Asistente IA' },
                   ]
                 },
                 {
@@ -1564,6 +1594,83 @@ export default function AdminView() {
                 </div>
               );
             })()}
+
+            {activeTab === 'AsistenteIA' && (
+              <div className="card" style={{ padding: 0, maxWidth: 900, margin: '0 auto', display: 'flex', flexDirection: 'column', height: 'calc(100vh - 340px)', minHeight: 480, overflow: 'hidden' }}>
+                {/* Header */}
+                <div style={{ padding: '1rem 1.5rem', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                  <div style={{ width: 36, height: 36, borderRadius: 9, background: 'rgba(99,102,241,0.12)', color: 'var(--primary)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <Sparkles size={18} />
+                  </div>
+                  <div>
+                    <h2 style={{ fontSize: '1rem', fontWeight: 800, margin: 0 }}>Asistente IA del Taller</h2>
+                    <p style={{ fontSize: '0.78rem', color: 'var(--text-muted)', margin: 0 }}>Pregunta lo que quieras sobre tus órdenes, ingresos y gastos. Solo lee la información, no la modifica.</p>
+                  </div>
+                  {chatMessages.length > 0 && (
+                    <button onClick={() => setChatMessages([])} style={{ marginLeft: 'auto', fontSize: '0.76rem', fontWeight: 600, color: 'var(--text-muted)', background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: 99, padding: '0.25rem 0.7rem', cursor: 'pointer', whiteSpace: 'nowrap' }}>
+                      Nueva conversación
+                    </button>
+                  )}
+                </div>
+
+                {/* Messages */}
+                <div style={{ flex: 1, overflowY: 'auto', padding: '1.25rem 1.5rem', display: 'flex', flexDirection: 'column', gap: '0.9rem' }}>
+                  {chatMessages.length === 0 && !chatLoading && (
+                    <div style={{ margin: 'auto', textAlign: 'center', maxWidth: 480 }}>
+                      <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem', marginBottom: '1rem' }}>Prueba con una de estas preguntas:</p>
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', justifyContent: 'center' }}>
+                        {[
+                          '¿Cuánto he facturado este mes?',
+                          '¿Cuál es mi mejor cliente?',
+                          '¿En qué estoy gastando más?',
+                          '¿Qué vehículos llevan más tiempo en el taller?',
+                          '¿Cómo va julio comparado con junio?',
+                        ].map(q => (
+                          <button key={q} onClick={() => handleChatSend(q)}
+                            style={{ fontSize: '0.82rem', fontWeight: 600, padding: '0.45rem 0.9rem', background: 'rgba(99,102,241,0.08)', color: 'var(--primary)', border: '1px solid rgba(99,102,241,0.3)', borderRadius: 99, cursor: 'pointer' }}>
+                            {q}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  {chatMessages.map((m, i) => (
+                    <div key={i} style={{ display: 'flex', justifyContent: m.role === 'user' ? 'flex-end' : 'flex-start' }}>
+                      <div style={{
+                        maxWidth: '80%', padding: '0.7rem 1rem', borderRadius: 14, fontSize: '0.9rem', lineHeight: 1.55, whiteSpace: 'pre-wrap', wordBreak: 'break-word',
+                        background: m.role === 'user' ? 'var(--primary)' : 'var(--bg)',
+                        color: m.role === 'user' ? '#fff' : 'var(--text)',
+                        border: m.role === 'user' ? 'none' : '1px solid var(--border)',
+                        borderBottomRightRadius: m.role === 'user' ? 4 : 14,
+                        borderBottomLeftRadius: m.role === 'user' ? 14 : 4,
+                      }}>
+                        {m.content}
+                      </div>
+                    </div>
+                  ))}
+                  {chatLoading && (
+                    <div style={{ display: 'flex', justifyContent: 'flex-start' }}>
+                      <div style={{ padding: '0.7rem 1rem', borderRadius: 14, background: 'var(--bg)', border: '1px solid var(--border)', color: 'var(--text-muted)', fontSize: '0.9rem', display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+                        <div className="spinner" style={{ width: 14, height: 14, border: '2px solid var(--border)', borderTopColor: 'var(--primary)', borderRadius: '50%', animation: 'spin 1s linear infinite' }} />
+                        Analizando la información...
+                      </div>
+                    </div>
+                  )}
+                  <div ref={chatEndRef} />
+                </div>
+
+                {/* Input */}
+                <form onSubmit={e => { e.preventDefault(); handleChatSend(); }}
+                  style={{ display: 'flex', gap: '0.6rem', padding: '1rem 1.5rem', borderTop: '1px solid var(--border)' }}>
+                  <input type="text" placeholder="Escribe tu pregunta..." value={chatInput} onChange={e => setChatInput(e.target.value)}
+                    style={{ flex: 1, fontSize: '0.95rem', padding: '0.7rem 1rem' }} disabled={chatLoading} />
+                  <button type="submit" className="btn-primary" disabled={chatLoading || !chatInput.trim()}
+                    style={{ padding: '0 1.4rem', opacity: chatLoading || !chatInput.trim() ? 0.6 : 1 }}>
+                    Enviar
+                  </button>
+                </form>
+              </div>
+            )}
 
             {activeTab === 'Ingresos Rápidos' && (
               <div className="card" style={{ padding: '1.5rem', maxWidth: 600, margin: '0 auto' }}>

@@ -149,6 +149,93 @@ server.get('/api/backup-db', (req, res) => {
   }
 });
 
+// AI analytics chat: answers business questions using the database (READ-ONLY)
+server.post('/api/chat-analytics', async (req, res) => {
+  try {
+    const { messages } = req.body || {};
+    if (!Array.isArray(messages) || messages.length === 0) {
+      return res.status(400).json({ error: 'Se requiere el historial de mensajes' });
+    }
+    const openRouterKey = process.env.OPENROUTER_API_KEY;
+    if (!openRouterKey) return res.status(500).json({ error: 'Falta OPENROUTER_API_KEY' });
+
+    const db = JSON.parse(fs.readFileSync(dbFile, 'utf8'));
+    const quotesByOrder = {};
+    (db.quotes || []).forEach(q => { (quotesByOrder[q.orderId] = quotesByOrder[q.orderId] || []).push(q); });
+    const calcTotals = (o) => {
+      const qs = quotesByOrder[o.id] || [];
+      const q = qs.find(x => x.autorizada) || qs[0];
+      let total = 0, iva = 0; const items = [];
+      (q?.items || []).forEach(i => {
+        const lt = (Number(i.precio) || 0) * (Number(i.cantidad) || 1);
+        total += lt + (i.aplicaIva ? lt * 0.19 : 0);
+        if (i.aplicaIva) iva += lt * 0.19;
+        items.push(`${i.descripcion} x${i.cantidad || 1} $${Math.round(Number(i.precio) || 0)}`);
+      });
+      return { total: Math.round(total), iva: Math.round(iva), items };
+    };
+
+    const allOrders = db.orders || [];
+    const orderLines = allOrders.slice(-250).map(o => {
+      const t = calcTotals(o);
+      return `#${o.id}|${o.placa}|${o.cliente}|${[o.marca, o.modelo, o.anio].filter(Boolean).join(' ')}|${o.estado}|${(o.fecha || '').split('T')[0]}|pago:${o.metodoPago || '-'}|total:$${t.total}|iva:$${t.iva}|items:[${t.items.join('; ')}]`;
+    }).join('\n');
+
+    const allExpenses = db.expenses || [];
+    const expenseLines = allExpenses.slice(-400).map(g =>
+      `${g.fecha || '?'}|${g.concepto}|${g.categoria || 'sin categoría'}|${g.metodoPago || '-'}|$${g.monto}`
+    ).join('\n');
+
+    const dataContext = `FECHA ACTUAL: ${new Date().toISOString().split('T')[0]}
+
+ÓRDENES DE SERVICIO (${allOrders.length} en total; formato: id|placa|cliente|vehículo|estado|fecha ingreso|método pago|total facturado|iva|items cotizados):
+${orderLines}
+
+GASTOS (${allExpenses.length} en total; formato: fecha|concepto|categoría|método de pago|monto):
+${expenseLines}
+
+NOTAS:
+- Estados de órdenes activas: Recepción, Proceso, Calidad, Ingresos Rápidos. Estado final: Entregado.
+- "Ingreso Rápido" como cliente = órdenes exprés varias, no un cliente real.
+- Los ingresos reales corresponden a órdenes en estado Entregado.`;
+
+    const systemPrompt = `Eres el analista financiero del Taller Automotriz. Respondes preguntas del dueño sobre su negocio usando ÚNICAMENTE los datos reales entregados abajo. Responde SIEMPRE en español, de forma breve, clara y directa. Formatea las cifras en pesos colombianos (ej: $1.250.000). Cuando hagas un cálculo, muestra brevemente cómo llegaste al resultado. Si la respuesta no está en los datos, dilo claramente en lugar de inventar.
+
+${dataContext}`;
+
+    const orRes = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${openRouterKey}`,
+        'Content-Type': 'application/json',
+        'HTTP-Referer': 'https://appagent.up.railway.app',
+        'X-Title': 'AppAgent'
+      },
+      body: JSON.stringify({
+        model: 'nvidia/nemotron-3-ultra-550b-a55b:free',
+        messages: [
+          { role: 'system', content: systemPrompt },
+          ...messages.slice(-10).map(m => ({ role: m.role === 'assistant' ? 'assistant' : 'user', content: String(m.content || '') }))
+        ],
+        temperature: 0.2
+      })
+    });
+
+    if (!orRes.ok) {
+      const err = await orRes.text();
+      console.error('Chat analytics OpenRouter error:', err);
+      return res.status(502).json({ error: 'Error de OpenRouter API', details: err });
+    }
+    const data = await orRes.json();
+    const reply = data?.choices?.[0]?.message?.content?.trim() || '';
+    if (!reply) return res.status(502).json({ error: 'La IA no devolvió respuesta' });
+    res.json({ reply });
+  } catch (e) {
+    console.error('Error in /api/chat-analytics:', e);
+    res.status(500).json({ error: e.message });
+  }
+});
+
 // Storage diagnostics: is the volume mounted? which backups exist and what do they contain?
 server.get('/api/storage-info', (req, res) => {
   try {
