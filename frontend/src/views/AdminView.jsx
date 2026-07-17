@@ -479,6 +479,28 @@ export default function AdminView() {
     } catch (e) { console.error(e); }
   };
 
+  // Minimal renderer for chat replies: **bold**, *italic*, "• " bullets
+  const renderChatText = (text) => String(text || '').split('\n').map((line, li) => {
+    const parts = [];
+    let rest = line;
+    let key = 0;
+    const regex = /\*\*(.+?)\*\*|\*(.+?)\*/;
+    while (rest.length > 0) {
+      const m = rest.match(regex);
+      if (!m) { parts.push(rest); break; }
+      if (m.index > 0) parts.push(rest.slice(0, m.index));
+      if (m[1] !== undefined) parts.push(<strong key={key++}>{m[1]}</strong>);
+      else parts.push(<em key={key++} style={{ opacity: 0.85 }}>{m[2]}</em>);
+      rest = rest.slice(m.index + m[0].length);
+    }
+    const isBullet = line.trimStart().startsWith('• ');
+    return (
+      <div key={li} style={{ paddingLeft: isBullet ? '0.9rem' : 0, minHeight: line.trim() === '' ? '0.5rem' : undefined }}>
+        {parts}
+      </div>
+    );
+  });
+
   const handleChatSend = async (text) => {
     const msg = (text ?? chatInput).trim();
     if (!msg || chatLoading) return;
@@ -1637,14 +1659,15 @@ export default function AdminView() {
                   {chatMessages.map((m, i) => (
                     <div key={i} style={{ display: 'flex', justifyContent: m.role === 'user' ? 'flex-end' : 'flex-start' }}>
                       <div style={{
-                        maxWidth: '80%', padding: '0.7rem 1rem', borderRadius: 14, fontSize: '0.9rem', lineHeight: 1.55, whiteSpace: 'pre-wrap', wordBreak: 'break-word',
+                        maxWidth: '80%', padding: '0.7rem 1rem', borderRadius: 14, fontSize: '0.9rem', lineHeight: 1.55, wordBreak: 'break-word',
                         background: m.role === 'user' ? 'var(--primary)' : 'var(--bg)',
                         color: m.role === 'user' ? '#fff' : 'var(--text)',
                         border: m.role === 'user' ? 'none' : '1px solid var(--border)',
                         borderBottomRightRadius: m.role === 'user' ? 4 : 14,
                         borderBottomLeftRadius: m.role === 'user' ? 14 : 4,
+                        whiteSpace: m.role === 'user' ? 'pre-wrap' : undefined,
                       }}>
-                        {m.content}
+                        {m.role === 'user' ? m.content : renderChatText(m.content)}
                       </div>
                     </div>
                   ))}
