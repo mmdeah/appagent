@@ -24,51 +24,35 @@ if (dataDir !== __dirname && !fs.existsSync(dbFile)) {
   }
 }
 
-// Ensure all required collections exist
+// READ-ONLY startup checks: the server NEVER writes to db.json on boot.
+// (Migrations and structure fixes were removed on purpose to protect the data.)
 try {
   const dbData = JSON.parse(fs.readFileSync(dbFile, 'utf8'));
   const requiredKeys = ['orders', 'quotes', 'reports', 'expenses', 'archived_orders', 'ai_reports', 'todos', 'ald_billings', 'cn_billings', 'fleet_users'];
-  let modified = false;
-  requiredKeys.forEach(key => {
-    if (!dbData[key]) {
-      dbData[key] = [];
-      modified = true;
-    }
-  });
-  if (modified) {
-    fs.writeFileSync(dbFile, JSON.stringify(dbData, null, 2));
-    console.log("Updated db.json with missing collections.");
-  }
+  const missing = requiredKeys.filter(k => !dbData[k]);
+  if (missing.length > 0) console.warn(`WARNING: db.json is missing collections: ${missing.join(', ')} (not modified)`);
+  console.log(`DB loaded: ${(dbData.orders || []).length} orders, ${(dbData.expenses || []).length} expenses.`);
 } catch (e) {
-  console.error("Error checking/updating db.json structure:", e);
+  console.error("Error reading db.json (file left untouched):", e.message);
 }
 
-// Migrate "Docs Rápidos" -> "Ingresos Rápidos"
-try {
-  const dbData = JSON.parse(fs.readFileSync(dbFile, 'utf8'));
-  let migrated = 0;
-  (dbData.orders || []).forEach(o => {
-    if (o.estado === 'Docs Rápidos') { o.estado = 'Ingresos Rápidos'; migrated++; }
-  });
-  if (migrated > 0) {
-    fs.writeFileSync(dbFile, JSON.stringify(dbData, null, 2));
-    console.log(`Migrated ${migrated} order(s) from "Docs Rápidos" to "Ingresos Rápidos".`);
-  }
-} catch (e) {
-  console.error("Error running Docs Rápidos migration:", e);
-}
-
-// Auto-backup on startup: save a timestamped copy of db.json
+// Auto-backup on startup: read-only copy of db.json. Skips backup when the DB
+// looks empty so a wipe never rotates out the good backups.
 try {
   const backupDir = path.join(dataDir, 'backups');
   if (!fs.existsSync(backupDir)) fs.mkdirSync(backupDir, { recursive: true });
-  const stamp = new Date().toISOString().replace(/[:.]/g, '-');
-  const backupFile = path.join(backupDir, `db_${stamp}.json`);
-  fs.copyFileSync(dbFile, backupFile);
-  // Keep only the last 10 backups
-  const backups = fs.readdirSync(backupDir).sort();
-  if (backups.length > 10) backups.slice(0, backups.length - 10).forEach(f => fs.unlinkSync(path.join(backupDir, f)));
-  console.log(`Backup created: ${backupFile}`);
+  const dbData = JSON.parse(fs.readFileSync(dbFile, 'utf8'));
+  const hasData = (dbData.orders || []).length > 0 || (dbData.expenses || []).length > 0;
+  if (hasData) {
+    const stamp = new Date().toISOString().replace(/[:.]/g, '-');
+    const backupFile = path.join(backupDir, `db_${stamp}.json`);
+    fs.copyFileSync(dbFile, backupFile);
+    const backups = fs.readdirSync(backupDir).filter(f => f.startsWith('db_')).sort();
+    if (backups.length > 10) backups.slice(0, backups.length - 10).forEach(f => fs.unlinkSync(path.join(backupDir, f)));
+    console.log(`Backup created: ${backupFile}`);
+  } else {
+    console.log('DB is empty — skipping startup backup to preserve existing backups.');
+  }
 } catch (e) {
   console.error("Backup error:", e.message);
 }
@@ -400,9 +384,6 @@ Genera el informe técnico formal en español enfocado en los ítems seleccionad
       console.error("Missing OPENROUTER_API_KEY environmental variable.");
       return res.status(500).json({ error: "Falta configurar la variable de entorno OPENROUTER_API_KEY en el servidor." });
     }
-
-    const openRouterKey = process.env.OPENROUTER_API_KEY;
-    if (!openRouterKey) return res.status(500).json({ error: "Falta configurar OPENROUTER_API_KEY en Railway." });
 
     console.log("Calling OpenRouter with model: nvidia/nemotron-3-ultra-550b-a55b:free...");
     const orRes = await fetch("https://openrouter.ai/api/v1/chat/completions", {
