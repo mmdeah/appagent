@@ -68,6 +68,7 @@ export default function AdminView() {
   const [gastosMetodo, setGastosMetodo] = useState('Todos');
   const [gastosCategoria, setGastosCategoria] = useState('Todas');
   const [gastosStatsPeriod, setGastosStatsPeriod] = useState('mes');
+  const [gastosAgrupar, setGastosAgrupar] = useState('dia');
   const [gastosStatsDesde, setGastosStatsDesde] = useState('');
   const [gastosStatsHasta, setGastosStatsHasta] = useState('');
   const [deleteExpenseId, setDeleteExpenseId] = useState(null);
@@ -1189,6 +1190,17 @@ export default function AdminView() {
               // ── Stats range ──────────────────────────────────────────
               const getGastosStatsRange = () => {
                 const now = new Date();
+                if (gastosStatsPeriod === 'hoy') {
+                  const desde = new Date(now); desde.setHours(0,0,0,0);
+                  const hasta = new Date(now); hasta.setHours(23,59,59,999);
+                  return { desde, hasta };
+                }
+                if (['7d','30d','90d'].includes(gastosStatsPeriod)) {
+                  const days = parseInt(gastosStatsPeriod);
+                  const hasta = new Date(now); hasta.setHours(23,59,59,999);
+                  const desde = new Date(now); desde.setDate(desde.getDate() - (days - 1)); desde.setHours(0,0,0,0);
+                  return { desde, hasta };
+                }
                 if (gastosStatsPeriod === 'semana') {
                   const day = now.getDay() || 7;
                   const desde = new Date(now); desde.setDate(now.getDate() - day + 1); desde.setHours(0,0,0,0);
@@ -1268,18 +1280,111 @@ export default function AdminView() {
 
               const deltaPct = (cur, prev) => (prev && prev !== 0) ? ((cur - prev) / Math.abs(prev)) * 100 : null;
 
-              // ── Monthly chart ─────────────────────────────────────────
-              const monthlyData = [];
-              const now = new Date();
-              for (let i = 5; i >= 0; i--) {
-                const d   = new Date(now.getFullYear(), now.getMonth() - i, 1);
-                const mD  = new Date(d.getFullYear(), d.getMonth(), 1);
-                const mH  = new Date(d.getFullYear(), d.getMonth()+1, 0, 23,59,59,999);
-                const ords = orders.filter(o => o.estado==='Entregado' && o.fecha && new Date(o.fecha)>=mD && new Date(o.fecha)<=mH);
-                const gsts = expenses.filter(g => g.fecha && new Date(g.fecha)>=mD && new Date(g.fecha)<=mH);
-                monthlyData.push({ label:`${MESES[d.getMonth()].slice(0,3)} ${d.getFullYear()}`, ingresos: ords.reduce((s,o)=>s+calcOrderTotal(o),0), gastos: gsts.reduce((s,g)=>s+(parseFloat(g.monto)||0),0), vehiculos: ords.length });
-              }
-              const maxVal = Math.max(...monthlyData.map(m => Math.max(m.ingresos, m.gastos)), 1);
+              // ── Trend buckets (follows the selected period + grouping) ──
+              const trendBuckets = (() => {
+                if (!sDesde || !sHasta) return [];
+                const buckets = [];
+                if (gastosAgrupar === 'mes') {
+                  let d = new Date(sDesde.getFullYear(), sDesde.getMonth(), 1);
+                  while (d <= sHasta && buckets.length < 48) {
+                    const end = new Date(d.getFullYear(), d.getMonth() + 1, 0, 23, 59, 59, 999);
+                    buckets.push({ start: new Date(d), end, label: `${MESES[d.getMonth()].slice(0,3)} ${String(d.getFullYear()).slice(2)}`, ingresos: 0, gastos: 0 });
+                    d = new Date(d.getFullYear(), d.getMonth() + 1, 1);
+                  }
+                } else if (gastosAgrupar === 'semana') {
+                  let d = new Date(sDesde); const dow = d.getDay() || 7; d.setDate(d.getDate() - dow + 1); d.setHours(0,0,0,0);
+                  while (d <= sHasta && buckets.length < 80) {
+                    const end = new Date(d); end.setDate(end.getDate() + 6); end.setHours(23,59,59,999);
+                    buckets.push({ start: new Date(d), end, label: `${d.getDate()} ${MESES[d.getMonth()].slice(0,3).toLowerCase()}`, ingresos: 0, gastos: 0 });
+                    d = new Date(d); d.setDate(d.getDate() + 7);
+                  }
+                } else {
+                  let d = new Date(sDesde); d.setHours(0,0,0,0);
+                  while (d <= sHasta && buckets.length < 190) {
+                    const end = new Date(d); end.setHours(23,59,59,999);
+                    buckets.push({ start: new Date(d), end, label: `${d.getDate()}/${d.getMonth()+1}`, ingresos: 0, gastos: 0 });
+                    d = new Date(d); d.setDate(d.getDate() + 1);
+                  }
+                }
+                orders.filter(o => o.estado === 'Entregado' && o.fecha).forEach(o => {
+                  const t = new Date(o.fecha);
+                  const b = buckets.find(x => t >= x.start && t <= x.end);
+                  if (b) b.ingresos += calcOrderTotal(o);
+                });
+                expenses.forEach(g => {
+                  if (!g.fecha) return;
+                  const t = new Date(g.fecha);
+                  const b = buckets.find(x => t >= x.start && t <= x.end);
+                  if (b) b.gastos += parseFloat(g.monto) || 0;
+                });
+                buckets.forEach(b => { b.utilidad = b.ingresos - b.gastos; });
+                return buckets;
+              })();
+              const trendHasData = trendBuckets.some(b => b.ingresos > 0 || b.gastos > 0);
+
+              // ── Printable period report ─────────────────────────────────
+              const generarReporte = () => {
+                const fmtDate = d => d ? d.toLocaleDateString('es-CO') : '—';
+                const periodo = `${fmtDate(sDesde)} — ${fmtDate(sHasta)}`;
+                const kpiRow = (l, v) => `<tr><td>${l}</td><td style="text-align:right;font-weight:700">${v}</td></tr>`;
+                const html = `<!DOCTYPE html><html lang="es"><head><meta charset="utf-8"><title>Reporte Financiero — Taller Automotriz</title>
+<style>
+  body { font-family: 'Segoe UI', Arial, sans-serif; color: #1a202c; margin: 2rem auto; max-width: 800px; padding: 0 1.5rem; }
+  h1 { font-size: 1.4rem; margin-bottom: 0.2rem; }
+  .muted { color: #718096; font-size: 0.85rem; }
+  h2 { font-size: 1rem; margin: 1.8rem 0 0.6rem; border-bottom: 2px solid #e2e8f0; padding-bottom: 0.3rem; }
+  table { width: 100%; border-collapse: collapse; font-size: 0.88rem; }
+  td, th { padding: 0.45rem 0.6rem; border-bottom: 1px solid #edf2f7; }
+  th { text-align: left; background: #f7fafc; font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.04em; color: #4a5568; }
+  .pos { color: #059669; } .neg { color: #dc2626; }
+  .print-btn { position: fixed; top: 1rem; right: 1rem; padding: 0.6rem 1.2rem; background: #1a202c; color: #fff; border: none; border-radius: 8px; font-weight: 700; cursor: pointer; }
+  @media print { .print-btn { display: none; } body { margin: 0.5rem; } }
+</style></head><body>
+<button class="print-btn" onclick="window.print()">🖨 Imprimir / PDF</button>
+<h1>Reporte Financiero — Taller Automotriz</h1>
+<div class="muted">Período: ${periodo} &nbsp;·&nbsp; Generado: ${new Date().toLocaleString('es-CO')}</div>
+
+<h2>Resumen del período</h2>
+<table>
+${kpiRow('Vehículos atendidos (entregados)', ordenesPeriodo.length)}
+${kpiRow('Ingresos', '$' + fmt(ingresosPeriodo))}
+${kpiRow('Gastos', '$' + fmt(gastosTotalPeriodo))}
+${kpiRow('Utilidad neta', `<span class="${ganancia >= 0 ? 'pos' : 'neg'}">$${fmt(ganancia)}</span>`)}
+${kpiRow('Margen', margenPct == null ? '—' : margenPct.toFixed(1) + '%')}
+${kpiRow('Ticket promedio', '$' + fmt(ticketProm))}
+${kpiRow('IVA generado (DIAN)', '$' + fmt(ivaPeriodo))}
+</table>
+
+<h2>Tendencia (${gastosAgrupar === 'dia' ? 'por día' : gastosAgrupar === 'semana' ? 'por semana' : 'por mes'})</h2>
+<table><thead><tr><th>Fecha</th><th style="text-align:right">Ingresos</th><th style="text-align:right">Gastos</th><th style="text-align:right">Utilidad</th></tr></thead><tbody>
+${trendBuckets.filter(b => b.ingresos > 0 || b.gastos > 0).map(b => `<tr><td>${b.label}</td><td style="text-align:right">$${fmt(b.ingresos)}</td><td style="text-align:right">$${fmt(b.gastos)}</td><td style="text-align:right" class="${b.utilidad >= 0 ? 'pos' : 'neg'}">$${fmt(b.utilidad)}</td></tr>`).join('')}
+</tbody></table>
+
+<h2>Top clientes del período</h2>
+<table><tbody>
+${topClientes.map(([c, t], i) => `<tr><td>${i+1}. ${c}</td><td style="text-align:right;font-weight:700">$${fmt(t)}</td></tr>`).join('') || '<tr><td class="muted">Sin datos</td></tr>'}
+</tbody></table>
+
+<h2>Servicios más vendidos</h2>
+<table><tbody>
+${topServicios.map(([s, d2]) => `<tr><td>${s} <span class="muted">×${d2.count}</span></td><td style="text-align:right;font-weight:700">$${fmt(d2.total)}</td></tr>`).join('') || '<tr><td class="muted">Sin datos</td></tr>'}
+</tbody></table>
+
+<h2>Gastos por categoría</h2>
+<table><tbody>
+${catList.map(([c, t]) => `<tr><td>${c}</td><td style="text-align:right;font-weight:700">$${fmt(t)} <span class="muted">(${gastosTotalPeriodo > 0 ? ((t/gastosTotalPeriodo)*100).toFixed(0) : 0}%)</span></td></tr>`).join('') || '<tr><td class="muted">Sin gastos en el período</td></tr>'}
+</tbody></table>
+
+<h2>Saldos por método de pago (histórico total)</h2>
+<table><tbody>
+${PAYMENT_METHODS.map(m => `<tr><td>${m}</td><td style="text-align:right;font-weight:700" class="${(balancesByMethod[m]||0) >= 0 ? 'pos' : 'neg'}">$${fmt(balancesByMethod[m]||0)}</td></tr>`).join('')}
+</tbody></table>
+</body></html>`;
+                const w = window.open('', '_blank');
+                if (!w) { alert('Permite las ventanas emergentes para generar el reporte.'); return; }
+                w.document.write(html);
+                w.document.close();
+              };
 
               // ── Expenses table filters ────────────────────────────────
               const qG = gastosSearch.trim().toLowerCase();
@@ -1368,12 +1473,19 @@ export default function AdminView() {
                     {/* Period pills */}
                     <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
                       <span style={{ fontSize: '0.82rem', fontWeight: 700, color: 'var(--text-muted)' }}>Estadísticas:</span>
-                      {[{k:'semana',l:'Esta semana'},{k:'mes',l:'Este mes'},{k:'año',l:'Este año'},{k:'personalizado',l:'Personalizado'}].map(p => (
-                        <button key={p.k} onClick={() => setGastosStatsPeriod(p.k)}
+                      {[
+                        {k:'hoy',l:'Hoy',g:'dia'},{k:'7d',l:'7 días',g:'dia'},{k:'30d',l:'30 días',g:'dia'},{k:'90d',l:'90 días',g:'semana'},
+                        {k:'mes',l:'Este mes',g:'dia'},{k:'año',l:'Este año',g:'mes'},{k:'personalizado',l:'Personalizado',g:'dia'},
+                      ].map(p => (
+                        <button key={p.k} onClick={() => { setGastosStatsPeriod(p.k); setGastosAgrupar(p.g); }}
                           style={{ padding:'0.28rem 0.8rem', borderRadius:20, border:'1px solid var(--border)', background: gastosStatsPeriod===p.k ? 'var(--primary)' : 'transparent', color: gastosStatsPeriod===p.k ? 'white' : 'var(--text-muted)', fontWeight:600, fontSize:'0.82rem', cursor:'pointer' }}>
                           {p.l}
                         </button>
                       ))}
+                      <button onClick={() => generarReporte()}
+                        style={{ marginLeft:'auto', display:'flex', alignItems:'center', gap:'0.4rem', padding:'0.35rem 1rem', borderRadius:'var(--radius-sm)', border:'none', background:'var(--text)', color:'var(--bg-card)', fontWeight:700, fontSize:'0.82rem', cursor:'pointer', whiteSpace:'nowrap' }}>
+                        <FileText size={13} /> Generar reporte
+                      </button>
                       {gastosStatsPeriod === 'personalizado' && (
                         <>
                           <input type="date" value={gastosStatsDesde} onChange={e => setGastosStatsDesde(e.target.value)} style={{ fontSize:'0.82rem', padding:'0.28rem 0.5rem', width:140 }} />
@@ -1481,29 +1593,62 @@ export default function AdminView() {
                       </div>
                     </div>
 
-                    {/* Bar chart */}
+                    {/* Trend line chart (follows selected period) */}
                     <div className="card" style={{ padding: '1.5rem' }}>
-                      <h3 style={{ fontSize: '0.95rem', fontWeight: 700, marginBottom: '1.25rem' }}>Últimos 6 meses</h3>
-                      <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'flex-end', height: 130 }}>
-                        {monthlyData.map(m => (
-                          <div key={m.label} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.2rem' }}>
-                            <div style={{ fontSize:'0.6rem', fontWeight:700, display:'flex', flexDirection:'column', alignItems:'center', lineHeight:1.25, minHeight:'1.5rem', justifyContent:'flex-end' }}>
-                              {m.ingresos > 0 && <span style={{ color:'#10b981', whiteSpace:'nowrap' }}>{fmtCompact(m.ingresos)}</span>}
-                              {m.gastos > 0 && <span style={{ color:'#ef4444', whiteSpace:'nowrap' }}>{fmtCompact(m.gastos)}</span>}
-                            </div>
-                            <div style={{ width:'100%', display:'flex', gap:'2px', alignItems:'flex-end', height:100 }}>
-                              <div title={`Ingresos: $${fmt(m.ingresos)}`} style={{ flex:1, background:'#10b981', borderRadius:'3px 3px 0 0', height:`${(m.ingresos/maxVal)*100}%`, minHeight: m.ingresos>0?3:0, transition:'height 0.3s' }} />
-                              <div title={`Gastos: $${fmt(m.gastos)}`}   style={{ flex:1, background:'#ef4444', borderRadius:'3px 3px 0 0', height:`${(m.gastos/maxVal)*100}%`,   minHeight: m.gastos>0?3:0,   transition:'height 0.3s' }} />
-                            </div>
-                            <div style={{ fontSize:'0.68rem', color:'var(--text-muted)', fontWeight:600, whiteSpace:'nowrap' }}>{m.label}</div>
-                            <div style={{ fontSize:'0.65rem', color:'var(--text-muted)' }}>{m.vehiculos} veh.</div>
-                          </div>
-                        ))}
+                      <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'1rem', flexWrap:'wrap', gap:'0.5rem' }}>
+                        <h3 style={{ fontSize: '0.95rem', fontWeight: 700, margin: 0 }}>Tendencia del período</h3>
+                        <div style={{ display:'flex', gap:'0.3rem' }}>
+                          {[{k:'dia',l:'Día'},{k:'semana',l:'Semana'},{k:'mes',l:'Mes'}].map(g => (
+                            <button key={g.k} onClick={() => setGastosAgrupar(g.k)}
+                              style={{ padding:'0.22rem 0.7rem', borderRadius:20, border:'1px solid var(--border)', background: gastosAgrupar===g.k ? 'var(--primary)' : 'transparent', color: gastosAgrupar===g.k ? 'white' : 'var(--text-muted)', fontWeight:600, fontSize:'0.76rem', cursor:'pointer' }}>
+                              {g.l}
+                            </button>
+                          ))}
+                        </div>
                       </div>
-                      <div style={{ display:'flex', gap:'1.25rem', marginTop:'0.75rem', fontSize:'0.78rem' }}>
-                        <span style={{ display:'flex', alignItems:'center', gap:'0.3rem' }}><span style={{ width:10, height:10, background:'#10b981', borderRadius:2, display:'inline-block' }}/> Ingresos</span>
-                        <span style={{ display:'flex', alignItems:'center', gap:'0.3rem' }}><span style={{ width:10, height:10, background:'#ef4444', borderRadius:2, display:'inline-block' }}/> Gastos</span>
-                      </div>
+                      {!trendHasData ? (
+                        <p style={{ color:'var(--text-muted)', fontSize:'0.85rem', textAlign:'center', padding:'2rem 0' }}>Sin movimientos en este período.</p>
+                      ) : (() => {
+                        const W = 800, H = 240, pL = 48, pR = 12, pT = 12, pB = 26;
+                        const maxY = Math.max(...trendBuckets.map(b => Math.max(b.ingresos, b.gastos, b.utilidad)), 1);
+                        const minY = Math.min(0, ...trendBuckets.map(b => b.utilidad));
+                        const xAt = i => pL + (trendBuckets.length === 1 ? (W-pL-pR)/2 : i * (W-pL-pR) / (trendBuckets.length-1));
+                        const yAt = v => pT + (H-pT-pB) * (1 - (v - minY) / ((maxY - minY) || 1));
+                        const pts = key => trendBuckets.map((b,i) => `${xAt(i)},${yAt(b[key])}`).join(' ');
+                        const gridVals = [0.25, 0.5, 0.75, 1].map(f => minY + f * (maxY - minY));
+                        const labStep = Math.max(1, Math.ceil(trendBuckets.length / 8));
+                        return (
+                          <>
+                            <svg viewBox={`0 0 ${W} ${H}`} style={{ width:'100%', height:'auto' }}>
+                              {gridVals.map((v, i) => (
+                                <g key={i}>
+                                  <line x1={pL} x2={W-pR} y1={yAt(v)} y2={yAt(v)} stroke="var(--border)" strokeWidth="1" strokeDasharray="3 4" />
+                                  <text x={pL-6} y={yAt(v)+3} textAnchor="end" fontSize="10" fill="var(--text-muted)">{fmtCompact(v)}</text>
+                                </g>
+                              ))}
+                              {minY < 0 && <line x1={pL} x2={W-pR} y1={yAt(0)} y2={yAt(0)} stroke="var(--text-muted)" strokeWidth="1" />}
+                              <polyline points={pts('ingresos')} fill="none" stroke="#10b981" strokeWidth="2" />
+                              <polyline points={pts('gastos')} fill="none" stroke="#ef4444" strokeWidth="2" strokeDasharray="5 4" />
+                              <polyline points={pts('utilidad')} fill="none" stroke="#818cf8" strokeWidth="2.5" />
+                              {trendBuckets.length <= 31 && trendBuckets.map((b, i) => (
+                                <g key={'d'+i}>
+                                  <circle cx={xAt(i)} cy={yAt(b.ingresos)} r="3" fill="#10b981"><title>{`${b.label} — Ingresos: $${fmt(b.ingresos)}`}</title></circle>
+                                  <circle cx={xAt(i)} cy={yAt(b.gastos)} r="3" fill="#ef4444"><title>{`${b.label} — Gastos: $${fmt(b.gastos)}`}</title></circle>
+                                  <circle cx={xAt(i)} cy={yAt(b.utilidad)} r="3" fill="#818cf8"><title>{`${b.label} — Utilidad: $${fmt(b.utilidad)}`}</title></circle>
+                                </g>
+                              ))}
+                              {trendBuckets.map((b, i) => (i % labStep === 0) ? (
+                                <text key={'x'+i} x={xAt(i)} y={H-8} textAnchor="middle" fontSize="10" fill="var(--text-muted)">{b.label}</text>
+                              ) : null)}
+                            </svg>
+                            <div style={{ display:'flex', gap:'1.25rem', marginTop:'0.5rem', fontSize:'0.78rem', flexWrap:'wrap' }}>
+                              <span style={{ display:'flex', alignItems:'center', gap:'0.3rem' }}><span style={{ width:14, height:3, background:'#10b981', display:'inline-block', borderRadius:2 }}/> Ingresos</span>
+                              <span style={{ display:'flex', alignItems:'center', gap:'0.3rem' }}><span style={{ width:14, height:3, background:'#ef4444', display:'inline-block', borderRadius:2 }}/> Gastos</span>
+                              <span style={{ display:'flex', alignItems:'center', gap:'0.3rem' }}><span style={{ width:14, height:3, background:'#818cf8', display:'inline-block', borderRadius:2 }}/> Utilidad</span>
+                            </div>
+                          </>
+                        );
+                      })()}
                     </div>
                   </div>
 
