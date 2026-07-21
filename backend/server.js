@@ -15,7 +15,10 @@ const OPENROUTER_MODEL_CHAIN = [
   'nvidia/nemotron-3-ultra-550b-a55b:free',
   'deepseek/deepseek-chat-v3-0324:free',
   'qwen/qwen3-14b:free',
-  'meta-llama/llama-3.3-70b-instruct:free',
+  'mistralai/mistral-small-3.2-24b-instruct:free',
+  'google/gemma-3-27b-it:free',
+  'meta-llama/llama-4-scout:free',
+  'deepseek/deepseek-r1:free',
 ];
 const callOpenRouterWithFallback = async (openRouterKey, { systemPrompt, userPrompt, messages, temperature = 0.3 }) => {
   const chatMessages = messages || [
@@ -49,7 +52,9 @@ const callOpenRouterWithFallback = async (openRouterKey, { systemPrompt, userPro
     }
     if (resp.ok) {
       const data = await resp.json();
-      const content = data?.choices?.[0]?.message?.content?.trim() || '';
+      let content = data?.choices?.[0]?.message?.content?.trim() || '';
+      // Some models (e.g. DeepSeek R1) emit <think>...</think> reasoning before the real answer
+      content = content.replace(/<think>[\s\S]*?<\/think>/gi, '').trim();
       if (content) return { ok: true, content };
       lastErrText = 'Respuesta vacía del modelo ' + model;
       continue;
