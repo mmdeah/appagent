@@ -138,7 +138,9 @@ export default function OrderDetailsModal({ order, onClose, fleetMode = false, i
           .badge-good { background: #dcfce7; color: #166534; }
           .badge-warn { background: #fef9c3; color: #854d0e; }
           .badge-bad { background: #fee2e2; color: #991b1b; }
-          
+          .disclaimer-box { margin-top: 24px; padding: 12px 16px; background: #f8fafc; border: 1px solid #e2e8f0; border-left: 3px solid #64748b; border-radius: 6px; font-size: 10.5px; color: #475569; line-height: 1.6; }
+          .disclaimer-box b { color: #1e293b; }
+
           @media print { body { padding: 0; } .header-title { margin-top: 0; } }
         </style>
       </head><body>${bodyHtml}
@@ -147,6 +149,12 @@ export default function OrderDetailsModal({ order, onClose, fleetMode = false, i
     `);
     win.document.close();
   };
+
+  const disclaimerHtml = `
+    <div class="disclaimer-box">
+      <b>⚠ Nota importante:</b> lo reportado corresponde únicamente a lo observado en el estado visible del vehículo al momento de la revisión. Pueden existir desgastes, fallas o daños ocultos no detectables sin desarme completo, que se identificarán solo al momento de intervenir el vehículo.
+    </div>
+  `;
 
   const renderChecklistHtml = (chk) => {
     if (!chk) return '';
@@ -246,6 +254,7 @@ export default function OrderDetailsModal({ order, onClose, fleetMode = false, i
       ${order.servicios ? `<div class="section-header">Servicios Solicitados</div><p style="padding: 10px; background: #f8fafc; border-radius: 6px; margin-bottom: 12px;">${order.servicios}</p>` : ''}
       ${order.notas ? `<div class="section-header">Notas y Observaciones</div><p style="padding: 10px; background: #fffbeb; border-radius: 6px; color: #92400e;">${order.notas}</p>` : ''}
       ${renderChecklistHtml(order.checklistFinal)}
+      ${disclaimerHtml}
     `);
   };
 
@@ -369,6 +378,7 @@ export default function OrderDetailsModal({ order, onClose, fleetMode = false, i
       ` : ''}
 
       ${renderChecklistHtml(order.checklistFinal)}
+      ${disclaimerHtml}
 
       <div style="margin-top: 60px; border-top: 1px solid #e2e8f0; padding-top: 20px; font-size: 10px; color: #94a3b8; text-align: center;">
         Esta es una representación física de un documento digital. Generado por AppTaller2.

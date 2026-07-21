@@ -265,6 +265,28 @@ if recom_text:
     story.append(alerta)
     story.append(Spacer(1, 0.4*cm))
 
+# Visible-condition disclaimer
+disclaimer = Table([[
+    Paragraph(
+        "<b>⚠ Nota importante:</b> lo reportado en este informe corresponde únicamente a lo "
+        "observado en el estado visible del vehículo al momento de la revisión. Pueden existir "
+        "desgastes, fallas o daños ocultos no detectables sin desarme completo, que se "
+        "identificarán solo al momento de intervenir el vehículo.",
+        s("Normal", fontName="Helvetica", fontSize=8.5, textColor=colors.HexColor("#475569"),
+          leading=13, alignment=TA_JUSTIFY))
+]], colWidths=[doc.width])
+disclaimer.setStyle(TableStyle([
+    ("BACKGROUND",    (0,0), (-1,-1), colors.HexColor("#F8FAFC")),
+    ("LINEBEFORE",    (0,0), (0,-1), 2, colors.HexColor("#64748B")),
+    ("BOX",           (0,0), (-1,-1), 0.5, colors.HexColor("#E2E8F0")),
+    ("TOPPADDING",    (0,0), (-1,-1), 8),
+    ("BOTTOMPADDING", (0,0), (-1,-1), 8),
+    ("LEFTPADDING",   (0,0), (-1,-1), 12),
+    ("RIGHTPADDING",  (0,0), (-1,-1), 12),
+]))
+story.append(disclaimer)
+story.append(Spacer(1, 0.3*cm))
+
 # ══════════════════════════════════════════════════════════════
 # 6. SOLICITUD
 # ══════════════════════════════════════════════════════════════
