@@ -42,7 +42,6 @@ export default function AdminView() {
   const [orderToDelete, setOrderToDelete] = useState(null);
   const [todos, setTodos] = useState([]);
   const [newTodo, setNewTodo] = useState('');
-  const [balancesByMethod, setBalancesByMethod] = useState({});
   const [formConfig, setFormConfig] = useState(null);
   const [newCategoryName, setNewCategoryName] = useState('');
   const [reportGenerator, setReportGenerator] = useState({ placa: '', secciones: [{ categoria: '', descripcion: '' }] });
@@ -255,37 +254,6 @@ export default function AdminView() {
       fetchTodos();
     } catch (e) { console.error(e); }
   };
-
-  const updateBalances = () => {
-    const balances = {};
-    PAYMENT_METHODS.forEach(m => {
-      const ingresos = orders.filter(o => o.estado === 'Entregado' && (o.metodoPago === m || (!o.metodoPago && m === 'Efectivo'))).reduce((acc, o) => {
-        let t = 0;
-        if (o.quotes && Array.isArray(o.quotes)) {
-          o.quotes.forEach(q => {
-            if (q.items && Array.isArray(q.items)) {
-              q.items.forEach(it => {
-                const p = parseFloat(it.precio) || 0;
-                const c = parseFloat(it.cantidad) || 0;
-                const sub = p * c;
-                t += it.aplicaIva ? sub * 1.19 : sub;
-              });
-            }
-          });
-        }
-        return acc + t;
-      }, 0);
-
-      const egresos = expenses.filter(g => g.metodoPago === m).reduce((acc, g) => acc + (parseFloat(g.monto) || 0), 0);
-      
-      balances[m] = Math.round(ingresos - egresos);
-    });
-    setBalancesByMethod(balances);
-  };
-
-  useEffect(() => {
-    updateBalances();
-  }, [orders, expenses]);
 
   const fetchOrders = async () => {
     try {
@@ -1283,6 +1251,18 @@ export default function AdminView() {
 
               const deltaPct = (cur, prev) => (prev && prev !== 0) ? ((cur - prev) / Math.abs(prev)) * 100 : null;
 
+              // ── Balances by payment method, scoped to the selected period ──
+              const balancesPeriodo = {};
+              PAYMENT_METHODS.forEach(m => {
+                const ingresos = ordenesPeriodo
+                  .filter(o => o.metodoPago === m || (!o.metodoPago && m === 'Efectivo'))
+                  .reduce((s, o) => s + calcOrderTotal(o), 0);
+                const egresos = gastosPeriodo
+                  .filter(g => g.metodoPago === m)
+                  .reduce((s, g) => s + (parseFloat(g.monto) || 0), 0);
+                balancesPeriodo[m] = Math.round(ingresos - egresos);
+              });
+
               // ── Trend buckets (follows the selected period + grouping) ──
               const trendBuckets = (() => {
                 if (!sDesde || !sHasta) return [];
@@ -1378,9 +1358,9 @@ ${topServicios.map(([s, d2]) => `<tr><td>${s} <span class="muted">×${d2.count}<
 ${catList.map(([c, t]) => `<tr><td>${c}</td><td style="text-align:right;font-weight:700">$${fmt(t)} <span class="muted">(${gastosTotalPeriodo > 0 ? ((t/gastosTotalPeriodo)*100).toFixed(0) : 0}%)</span></td></tr>`).join('') || '<tr><td class="muted">Sin gastos en el período</td></tr>'}
 </tbody></table>
 
-<h2>Saldos por método de pago (histórico total)</h2>
+<h2>Saldos por método de pago (del período)</h2>
 <table><tbody>
-${PAYMENT_METHODS.map(m => `<tr><td>${m}</td><td style="text-align:right;font-weight:700" class="${(balancesByMethod[m]||0) >= 0 ? 'pos' : 'neg'}">$${fmt(balancesByMethod[m]||0)}</td></tr>`).join('')}
+${PAYMENT_METHODS.map(m => `<tr><td>${m}</td><td style="text-align:right;font-weight:700" class="${(balancesPeriodo[m]||0) >= 0 ? 'pos' : 'neg'}">$${fmt(balancesPeriodo[m]||0)}</td></tr>`).join('')}
 </tbody></table>
 </body></html>`;
                 const w = window.open('', '_blank');
@@ -1549,10 +1529,10 @@ ${PAYMENT_METHODS.map(m => `<tr><td>${m}</td><td style="text-align:right;font-we
                         </div>
                       </div>
                       <div className="card" style={{ padding: '1.5rem' }}>
-                        <h3 style={{ fontSize: '0.95rem', fontWeight: 700, marginBottom: '1rem' }}>Saldos por método de pago <span style={{ fontWeight: 500, color: 'var(--text-muted)', fontSize: '0.8rem' }}>(histórico total)</span></h3>
+                        <h3 style={{ fontSize: '0.95rem', fontWeight: 700, marginBottom: '1rem' }}>Saldos por método de pago <span style={{ fontWeight: 500, color: 'var(--text-muted)', fontSize: '0.8rem' }}>(del período)</span></h3>
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
                           {PAYMENT_METHODS.map(m => {
-                            const saldo = balancesByMethod[m] || 0;
+                            const saldo = balancesPeriodo[m] || 0;
                             return (
                               <div key={m} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0.55rem 0.8rem', background: 'var(--bg)', borderRadius: 8, border: '1px solid var(--border)' }}>
                                 <span style={{ fontSize: '0.85rem', fontWeight: 600 }}>{m}</span>
@@ -1561,7 +1541,7 @@ ${PAYMENT_METHODS.map(m => `<tr><td>${m}</td><td style="text-align:right;font-we
                             );
                           })}
                         </div>
-                        <p style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginTop: '0.75rem' }}>Ingresos de órdenes entregadas menos gastos, según método de pago registrado.</p>
+                        <p style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginTop: '0.75rem' }}>Ingresos de órdenes entregadas menos gastos del período seleccionado, según método de pago registrado.</p>
                       </div>
                     </div>
 
