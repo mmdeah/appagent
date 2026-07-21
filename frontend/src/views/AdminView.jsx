@@ -519,7 +519,10 @@ export default function AdminView() {
       if (!res.ok) throw new Error([data.error, data.details].filter(Boolean).join(' — ') || 'Error del servidor');
       setChatMessages([...newMessages, { role: 'assistant', content: data.reply }]);
     } catch (e) {
-      setChatMessages([...newMessages, { role: 'assistant', content: '⚠ Error: ' + e.message }]);
+      const msg = e.message === 'Failed to fetch'
+        ? 'No se pudo conectar con el servidor. Los modelos de IA gratuitos tardaron demasiado o el servidor no respondió — intenta de nuevo en unos segundos.'
+        : e.message;
+      setChatMessages([...newMessages, { role: 'assistant', content: '⚠ Error: ' + msg }]);
     } finally {
       setChatLoading(false);
     }

@@ -25,16 +25,28 @@ const callOpenRouterWithFallback = async (openRouterKey, { systemPrompt, userPro
   let lastErrText = '';
   for (const model of OPENROUTER_MODEL_CHAIN) {
     console.log(`Calling OpenRouter with model: ${model}...`);
-    const resp = await fetch('https://openrouter.ai/api/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${openRouterKey}`,
-        'Content-Type': 'application/json',
-        'HTTP-Referer': 'https://appagent.up.railway.app',
-        'X-Title': 'AppAgent'
-      },
-      body: JSON.stringify({ model, messages: chatMessages, temperature })
-    });
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 20000); // 20s budget per model
+    let resp;
+    try {
+      resp = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+        method: 'POST',
+        signal: controller.signal,
+        headers: {
+          'Authorization': `Bearer ${openRouterKey}`,
+          'Content-Type': 'application/json',
+          'HTTP-Referer': 'https://appagent.up.railway.app',
+          'X-Title': 'AppAgent'
+        },
+        body: JSON.stringify({ model, messages: chatMessages, temperature })
+      });
+    } catch (e) {
+      lastErrText = e.name === 'AbortError' ? `Tiempo de espera agotado con ${model}` : `Error de red con ${model}: ${e.message}`;
+      console.warn(lastErrText);
+      continue;
+    } finally {
+      clearTimeout(timeout);
+    }
     if (resp.ok) {
       const data = await resp.json();
       const content = data?.choices?.[0]?.message?.content?.trim() || '';
