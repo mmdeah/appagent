@@ -9,6 +9,47 @@ const multer = require('multer');
 const server = jsonServer.create();
 const middlewares = jsonServer.defaults();
 
+// Free OpenRouter models are unreliable (rate limits, upstream overload, models
+// going paid). Try each in order and fall back to the next on a recoverable error.
+const OPENROUTER_MODEL_CHAIN = [
+  'nvidia/nemotron-3-ultra-550b-a55b:free',
+  'deepseek/deepseek-chat-v3-0324:free',
+  'qwen/qwen3-14b:free',
+  'meta-llama/llama-3.3-70b-instruct:free',
+];
+const callOpenRouterWithFallback = async (openRouterKey, { systemPrompt, userPrompt, messages, temperature = 0.3 }) => {
+  const chatMessages = messages || [
+    { role: 'system', content: systemPrompt },
+    { role: 'user', content: userPrompt }
+  ];
+  let lastErrText = '';
+  for (const model of OPENROUTER_MODEL_CHAIN) {
+    console.log(`Calling OpenRouter with model: ${model}...`);
+    const resp = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${openRouterKey}`,
+        'Content-Type': 'application/json',
+        'HTTP-Referer': 'https://appagent.up.railway.app',
+        'X-Title': 'AppAgent'
+      },
+      body: JSON.stringify({ model, messages: chatMessages, temperature })
+    });
+    if (resp.ok) {
+      const data = await resp.json();
+      const content = data?.choices?.[0]?.message?.content?.trim() || '';
+      if (content) return { ok: true, content };
+      lastErrText = 'Respuesta vacía del modelo ' + model;
+      continue;
+    }
+    lastErrText = await resp.text();
+    console.warn(`Model ${model} failed:`, lastErrText);
+    // 429 (rate limit), 502/503 (upstream overload) and 404 (model gone) are all worth retrying with the next model
+    if (![429, 404, 500, 502, 503].includes(resp.status)) break;
+  }
+  return { ok: false, error: lastErrText };
+};
+
 // Use Railway volume path if available, otherwise use local directory
 const dataDir = process.env.RAILWAY_VOLUME_MOUNT_PATH || __dirname;
 const dbFile = path.join(dataDir, 'db.json');
@@ -222,33 +263,18 @@ Ejemplo de respuesta bien formateada:
 
 ${dataContext}`;
 
-    const orRes = await fetch('https://openrouter.ai/api/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${openRouterKey}`,
-        'Content-Type': 'application/json',
-        'HTTP-Referer': 'https://appagent.up.railway.app',
-        'X-Title': 'AppAgent'
-      },
-      body: JSON.stringify({
-        model: 'nvidia/nemotron-3-ultra-550b-a55b:free',
-        messages: [
-          { role: 'system', content: systemPrompt },
-          ...messages.slice(-10).map(m => ({ role: m.role === 'assistant' ? 'assistant' : 'user', content: String(m.content || '') }))
-        ],
-        temperature: 0.2
-      })
+    const result = await callOpenRouterWithFallback(openRouterKey, {
+      messages: [
+        { role: 'system', content: systemPrompt },
+        ...messages.slice(-10).map(m => ({ role: m.role === 'assistant' ? 'assistant' : 'user', content: String(m.content || '') }))
+      ],
+      temperature: 0.2
     });
-
-    if (!orRes.ok) {
-      const err = await orRes.text();
-      console.error('Chat analytics OpenRouter error:', err);
-      return res.status(502).json({ error: 'Error de OpenRouter API', details: err });
+    if (!result.ok) {
+      console.error('Chat analytics OpenRouter error:', result.error);
+      return res.status(502).json({ error: 'Error de OpenRouter API', details: result.error });
     }
-    const data = await orRes.json();
-    const reply = data?.choices?.[0]?.message?.content?.trim() || '';
-    if (!reply) return res.status(502).json({ error: 'La IA no devolvió respuesta' });
-    res.json({ reply });
+    res.json({ reply: result.content });
   } catch (e) {
     console.error('Error in /api/chat-analytics:', e);
     res.status(500).json({ error: e.message });
@@ -491,34 +517,12 @@ Genera el informe técnico formal en español enfocado en los ítems seleccionad
       return res.status(500).json({ error: "Falta configurar la variable de entorno OPENROUTER_API_KEY en el servidor." });
     }
 
-    console.log("Calling OpenRouter with model: nvidia/nemotron-3-ultra-550b-a55b:free...");
-    const orRes = await fetch("https://openrouter.ai/api/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        "Authorization": `Bearer ${openRouterKey}`,
-        "Content-Type": "application/json",
-        "HTTP-Referer": "https://appagent.up.railway.app",
-        "X-Title": "AppAgent"
-      },
-      body: JSON.stringify({
-        model: "nvidia/nemotron-3-ultra-550b-a55b:free",
-        messages: [
-          { role: "system", content: systemPrompt },
-          { role: "user", content: userPrompt }
-        ],
-        temperature: 0.3
-      })
-    });
-
-    if (!orRes.ok) {
-      const err = await orRes.text();
-      console.error("OpenRouter API error:", err);
-      return res.status(502).json({ error: "Error de OpenRouter API", details: err });
+    const result = await callOpenRouterWithFallback(openRouterKey, { systemPrompt, userPrompt, temperature: 0.3 });
+    if (!result.ok) {
+      console.error("OpenRouter API error:", result.error);
+      return res.status(502).json({ error: "Error de OpenRouter API", details: result.error });
     }
-
-    const orData = await orRes.json();
-    let contentText = orData?.choices?.[0]?.message?.content?.trim() || '';
-    if (!contentText) return res.status(502).json({ error: "OpenRouter no devolvió contenido", details: JSON.stringify(orData) });
+    let contentText = result.content;
     // Strip markdown code fences
     contentText = contentText.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, '').trim();
 
