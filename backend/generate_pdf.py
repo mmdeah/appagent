@@ -271,7 +271,7 @@ disclaimer = Table([[
         "<b>⚠ Nota importante:</b> lo reportado en este informe corresponde únicamente a lo "
         "observado en el estado visible del vehículo al momento de la revisión. Pueden existir "
         "desgastes, fallas o daños ocultos no detectables sin desarme completo, que se "
-        "identificarán solo al momento de intervenir el vehículo.",
+        "identificarán solo al momento de intervenir el vehículo o posterior.",
         s("Normal", fontName="Helvetica", fontSize=8.5, textColor=colors.HexColor("#475569"),
           leading=13, alignment=TA_JUSTIFY))
 ]], colWidths=[doc.width])

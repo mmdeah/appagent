@@ -152,7 +152,7 @@ export default function OrderDetailsModal({ order, onClose, fleetMode = false, i
 
   const disclaimerHtml = `
     <div class="disclaimer-box">
-      <b>⚠ Nota importante:</b> lo reportado corresponde únicamente a lo observado en el estado visible del vehículo al momento de la revisión. Pueden existir desgastes, fallas o daños ocultos no detectables sin desarme completo, que se identificarán solo al momento de intervenir el vehículo.
+      <b>⚠ Nota importante:</b> lo reportado corresponde únicamente a lo observado en el estado visible del vehículo al momento de la revisión. Pueden existir desgastes, fallas o daños ocultos no detectables sin desarme completo, que se identificarán solo al momento de intervenir el vehículo o posterior.
     </div>
   `;
 
