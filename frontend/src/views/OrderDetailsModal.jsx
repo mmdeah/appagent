@@ -748,7 +748,7 @@ export default function OrderDetailsModal({ order, onClose, fleetMode = false, i
               {/* Form to add new item */}
               {showAddItem && (
                 <div className="hide-on-print" style={{ background: 'rgba(99,102,241,0.06)', border: '1px solid var(--primary)', borderRadius: 12, padding: '1.25rem', marginBottom: '1.25rem' }}>
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem', marginBottom: '0.75rem' }}>
+                  <div className="form-grid-2" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem', marginBottom: '0.75rem' }}>
                     <div>
                       <label style={{ fontSize: '0.78rem', fontWeight: 700, color: 'var(--text-muted)', display: 'block', marginBottom: '0.3rem' }}>CATEGORÍA</label>
                       <select value={newItem.category} onChange={e => setNewItem({ ...newItem, category: e.target.value })}
@@ -1101,7 +1101,7 @@ export default function OrderDetailsModal({ order, onClose, fleetMode = false, i
                     {savingApprovals ? 'Guardando...' : '✓ Guardar aprobaciones'}
                   </button>
                 )}
-                <div style={{ marginLeft: fleetMode ? 0 : 'auto', display: 'flex', gap: '0.5rem' }}>
+                <div style={{ marginLeft: fleetMode ? 0 : 'auto', display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
                   <button onClick={() => printQuote('COTIZACIÓN')} className="btn-secondary"><Printer size={16} /> Cotización PDF</button>
                   <button onClick={() => printQuote('CUENTA DE COBRO')} className="btn-secondary"><Printer size={16} /> Cta. Cobro PDF</button>
                 </div>
