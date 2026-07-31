@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
-import { Search, ChevronLeft, ChevronRight, ArrowRight, Calendar, Gauge, Car, Camera } from 'lucide-react';
+import { Search, ChevronLeft, ChevronRight, ArrowRight, Calendar, Gauge, Car, Camera, ShieldCheck, CheckCircle2, Users } from 'lucide-react';
 import { API_URL, getPicoYPlaca } from '../api';
-import vehiculoImg from '../assets/vehiculo.png';
 
 const fmt = (n) => '$' + (parseFloat(n) || 0).toLocaleString('es-CO', { minimumFractionDigits: 0 });
 
@@ -90,17 +89,15 @@ export default function ClientView() {
     fontFamily: "-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,system-ui,sans-serif", color: '#f4f6fb', WebkitFontSmoothing: 'antialiased',
   };
   const columnStyle = { width: '100%', maxWidth: 480, minHeight: '100vh', display: 'flex', flexDirection: 'column', position: 'relative' };
-  const glowStyle = { position: 'absolute', top: -70, left: '50%', transform: 'translateX(-50%)', width: 340, height: 260, background: 'radial-gradient(circle, rgba(109,112,242,.28), transparent 70%)', filter: 'blur(6px)', pointerEvents: 'none', zIndex: 0 };
 
   // ── Pantalla de búsqueda ──────────────────────────────────────────
   if (screen === 'search') {
     return (
       <div style={wrapperStyle}>
         <div style={columnStyle}>
-          <div style={glowStyle} />
           <div style={{ display: 'flex', flexDirection: 'column', minHeight: '100vh' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '24px 20px 0' }}>
-              <div style={{ width: 46, height: 46, borderRadius: 13, background: 'linear-gradient(135deg,#8386f7,#4b4fd1)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, fontSize: 19, color: '#fff', flexShrink: 0, boxShadow: '0 6px 16px rgba(90,93,235,.35)' }}>
+              <div style={{ width: 44, height: 44, borderRadius: 12, background: '#6d70f2', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, fontSize: 18, color: '#fff', flexShrink: 0 }}>
                 {SHOP.name.charAt(0)}
               </div>
               <div>
@@ -133,8 +130,21 @@ export default function ClientView() {
               {loading && <p style={{ fontSize: 12.5, color: '#6b7488', marginTop: 10 }}>Buscando...</p>}
             </div>
 
-            <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: 140, padding: '10px 24px' }}>
-              <img src={vehiculoImg} alt="Vehículo" style={{ width: '100%', maxWidth: 300, height: 'auto', filter: 'drop-shadow(0 16px 22px rgba(0,0,0,.45))' }} />
+            <div style={{ display: 'flex', alignItems: 'stretch', margin: '32px 22px 0', padding: '22px 2px', borderTop: '1px solid rgba(255,255,255,.08)', borderBottom: '1px solid rgba(255,255,255,.08)' }}>
+              <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center', gap: 9, padding: '0 6px' }}>
+                <ShieldCheck size={20} strokeWidth={1.8} color="#8992a8" />
+                <div style={{ fontSize: 11.5, fontWeight: 700, color: '#dfe2ee', lineHeight: 1.35 }}>Amplia garantía</div>
+              </div>
+              <div style={{ width: 1, background: 'rgba(255,255,255,.08)' }} />
+              <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center', gap: 9, padding: '0 6px' }}>
+                <CheckCircle2 size={20} strokeWidth={1.8} color="#8992a8" />
+                <div style={{ fontSize: 11.5, fontWeight: 700, color: '#dfe2ee', lineHeight: 1.35 }}>Técnicos certificados</div>
+              </div>
+              <div style={{ width: 1, background: 'rgba(255,255,255,.08)' }} />
+              <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center', gap: 9, padding: '0 6px' }}>
+                <Users size={20} strokeWidth={1.8} color="#8992a8" />
+                <div style={{ fontSize: 11.5, fontWeight: 700, color: '#dfe2ee', lineHeight: 1.35 }}>+1.200 vehículos atendidos</div>
+              </div>
             </div>
 
             <Footer />
@@ -150,7 +160,6 @@ export default function ClientView() {
     return (
       <div style={wrapperStyle}>
         <div style={columnStyle}>
-          <div style={glowStyle} />
           <div style={{ display: 'flex', flexDirection: 'column', minHeight: '100vh' }}>
             <BackBar label="Buscar otra placa" onClick={backToSearch} />
 
@@ -159,12 +168,6 @@ export default function ClientView() {
               <h1 style={{ fontSize: 31, fontWeight: 800, letterSpacing: '-.02em', margin: '5px 0 4px' }}>{placa}</h1>
               <div style={{ fontSize: 14, color: '#9aa3b8' }}>
                 {hasResults ? `${orders.length} orden${orders.length !== 1 ? 'es' : ''} encontrada${orders.length !== 1 ? 's' : ''}` : ' '}
-              </div>
-            </div>
-
-            <div style={{ padding: '6px 20px 0' }}>
-              <div style={{ position: 'relative', borderRadius: 20, padding: '10px 10px 2px', background: 'radial-gradient(ellipse at 50% 35%, rgba(124,127,245,.16), transparent 70%), #131a2c', border: '1px solid rgba(255,255,255,.07)', overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: 110 }}>
-                <img src={vehiculoImg} alt="Vehículo" style={{ width: '100%', maxWidth: 220, height: 'auto', filter: 'drop-shadow(0 12px 16px rgba(0,0,0,.4))' }} />
               </div>
             </div>
 
@@ -231,33 +234,29 @@ export default function ClientView() {
   const kmText = order.kilometraje ? `${(parseFloat(order.kilometraje) || 0).toLocaleString('es-CO')} km` : 'N/A';
   const picoPlaca = getPicoYPlaca(order.placa);
   const badItems = report?.items?.filter(it => it.state !== 'Bueno') || [];
+  const orderNo = `ORD-${String(order.id).substring(0, 8).toUpperCase()}`;
 
   return (<>
     <div style={wrapperStyle}>
       <div style={columnStyle}>
-        <div style={glowStyle} />
         <div style={{ display: 'flex', flexDirection: 'column', minHeight: '100vh' }}>
           <BackBar label="Ver todas las órdenes" onClick={backToResults} />
 
           <div style={{ padding: '18px 20px 0' }}>
-            <div style={{ position: 'relative', borderRadius: 22, padding: '16px 12px 6px', background: 'radial-gradient(ellipse at 50% 38%, rgba(124,127,245,.18), transparent 70%), #131a2c', border: '1px solid rgba(255,255,255,.07)', overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: 180 }}>
-              <img src={vehiculoImg} alt="Vehículo" style={{ width: '100%', maxWidth: 380, height: 'auto', filter: 'drop-shadow(0 18px 24px rgba(0,0,0,.45))' }} />
-            </div>
-          </div>
-
-          <div style={{ padding: '14px 20px 0' }}>
-            <div style={{ position: 'relative', overflow: 'hidden', borderRadius: 22, padding: 22, background: 'linear-gradient(135deg,#1c2247 0%,#12172a 65%)', border: '1px solid rgba(255,255,255,.09)' }}>
-              <Car size={130} strokeWidth={1} color="#4b52a8" style={{ position: 'absolute', top: -18, right: -20, opacity: .14, transform: 'rotate(-8deg)' }} />
-              <div style={{ position: 'relative', display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 10 }}>
-                <h1 style={{ fontSize: 28, fontWeight: 800, letterSpacing: '-.02em', margin: 0 }}>{order.placa}</h1>
+            <div style={{ borderRadius: 18, padding: 20, background: '#10141f', border: '1px solid rgba(255,255,255,.08)' }}>
+              <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 10 }}>
+                <div>
+                  <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: '.08em', color: '#6b7488', textTransform: 'uppercase', marginBottom: 5 }}>Orden N.° {orderNo}</div>
+                  <h1 style={{ fontSize: 28, fontWeight: 800, letterSpacing: '-.02em', margin: 0 }}>{order.placa}</h1>
+                  <div style={{ fontSize: 15, color: '#aab1c9', marginTop: 4 }}>{order.marca} {order.modelo} {order.anio}</div>
+                </div>
                 <span style={{ flexShrink: 0, fontSize: 11, fontWeight: 800, letterSpacing: '.04em', textTransform: 'uppercase', padding: '6px 12px', borderRadius: 999, background: st.bg, color: st.fg }}>{st.label}</span>
               </div>
-              <div style={{ position: 'relative', fontSize: 15, color: '#aab1c9', marginTop: 4 }}>{order.marca} {order.modelo} {order.anio}</div>
-              <div style={{ position: 'relative', display: 'flex', gap: 10, marginTop: 16, flexWrap: 'wrap' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'rgba(255,255,255,.06)', borderRadius: 10, padding: '7px 11px', fontSize: 12.5, color: '#c7cbdb' }}>
+              <div style={{ display: 'flex', gap: 10, marginTop: 16, flexWrap: 'wrap' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6, border: '1px solid rgba(255,255,255,.09)', borderRadius: 10, padding: '7px 11px', fontSize: 12.5, color: '#c7cbdb' }}>
                   <Calendar size={14} strokeWidth={2} />{dateShort}
                 </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'rgba(255,255,255,.06)', borderRadius: 10, padding: '7px 11px', fontSize: 12.5, color: '#c7cbdb' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6, border: '1px solid rgba(255,255,255,.09)', borderRadius: 10, padding: '7px 11px', fontSize: 12.5, color: '#c7cbdb' }}>
                   <Gauge size={14} strokeWidth={2} />{kmText}
                 </div>
               </div>
@@ -404,7 +403,11 @@ export default function ClientView() {
                     <span style={{ fontSize: 25, fontWeight: 800, color: '#9a9dfc' }}>{fmt(totals.sub + totals.iva)}</span>
                   </div>
                 </div>
-                <div style={{ fontSize: 11, color: '#5b6478', textAlign: 'center', marginTop: 14 }}>Valores expresados en pesos colombianos (COP)</div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 16, padding: '12px 14px', borderRadius: 12, background: 'rgba(61,220,151,.08)', border: '1px solid rgba(61,220,151,.18)' }}>
+                  <ShieldCheck size={16} strokeWidth={2} color="#6be3ac" style={{ flexShrink: 0 }} />
+                  <span style={{ fontSize: 12.5, color: '#a9ecc9', fontWeight: 600, lineHeight: 1.4 }}>Repuestos y mano de obra con amplia garantía</span>
+                </div>
+                <div style={{ fontSize: 11, color: '#5b6478', textAlign: 'center', marginTop: 12 }}>Valores expresados en pesos colombianos (COP)</div>
               </div>
             </div>
           )}
