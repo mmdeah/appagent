@@ -12,6 +12,8 @@ export default function OrderDetailsModal({ order, onClose, fleetMode = false, i
   const [quoteItems, setQuoteItems] = useState(
     order.quotes?.[0]?.items || [{ descripcion: '', cantidad: 1, precio: 0, aplicaIva: false }]
   );
+  const [quoteId, setQuoteId] = useState(order.quotes?.[0]?.id ?? null);
+  const [savingQuote, setSavingQuote] = useState(false);
   const [statusMsg, setStatusMsg] = useState({ text: '', type: '' });
   const [showConfirm, setShowConfirm] = useState(false);
   const [lightboxSrc, setLightboxSrc] = useState(null);
@@ -28,18 +30,21 @@ export default function OrderDetailsModal({ order, onClose, fleetMode = false, i
   const ITEM_STATES = ['Bueno','Regular','Malo'];
 
   const handleSaveApprovals = async () => {
-    const quote = order.quotes?.[0];
-    if (!quote) return;
+    if (!quoteId) return;
     setSavingApprovals(true);
     try {
-      await fetch(`${API_URL}/quotes/${quote.id}`, {
+      const res = await fetch(`${API_URL}/quotes/${quoteId}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ items: quoteItems }),
       });
+      if (!res.ok) throw new Error('El servidor rechazó el guardado');
       showStatus('Aprobaciones guardadas');
       onUpdate && onUpdate();
-    } catch (e) { console.error(e); }
+    } catch (e) {
+      console.error(e);
+      showStatus('Error al guardar las aprobaciones. Intenta de nuevo.', 'error');
+    }
     finally { setSavingApprovals(false); }
   };
 
@@ -401,61 +406,89 @@ export default function OrderDetailsModal({ order, onClose, fleetMode = false, i
     showStatus('Precios del reporte actualizados');
   };
 
-  const saveQuote = async () => {
-    const payload = { orderId: order.id, items: quoteItems, fecha: new Date().toISOString() };
-    if (order.quotes?.length > 0) {
-      await fetch(`${API_URL}/quotes/${order.quotes[0].id}`, {
+  // Guarda o crea la cotización, devolviendo el id real de la fila usada.
+  // Nunca vuelve a crear una fila nueva una vez que ya se creó una en esta sesión
+  // (eso era el bug: cada "Guardar Borrador" posterior hacía POST otra vez en vez
+  // de PUT, dejando la edición más reciente huérfana en una cotización que nadie
+  // volvía a leer).
+  const persistQuote = async (extra = {}) => {
+    const payload = { orderId: order.id, items: quoteItems, fecha: new Date().toISOString(), ...extra };
+    let res;
+    if (quoteId) {
+      res = await fetch(`${API_URL}/quotes/${quoteId}`, {
         method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload)
       });
     } else {
-      await fetch(`${API_URL}/quotes`, {
+      res = await fetch(`${API_URL}/quotes`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload)
       });
     }
-    showStatus('Cotización guardada exitosamente');
+    if (!res.ok) throw new Error('El servidor rechazó el guardado de la cotización');
+    const saved = await res.json();
+    if (!quoteId && saved?.id) setQuoteId(saved.id);
+    return saved;
+  };
+
+  const saveQuote = async () => {
+    setSavingQuote(true);
+    try {
+      await persistQuote();
+      showStatus('Cotización guardada exitosamente');
+      onUpdate && onUpdate();
+    } catch (e) {
+      console.error(e);
+      showStatus('Error al guardar el borrador. Verifica tu conexión e intenta de nuevo.', 'error');
+      throw e;
+    } finally {
+      setSavingQuote(false);
+    }
   };
 
   const authorizeQuote = async () => {
-    const payload = { 
-      orderId: order.id, 
-      items: quoteItems, 
-      fecha: new Date().toISOString(),
-      autorizada: true 
-    };
-    
-    if (order.quotes?.length > 0) {
-      await fetch(`${API_URL}/quotes/${order.quotes[0].id}`, {
-        method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload)
+    setSavingQuote(true);
+    try {
+      await persistQuote({ autorizada: true });
+
+      const res = await fetch(`${API_URL}/orders/${order.id}`, {
+        method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ estado: 'Proceso' })
       });
-    } else {
-      await fetch(`${API_URL}/quotes`, {
-        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload)
-      });
+      if (!res.ok) throw new Error('El servidor rechazó la actualización de la orden');
+
+      onUpdate && onUpdate();
+      showStatus('¡Cotización Autorizada! El técnico ya tiene el ticket.', 'success');
+      setTimeout(() => onClose(), 1500);
+    } catch (e) {
+      console.error(e);
+      showStatus('Error al autorizar la cotización. Intenta de nuevo.', 'error');
+    } finally {
+      setSavingQuote(false);
     }
-
-    await fetch(`${API_URL}/orders/${order.id}`, {
-      method: 'PATCH', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ estado: 'Proceso' })
-    });
-
-    showStatus('¡Cotización Autorizada! El técnico ya tiene el ticket.', 'success');
-    setTimeout(() => onClose(), 1500);
   };
 
   const doDeliver = async () => {
-    // Primero guardamos la cotización para asegurar que las estadísticas se actualicen
-    await saveQuote();
-    
-    await fetch(`${API_URL}/orders/${order.id}`, {
-      method: 'PATCH', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ 
-        estado: 'Entregado', 
-        fechaEntrega: new Date().toISOString(), 
-        metodoPago,
-        notasEntrega 
-      })
-    });
-    onClose();
+    try {
+      // Primero guardamos la cotización para asegurar que las estadísticas se actualicen
+      await persistQuote();
+
+      const res = await fetch(`${API_URL}/orders/${order.id}`, {
+        method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          estado: 'Entregado',
+          fechaEntrega: new Date().toISOString(),
+          metodoPago,
+          notasEntrega
+        })
+      });
+      if (!res.ok) throw new Error('El servidor rechazó la entrega');
+
+      onUpdate && onUpdate();
+      onClose();
+    } catch (e) {
+      console.error(e);
+      setShowConfirm(false);
+      showStatus('Error al entregar el vehículo. Intenta de nuevo.', 'error');
+    }
   };
 
   const transferToQuote = () => {
@@ -1092,9 +1125,9 @@ export default function OrderDetailsModal({ order, onClose, fleetMode = false, i
               </div>}
 
               <div className="hide-on-print" style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap', alignItems: 'center' }}>
-                {!fleetMode && <button onClick={saveQuote} className="btn-secondary">Guardar Borrador</button>}
-                {!fleetMode && <button onClick={authorizeQuote} className="btn-primary" style={{ background: 'var(--success)', borderColor: 'var(--success)' }}>
-                  <CheckCircle size={16} /> Autorizar y Empezar Trabajo
+                {!fleetMode && <button onClick={saveQuote} disabled={savingQuote} className="btn-secondary">{savingQuote ? 'Guardando...' : 'Guardar Borrador'}</button>}
+                {!fleetMode && <button onClick={authorizeQuote} disabled={savingQuote} className="btn-primary" style={{ background: 'var(--success)', borderColor: 'var(--success)' }}>
+                  <CheckCircle size={16} /> {savingQuote ? 'Guardando...' : 'Autorizar y Empezar Trabajo'}
                 </button>}
                 {fleetMode && (
                   <button onClick={handleSaveApprovals} disabled={savingApprovals} className="btn-primary">
