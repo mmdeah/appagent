@@ -13,6 +13,8 @@ const fmtCompact = (n) => {
   if (Math.abs(v) >= 1e3) return `${Math.round(v / 1e3)}K`;
   return String(v);
 };
+// Muestra "1.234.567" mientras se escribe; el valor guardado en el estado sigue siendo solo dígitos.
+const fmtMiles = (digitsOnly) => digitsOnly ? parseInt(digitsOnly, 10).toLocaleString('es-CO') : '';
 
 const COLUMNS = ['Recepción', 'Proceso', 'Calidad', 'Ingresos Rápidos'];
 const PAYMENT_METHODS = ['Efectivo', 'Nequi', 'Bancolombia', 'Banco de Bogota', 'Tarjeta'];
@@ -564,19 +566,29 @@ export default function AdminView() {
   return (
     <div style={{ minHeight: '100vh', background: 'var(--bg)' }}>
       <style>{`
-        .gasto-form-grid {
-          display: grid;
-          grid-template-columns: 150px 1fr 120px 170px auto;
-          gap: 0.75rem;
-          align-items: end;
+        .gasto-label {
+          display: block; font-size: 0.95rem; font-weight: 700; color: var(--text);
+          margin-bottom: 0.4rem;
         }
-        .gasto-form-grid .gasto-submit-btn { width: auto; }
-        @media (max-width: 768px) {
-          .gasto-form-grid {
-            grid-template-columns: 1fr 1fr;
-          }
-          .gasto-form-grid .gasto-concepto { grid-column: 1 / -1; }
-          .gasto-form-grid .gasto-submit-btn { grid-column: 1 / -1; width: 100%; justify-content: center; }
+        .gasto-main-row {
+          display: grid;
+          grid-template-columns: 1fr 220px;
+          gap: 1rem;
+          margin-bottom: 1.25rem;
+        }
+        .gasto-meta-row {
+          display: grid;
+          grid-template-columns: repeat(3, 1fr);
+          gap: 1rem;
+          margin-bottom: 1.5rem;
+        }
+        .gasto-submit-btn-v2 {
+          width: 100%; justify-content: center; height: 54px;
+          font-size: 1.05rem; gap: 0.5rem;
+        }
+        @media (max-width: 640px) {
+          .gasto-main-row { grid-template-columns: 1fr; margin-bottom: 1rem; }
+          .gasto-meta-row { grid-template-columns: 1fr; gap: 0.85rem; margin-bottom: 1.25rem; }
         }
         .gasto-ai-btn { display: flex; align-items: center; gap: 0.4rem; }
         @media (max-width: 480px) {
@@ -1419,42 +1431,59 @@ ${PAYMENT_METHODS.map(m => `<tr><td>${m}</td><td style="text-align:right;font-we
 
                   {/* ── ROW 1: Quick entry + AI scan ─────────────────── */}
                   <div className="card" style={{ padding: '1.5rem' }}>
-                    <div className="gasto-header-row" style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'1.25rem', gap:'0.75rem' }}>
-                      <h2 style={{ fontSize: '1rem', fontWeight: 700, margin: 0 }}>Registro Rápido de Gasto</h2>
+                    <div className="gasto-header-row" style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'1.5rem', gap:'0.75rem' }}>
+                      <div style={{ display:'flex', alignItems:'center', gap:'0.65rem' }}>
+                        <div style={{ width:38, height:38, borderRadius:10, background:'rgba(99,102,241,0.12)', color:'var(--primary)', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>
+                          <Receipt size={19} />
+                        </div>
+                        <h2 style={{ fontSize: '1.15rem', fontWeight: 800, margin: 0 }}>Registrar un Gasto</h2>
+                      </div>
                       <input type="file" accept="image/*" ref={expenseImageInputRef} style={{ display:'none' }} onChange={e => { analyzeExpenseImage(e.target.files[0]); e.target.value=''; }} />
                       <button type="button" className="gasto-ai-btn" onClick={() => expenseImageInputRef.current?.click()} disabled={analyzingExpense}
-                        style={{ padding:'0.45rem 1rem', background: analyzingExpense ? 'var(--bg)' : 'rgba(99,102,241,0.1)', color:'var(--primary)', border:'1.5px dashed var(--primary)', borderRadius:'var(--radius-sm)', cursor: analyzingExpense ? 'not-allowed' : 'pointer', fontWeight:700, fontSize:'0.83rem', opacity: analyzingExpense ? 0.7 : 1, whiteSpace:'nowrap' }}>
-                        <Sparkles size={14} />{analyzingExpense ? 'Analizando...' : 'Escanear con IA'}
+                        style={{ padding:'0.55rem 1.1rem', background: analyzingExpense ? 'var(--bg)' : 'rgba(99,102,241,0.1)', color:'var(--primary)', border:'1.5px dashed var(--primary)', borderRadius:'var(--radius-sm)', cursor: analyzingExpense ? 'not-allowed' : 'pointer', fontWeight:700, fontSize:'0.88rem', opacity: analyzingExpense ? 0.7 : 1, whiteSpace:'nowrap' }}>
+                        <Sparkles size={15} />{analyzingExpense ? 'Analizando...' : 'Tomar Foto del Recibo'}
                       </button>
                     </div>
                     <form onSubmit={handleExpenseSubmit}>
-                      <div className="gasto-form-grid">
+                      <div className="gasto-main-row">
+                        <div className="gasto-concepto-field">
+                          <label className="gasto-label">¿Qué compraste?</label>
+                          <input type="text" required placeholder="Ej. Aceite de motor, repuestos..." value={expenseForm.concepto} onChange={e => setExpenseForm({...expenseForm, concepto: e.target.value})} style={{ width:'100%', fontSize:'1.05rem' }} />
+                        </div>
+                        <div className="gasto-monto-field">
+                          <label className="gasto-label">¿Cuánto costó?</label>
+                          <div style={{ position:'relative' }}>
+                            <span style={{ position:'absolute', left:'1rem', top:'50%', transform:'translateY(-50%)', fontSize:'1.3rem', fontWeight:800, color:'var(--success)', pointerEvents:'none' }}>$</span>
+                            <input type="text" inputMode="numeric" required placeholder="0" className="price-input"
+                              value={fmtMiles(expenseForm.monto)}
+                              onChange={e => setExpenseForm({ ...expenseForm, monto: e.target.value.replace(/\D/g, '') })}
+                              style={{ width:'100%', paddingLeft:'2.15rem', fontSize:'1.3rem', fontWeight:800 }} />
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="gasto-meta-row">
                         <div>
-                          <label style={{ display:'block', fontSize:'0.78rem', fontWeight:600, color:'var(--text-muted)', marginBottom:'0.3rem' }}>Fecha</label>
+                          <label className="gasto-label">Fecha</label>
                           <input type="date" required value={expenseForm.fecha} onChange={e => setExpenseForm({...expenseForm, fecha: e.target.value})} style={{ width:'100%' }} />
                         </div>
-                        <div className="gasto-concepto">
-                          <label style={{ display:'block', fontSize:'0.78rem', fontWeight:600, color:'var(--text-muted)', marginBottom:'0.3rem' }}>Concepto</label>
-                          <input type="text" required placeholder="Ej. Compra de repuestos..." value={expenseForm.concepto} onChange={e => setExpenseForm({...expenseForm, concepto: e.target.value})} style={{ width:'100%' }} />
-                        </div>
                         <div>
-                          <label style={{ display:'block', fontSize:'0.78rem', fontWeight:600, color:'var(--text-muted)', marginBottom:'0.3rem' }}>Monto ($)</label>
-                          <input type="number" required placeholder="0" inputMode="numeric" value={expenseForm.monto} onChange={e => setExpenseForm({...expenseForm, monto: e.target.value})} style={{ width:'100%' }} />
-                        </div>
-                        <div>
-                          <label style={{ display:'block', fontSize:'0.78rem', fontWeight:600, color:'var(--text-muted)', marginBottom:'0.3rem' }}>Categoría</label>
+                          <label className="gasto-label">Categoría</label>
                           <select value={expenseForm.categoria} onChange={e => setExpenseForm({...expenseForm, categoria: e.target.value})} style={{ width:'100%' }}>
                             {EXPENSE_CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
                           </select>
                         </div>
                         <div>
-                          <label style={{ display:'block', fontSize:'0.78rem', fontWeight:600, color:'var(--text-muted)', marginBottom:'0.3rem' }}>Método de Pago</label>
+                          <label className="gasto-label">Método de Pago</label>
                           <select value={expenseForm.metodoPago} onChange={e => setExpenseForm({...expenseForm, metodoPago: e.target.value})} style={{ width:'100%' }}>
                             {PAYMENT_METHODS.map(m => <option key={m} value={m}>{m}</option>)}
                           </select>
                         </div>
-                        <button type="submit" className="btn-primary gasto-submit-btn" style={{ height:38, padding:'0 1.25rem', whiteSpace:'nowrap' }}>+ Guardar</button>
                       </div>
+
+                      <button type="submit" className="btn-primary gasto-submit-btn-v2">
+                        <PlusCircle size={20} /> Guardar Gasto
+                      </button>
                     </form>
                   </div>
 
