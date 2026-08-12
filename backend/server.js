@@ -86,7 +86,7 @@ if (dataDir !== __dirname && !fs.existsSync(dbFile)) {
 // (Migrations and structure fixes were removed on purpose to protect the data.)
 try {
   const dbData = JSON.parse(fs.readFileSync(dbFile, 'utf8'));
-  const requiredKeys = ['orders', 'quotes', 'reports', 'expenses', 'archived_orders', 'ai_reports', 'todos', 'ald_billings', 'cn_billings', 'fleet_users'];
+  const requiredKeys = ['orders', 'quotes', 'reports', 'expenses', 'archived_orders', 'ai_reports', 'todos', 'ald_billings', 'cn_billings', 'la_ascension_billings', 'fleet_users'];
   const missing = requiredKeys.filter(k => !dbData[k]);
   if (missing.length > 0) console.warn(`WARNING: db.json is missing collections: ${missing.join(', ')} (not modified)`);
   console.log(`DB loaded: ${(dbData.orders || []).length} orders, ${(dbData.expenses || []).length} expenses.`);
@@ -338,6 +338,28 @@ server.post('/api/restore-backup', (req, res) => {
     if (router.db && typeof router.db.setState === 'function') { router.db.setState(data); }
     res.json({ message: `Base de datos restaurada desde ${filename}`, orders: (data.orders || []).length, expenses: (data.expenses || []).length });
   } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// Manual, explicit-only provisioning: add a brand-new EMPTY collection key if
+// (and only if) it doesn't already exist. Never touches or modifies any existing
+// key/data. This never runs automatically — it must be POSTed to on purpose,
+// same pattern as /api/migrate-ai-reports below. Needed because json-server's
+// REST routes for a resource only exist if the key was present in db.json when
+// the router was created at boot.
+server.post('/api/ensure-collection', (req, res) => {
+  try {
+    const { name } = req.body || {};
+    if (!name || !/^[a-z_]+$/.test(name)) return res.status(400).json({ error: 'Nombre de colección inválido' });
+    const dbData = JSON.parse(fs.readFileSync(dbFile, 'utf8'));
+    if (dbData[name] !== undefined) {
+      return res.json({ message: `La colección "${name}" ya existía. No se modificó nada.`, created: false });
+    }
+    dbData[name] = [];
+    fs.writeFileSync(dbFile, JSON.stringify(dbData, null, 2));
+    res.json({ message: `Colección "${name}" creada vacía. El servidor necesita reiniciarse para exponer sus rutas REST.`, created: true });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
 });
 
 // One-time cleanup: move AI reports (no items field) from reports → ai_reports

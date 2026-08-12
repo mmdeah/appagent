@@ -43,7 +43,7 @@ export default function BillingCycleTab({
   orders, clientFilter, billings, collection,
   onRefreshBillings, onRefreshOrders,
   title, emptyMsg, onOrderClick,
-  noCutDate = false
+  noCutDate = false, paymentDays = 30
 }) {
   const [localSelected, setLocalSelected] = useState({});
   const [movingOrder, setMovingOrder]     = useState(null);
@@ -159,7 +159,7 @@ export default function BillingCycleTab({
   // Billing actions
   const markFacturada = async (cycleId, year, month, billing) => {
     const fechaEnvio = new Date().toISOString();
-    const venc = new Date(); venc.setDate(venc.getDate() + 30);
+    const venc = new Date(); venc.setDate(venc.getDate() + paymentDays);
     const fechaVencimiento = venc.toISOString();
     if (billing) {
       await fetch(`${API_URL}/${collection}/${cycleId}`, {
@@ -258,7 +258,7 @@ export default function BillingCycleTab({
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
         <div>
           <h2 style={{ fontSize: '1.4rem', fontWeight: 800, margin: 0 }}>{title}</h2>
-          <p style={{ color: 'var(--text-muted)', margin: '0.2rem 0 0' }}>{noCutDate ? 'Sin fecha de corte fija · pago a 30 días desde emisión de factura' : 'Corte el día 20 de cada mes · pago a 30 días desde el corte'}</p>
+          <p style={{ color: 'var(--text-muted)', margin: '0.2rem 0 0' }}>{noCutDate ? `Sin fecha de corte fija · pago a ${paymentDays} días desde emisión de factura` : `Corte el día 20 de cada mes · pago a ${paymentDays} días desde el corte`}</p>
         </div>
         <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
           {[

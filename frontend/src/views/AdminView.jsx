@@ -58,6 +58,7 @@ export default function AdminView() {
   const [historialHasta, setHistorialHasta] = useState('');
   const [aldBillings, setAldBillings] = useState([]);
   const [cnBillings, setCnBillings] = useState([]);
+  const [laAscensionBillings, setLaAscensionBillings] = useState([]);
   const [analyzingExpense, setAnalyzingExpense] = useState(false);
   const expenseImageInputRef = React.useRef(null);
   const [fleetUsers, setFleetUsers] = useState([]);
@@ -81,6 +82,7 @@ export default function AdminView() {
   const MESES = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
   const IS_FLOTA = (cliente) => /(ald|ayvens)/i.test(cliente || '');
   const IS_CN = (cliente) => /consult.?networks/i.test(cliente || '');
+  const IS_LA_ASCENSION = (cliente) => /la\s*ascensi[oó]n/i.test(cliente || '');
 
   const fetchAldBillings = () => {
     fetch(`${API_URL}/ald_billings`)
@@ -89,6 +91,10 @@ export default function AdminView() {
   const fetchCnBillings = () => {
     fetch(`${API_URL}/cn_billings`)
       .then(r => r.json()).then(data => setCnBillings(Array.isArray(data) ? data : [])).catch(() => {});
+  };
+  const fetchLaAscensionBillings = () => {
+    fetch(`${API_URL}/la_ascension_billings`)
+      .then(r => r.json()).then(data => setLaAscensionBillings(Array.isArray(data) ? data : [])).catch(() => {});
   };
 
   const [statsPeriod, setStatsPeriod] = useState('mes');
@@ -331,7 +337,7 @@ export default function AdminView() {
     }
   };
 
-  useEffect(() => { fetchOrders(); fetchExpenses(); fetchTodos(); fetchConfig(); fetchAldBillings(); fetchCnBillings(); fetchFleetUsers(); }, []);
+  useEffect(() => { fetchOrders(); fetchExpenses(); fetchTodos(); fetchConfig(); fetchAldBillings(); fetchCnBillings(); fetchLaAscensionBillings(); fetchFleetUsers(); }, []);
   useEffect(() => {
     const handler = (e) => { if (navRef.current && !navRef.current.contains(e.target)) setOpenMenu(null); };
     document.addEventListener('mousedown', handler);
@@ -734,6 +740,7 @@ export default function AdminView() {
                     { id: 'Gastos',           icon: <Receipt size={14} />,    label: 'Gastos' },
                     { id: 'ALD',              icon: <CreditCard size={14} />, label: 'ALD / Ayvens' },
                     { id: 'ConsultNetworks',  icon: <CreditCard size={14} />, label: 'Consult Networks' },
+                    { id: 'LaAscension',      icon: <CreditCard size={14} />, label: 'La Ascensión' },
                     { id: 'AsistenteIA',      icon: <Sparkles size={14} />,   label: 'Asistente IA' },
                   ]
                 },
@@ -1088,20 +1095,42 @@ export default function AdminView() {
               </div>
             )}
 
-            {(activeTab === 'ALD' || activeTab === 'ConsultNetworks') && (
-              <BillingCycleTab
-                orders={orders}
-                clientFilter={activeTab === 'ALD' ? IS_FLOTA : IS_CN}
-                billings={activeTab === 'ALD' ? aldBillings : cnBillings}
-                collection={activeTab === 'ALD' ? 'ald_billings' : 'cn_billings'}
-                onRefreshBillings={activeTab === 'ALD' ? fetchAldBillings : fetchCnBillings}
-                onRefreshOrders={fetchOrders}
-                title={activeTab === 'ALD' ? 'Flotas (ALD / Ayvens)' : 'Consult Networks'}
-                emptyMsg={activeTab === 'ALD' ? 'No hay vehículos de flota entregados aún.' : 'No hay vehículos de Consult Networks entregados aún.'}
-                noCutDate={activeTab === 'ConsultNetworks'}
-                onOrderClick={setSelectedOrder}
-              />
-            )}
+            {(() => {
+              const BILLING_TABS = {
+                ALD: {
+                  clientFilter: IS_FLOTA, billings: aldBillings, collection: 'ald_billings',
+                  onRefreshBillings: fetchAldBillings, title: 'Flotas (ALD / Ayvens)',
+                  emptyMsg: 'No hay vehículos de flota entregados aún.', noCutDate: false, paymentDays: 30,
+                },
+                ConsultNetworks: {
+                  clientFilter: IS_CN, billings: cnBillings, collection: 'cn_billings',
+                  onRefreshBillings: fetchCnBillings, title: 'Consult Networks',
+                  emptyMsg: 'No hay vehículos de Consult Networks entregados aún.', noCutDate: true, paymentDays: 30,
+                },
+                LaAscension: {
+                  clientFilter: IS_LA_ASCENSION, billings: laAscensionBillings, collection: 'la_ascension_billings',
+                  onRefreshBillings: fetchLaAscensionBillings, title: 'La Ascensión',
+                  emptyMsg: 'No hay vehículos de La Ascensión entregados aún.', noCutDate: true, paymentDays: 15,
+                },
+              };
+              const cfg = BILLING_TABS[activeTab];
+              if (!cfg) return null;
+              return (
+                <BillingCycleTab
+                  orders={orders}
+                  clientFilter={cfg.clientFilter}
+                  billings={cfg.billings}
+                  collection={cfg.collection}
+                  onRefreshBillings={cfg.onRefreshBillings}
+                  onRefreshOrders={fetchOrders}
+                  title={cfg.title}
+                  emptyMsg={cfg.emptyMsg}
+                  noCutDate={cfg.noCutDate}
+                  paymentDays={cfg.paymentDays}
+                  onOrderClick={setSelectedOrder}
+                />
+              );
+            })()}
 
             {activeTab === 'UsuariosFlota' && (
               <div style={{ maxWidth: 860, display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
