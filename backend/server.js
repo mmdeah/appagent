@@ -5,9 +5,16 @@ const path = require('path');
 const cors = require('cors');
 const { spawn } = require('child_process');
 const multer = require('multer');
+const Anthropic = require('@anthropic-ai/sdk');
 
 const server = jsonServer.create();
 const middlewares = jsonServer.defaults();
+
+// Claude API client for the AI technical report. Built lazily/guarded so a
+// missing ANTHROPIC_API_KEY never crashes server startup (the SDK constructor
+// throws synchronously if no key/auth is found) — same "never take the whole
+// app down for one missing feature key" pattern as OPENROUTER_API_KEY below.
+const anthropic = process.env.ANTHROPIC_API_KEY ? new Anthropic() : null;
 
 // Free OpenRouter models are unreliable (rate limits, upstream overload, models
 // going paid). Try each in order and fall back to the next on a recoverable error.
@@ -550,18 +557,38 @@ ${notes || 'Ninguna observación especial.'}
 
 Genera el informe técnico formal en español enfocado en los ítems seleccionados y en los datos del vehículo, siguiendo el esquema JSON proporcionado de manera estricta.`;
 
-    const openRouterKey = process.env.OPENROUTER_API_KEY;
-    if (!openRouterKey) {
-      console.error("Missing OPENROUTER_API_KEY environmental variable.");
-      return res.status(500).json({ error: "Falta configurar la variable de entorno OPENROUTER_API_KEY en el servidor." });
+    if (!anthropic) {
+      console.error("Missing ANTHROPIC_API_KEY environmental variable.");
+      return res.status(500).json({ error: "Falta configurar la variable de entorno ANTHROPIC_API_KEY en el servidor." });
     }
 
-    const result = await callOpenRouterWithFallback(openRouterKey, { systemPrompt, userPrompt, temperature: 0.3 });
-    if (!result.ok) {
-      console.error("OpenRouter API error:", result.error);
-      return res.status(502).json({ error: "Error de OpenRouter API", details: result.error });
+    let contentText;
+    try {
+      const claudeResponse = await anthropic.messages.create({
+        model: "claude-haiku-4-5",
+        max_tokens: 16000,
+        system: systemPrompt,
+        messages: [{ role: "user", content: userPrompt }],
+      });
+      const textBlock = claudeResponse.content.find(b => b.type === 'text');
+      contentText = textBlock ? textBlock.text : '';
+    } catch (claudeError) {
+      console.error("Claude API error:", claudeError);
+      if (claudeError instanceof Anthropic.AuthenticationError) {
+        return res.status(500).json({ error: "La clave de Claude (ANTHROPIC_API_KEY) es inválida.", details: claudeError.message });
+      }
+      if (claudeError instanceof Anthropic.RateLimitError) {
+        return res.status(502).json({ error: "Límite de uso de Claude alcanzado. Intenta de nuevo en unos minutos.", details: claudeError.message });
+      }
+      if (claudeError instanceof Anthropic.APIError) {
+        return res.status(502).json({ error: "Error de la API de Claude", details: claudeError.message });
+      }
+      return res.status(502).json({ error: "Error al conectar con Claude", details: claudeError.message });
     }
-    let contentText = result.content;
+
+    if (!contentText) {
+      return res.status(502).json({ error: "Claude no devolvió contenido" });
+    }
     // Strip markdown code fences
     contentText = contentText.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, '').trim();
 
