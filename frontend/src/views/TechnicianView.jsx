@@ -2,19 +2,16 @@ import React, { useState, useEffect, useContext } from 'react';
 import { API_URL, getPicoYPlaca } from '../api';
 import { ThemeContext } from '../App';
 import PhotoUploadModal from './PhotoUploadModal';
-import { 
-  Wrench, 
-  Car, 
-  ChevronRight, 
-  ClipboardList, 
-  ArrowLeft, 
-  PlusCircle, 
-  SendHorizonal, 
+import {
+  Wrench,
+  Car,
+  ClipboardList,
+  ArrowLeft,
+  PlusCircle,
+  SendHorizonal,
   Camera,
   AlertTriangle,
   Info,
-  Search,
-  History,
   CheckCircle
 } from 'lucide-react';
 
@@ -53,10 +50,6 @@ export default function TechnicianView() {
   const [showChecklist, setShowChecklist] = useState(null);
   const [checklist, setChecklist] = useState({ pruebaRuta: false, limpio: false, herramientas: false });
   
-  const [activeTab, setActiveTab] = useState('Pendientes');
-  const [pastReports, setPastReports] = useState([]);
-  const [searchQuery, setSearchQuery] = useState('');
-  const [viewingPastReport, setViewingPastReport] = useState(null);
   const [revisionCategories, setRevisionCategories] = useState(REVISION_CATEGORIES_DEFAULT);
   const [pendingPriority, setPendingPriority] = useState(null); // { category, item }
 
@@ -83,16 +76,8 @@ export default function TechnicianView() {
       .catch(() => setLoading(false));
   };
 
-  const fetchPastReports = () => {
-    fetch(`${API_URL}/reports?_expand=order&_sort=fecha&_order=desc`)
-      .then(res => res.json())
-      .then(data => setPastReports(data))
-      .catch(err => console.error(err));
-  };
-
   useEffect(() => {
     fetchOrders();
-    fetchPastReports();
     fetchConfig();
   }, []);
 
@@ -105,7 +90,8 @@ export default function TechnicianView() {
     setReportData(prev => {
       const key = `${category}-${item}`;
       const current = prev[key] || {};
-      if (current.state === state && !prioridad) {
+      // Sin estado (checkbox desmarcado) o repetir el mismo estado ya activo = quitar el ítem del reporte
+      if (!state || (current.state === state && !prioridad)) {
         const next = { ...prev };
         delete next[key];
         return next;
@@ -256,7 +242,6 @@ export default function TechnicianView() {
         setPrecioDiagnostico('');
         setStatusMsg({ text: '', type: '' });
         fetchOrders();
-        fetchPastReports();
       }, 2000);
     } catch (e) { setStatusMsg({ text: '✗ Error al subir el reporte', type: 'error' }); }
   };
@@ -448,54 +433,6 @@ export default function TechnicianView() {
             <button className="btn-success" style={{ width: '100%', padding: '1rem', fontSize: '1.1rem', fontWeight: 900, marginTop: '1.5rem', borderRadius: 12, display: 'block' }} onClick={submitReport}>SUBIR REVISIÓN</button>
           </div>
         </div>
-      ) : viewingPastReport ? (
-        <div style={{ padding: '1.5rem', maxWidth: 800, margin: '0 auto' }}>
-          <button className="btn-secondary" style={{ marginBottom: '1.5rem' }} onClick={() => setViewingPastReport(null)}>
-            <ArrowLeft size={16} /> Volver al Historial
-          </button>
-          <div className="card" style={{ padding: '1.5rem', marginBottom: '1.5rem' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
-              <h2 style={{ fontSize: '1.25rem', fontWeight: 800 }}>Reporte Técnico</h2>
-              <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>{new Date(viewingPastReport.fecha).toLocaleString('es-CO')}</span>
-            </div>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem' }}>
-              <div>
-                <span style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase' }}>Vehículo</span>
-                <div style={{ fontWeight: 800, fontSize: '1.1rem' }}>{viewingPastReport.order?.placa}</div>
-                <div style={{ fontSize: '0.9rem' }}>{viewingPastReport.order?.marca} {viewingPastReport.order?.modelo}</div>
-              </div>
-              <div>
-                <span style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase' }}>Cliente</span>
-                <div style={{ fontWeight: 600 }}>{viewingPastReport.order?.cliente}</div>
-              </div>
-            </div>
-          </div>
-          <div style={{ display: 'grid', gap: '1rem' }}>
-            {Object.entries(viewingPastReport.items.reduce((acc, it) => { if (!acc[it.category]) acc[it.category] = []; acc[it.category].push(it); return acc; }, {})).map(([cat, items]) => (
-              <div key={cat} className="card" style={{ padding: '1.25rem' }}>
-                <h3 style={{ fontSize: '0.9rem', fontWeight: 800, textTransform: 'uppercase', color: 'var(--primary)', marginBottom: '1rem', borderBottom: '1px solid var(--border)', paddingBottom: '0.5rem' }}>{cat}</h3>
-                <div style={{ display: 'grid', gap: '0.75rem' }}>
-                  {items.map((it, idx) => (
-                    <div key={idx} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingBottom: '0.5rem', borderBottom: '1px solid rgba(255,255,255,0.02)' }}>
-                      <div><div style={{ fontWeight: 600 }}>{it.item} {it.area && <span style={{ color: 'var(--primary)' }}>({it.area})</span>}</div>{it.cantidad && <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Cantidad: {it.cantidad}</div>}</div>
-                      <div style={{ fontWeight: 800, fontSize: '0.85rem', color: it.state === 'Bueno' ? 'var(--success)' : it.state === 'Malo' ? 'var(--error)' : 'var(--warning)' }}>{it.state?.toUpperCase()}</div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            ))}
-            {viewingPastReport.scannerCodes?.length > 0 && (
-              <div className="card" style={{ padding: '1.25rem' }}>
-                <h3 style={{ fontSize: '0.9rem', fontWeight: 800, textTransform: 'uppercase', color: 'var(--primary)', marginBottom: '1rem' }}>Códigos de Escáner</h3>
-                {viewingPastReport.scannerCodes.map((c, i) => (
-                  <div key={i} style={{ marginBottom: '0.5rem', padding: '0.5rem', background: 'rgba(255,255,255,0.02)', borderRadius: 6 }}>
-                    <strong>{c.prefix}{c.code}:</strong> {c.description}
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        </div>
       ) : (
         <>
           <div className="tech-header">
@@ -517,77 +454,52 @@ export default function TechnicianView() {
           </div>
 
           <div style={{ padding: '1rem', maxWidth: 1600, margin: '0 auto' }}>
-            <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1.5rem', background: 'var(--card-bg)', padding: '0.3rem', borderRadius: 10, border: '1px solid var(--border)', maxWidth: 400 }}>
-              <button onClick={() => setActiveTab('Pendientes')} style={{ flex: 1, padding: '0.6rem', borderRadius: 8, border: 'none', cursor: 'pointer', fontWeight: 800, fontSize: '0.9rem', background: activeTab === 'Pendientes' ? 'var(--primary)' : 'transparent', color: activeTab === 'Pendientes' ? 'white' : 'var(--text-muted)', transition: '0.2s' }}>Pendientes</button>
-              <button onClick={() => setActiveTab('Historial')} style={{ flex: 1, padding: '0.6rem', borderRadius: 8, border: 'none', cursor: 'pointer', fontWeight: 800, fontSize: '0.9rem', background: activeTab === 'Historial' ? 'var(--primary)' : 'transparent', color: activeTab === 'Historial' ? 'white' : 'var(--text-muted)', transition: '0.2s' }}>Historial</button>
-            </div>
-
             {statusMsg.text && <div className={`toast toast-${statusMsg.type}`} style={{ marginBottom: '1.5rem' }}>{statusMsg.text}</div>}
 
-            {activeTab === 'Pendientes' ? (
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 350px), 1fr))', gap: '1.5rem' }}>
-                <div>
-                  <h2 style={{ fontSize: '0.9rem', fontWeight: 800, textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}><AlertTriangle size={14} color="var(--warning)" /> Revision Pendiente ({pendingOrders.length})</h2>
-                  <div style={{ display: 'grid', gap: '1rem' }}>
-                    {pendingOrders.map(o => (
-                      <div key={o.id} className="card card-hover" style={{ cursor: 'pointer', padding: '1.25rem', borderLeft: '4px solid var(--primary)' }} onClick={() => setSelectedOrder(o)}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
-                          <div>
-                            <div style={{ fontSize: '1.45rem', fontWeight: 900, lineHeight: 1 }}>{o.placa}</div>
-                            <div style={{ fontSize: '0.95rem', color: 'var(--text-muted)', fontWeight: 600 }}>{o.marca} {o.modelo}</div>
-                            {getPicoYPlaca(o.placa) && <div style={{ fontSize: '0.85rem', color: '#f59e0b', fontWeight: 800, marginTop: '0.2rem' }}>⚠️ {getPicoYPlaca(o.placa)}</div>}
-                          </div>
-                          <div style={{ background: 'var(--primary)', color: 'white', padding: '0.3rem 0.6rem', borderRadius: 6, fontWeight: 900 }}>{o.kilometraje ? `${fmt(o.kilometraje)} KM` : 'S/K'}</div>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 350px), 1fr))', gap: '1.5rem' }}>
+              <div>
+                <h2 style={{ fontSize: '0.9rem', fontWeight: 800, textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}><AlertTriangle size={14} color="var(--warning)" /> Revision Pendiente ({pendingOrders.length})</h2>
+                <div style={{ display: 'grid', gap: '1rem' }}>
+                  {pendingOrders.map(o => (
+                    <div key={o.id} className="card card-hover" style={{ cursor: 'pointer', padding: '1.25rem', borderLeft: '4px solid var(--primary)' }} onClick={() => setSelectedOrder(o)}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
+                        <div>
+                          <div style={{ fontSize: '1.45rem', fontWeight: 900, lineHeight: 1 }}>{o.placa}</div>
+                          <div style={{ fontSize: '0.95rem', color: 'var(--text-muted)', fontWeight: 600 }}>{o.marca} {o.modelo}</div>
+                          {getPicoYPlaca(o.placa) && <div style={{ fontSize: '0.85rem', color: '#f59e0b', fontWeight: 800, marginTop: '0.2rem' }}>⚠️ {getPicoYPlaca(o.placa)}</div>}
                         </div>
-                        {o.servicios && <div style={{ padding: '0.6rem', background: 'rgba(99,102,241,0.1)', borderRadius: 6, fontSize: '1rem', fontWeight: 600 }}>{o.servicios}</div>}
+                        <div style={{ background: 'var(--primary)', color: 'white', padding: '0.3rem 0.6rem', borderRadius: 6, fontWeight: 900 }}>{o.kilometraje ? `${fmt(o.kilometraje)} KM` : 'S/K'}</div>
                       </div>
-                    ))}
-                    {pendingOrders.length === 0 && <div className="card" style={{ textAlign: 'center', padding: '2rem', opacity: 0.5, borderStyle: 'dashed' }}>Vacio</div>}
-                  </div>
-                </div>
-                <div>
-                  <h2 style={{ fontSize: '0.9rem', fontWeight: 800, textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}><CheckCircle size={14} color="var(--success)" /> En Trabajo ({authorizedOrders.length})</h2>
-                  <div style={{ display: 'grid', gap: '1rem' }}>
-                    {authorizedOrders.map(o => (
-                      <div key={o.id} className="card" style={{ padding: '1.25rem', borderLeft: '4px solid var(--success)' }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1rem' }}>
-                          <div>
-                            <div style={{ fontSize: '1.45rem', fontWeight: 900, lineHeight: 1 }}>{o.placa}</div>
-                            <div style={{ fontSize: '0.95rem', color: 'var(--text-muted)', fontWeight: 600 }}>{o.marca} {o.modelo}</div>
-                          </div>
-                          <div style={{ display: 'flex', gap: '0.4rem' }}>
-                            <button className="btn-secondary" onClick={() => setSelectedOrder(o)} style={{ padding: '0.3rem 0.6rem', fontSize: '0.85rem', fontWeight: 800 }}>Reportar</button>
-                            <button className="btn-success" onClick={() => setShowChecklist(o.id)} style={{ padding: '0.3rem 0.6rem', fontSize: '0.85rem', fontWeight: 800 }}>Terminar</button>
-                          </div>
-                        </div>
-                        <div style={{ background: 'var(--surface2)', borderRadius: 8, padding: '0.75rem', fontSize: '0.9rem', fontWeight: 600 }}>
-                          {o.quotes?.find(q => q.autorizada)?.items?.map(i => i.descripcion).join(', ')}
-                        </div>
-                      </div>
-                    ))}
-                    {authorizedOrders.length === 0 && <div className="card" style={{ textAlign: 'center', padding: '2rem', opacity: 0.5, borderStyle: 'dashed' }}>Vacio</div>}
-                  </div>
-                </div>
-              </div>
-            ) : (
-              <div className="card" style={{ padding: '1.5rem', maxWidth: 800, margin: '0 auto' }}>
-                <div style={{ position: 'relative', marginBottom: '1.5rem' }}>
-                  <Search size={18} style={{ position: 'absolute', left: '0.75rem', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
-                  <input placeholder="Buscar placa..." value={searchQuery} onChange={e => setSearchQuery(e.target.value.toUpperCase())} style={{ width: '100%', padding: '0.75rem 0.75rem 0.75rem 2.5rem' }} />
-                </div>
-                <div style={{ display: 'grid', gap: '0.75rem' }}>
-                  {pastReports.filter(r => r.order?.placa.includes(searchQuery)).map(r => (
-                    <div key={r.id} className="card order-card" style={{ padding: '1rem', cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }} onClick={() => setViewingPastReport(r)}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-                        <span className="plate-tag">{r.order?.placa}</span>
-                        <div><div style={{ fontWeight: 800 }}>{r.order?.marca} {r.order?.modelo}</div><div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>{new Date(r.fecha).toLocaleDateString()}</div></div>
-                      </div>
-                      <ChevronRight size={18} color="var(--text-muted)" />
+                      {o.servicios && <div style={{ padding: '0.6rem', background: 'rgba(99,102,241,0.1)', borderRadius: 6, fontSize: '1rem', fontWeight: 600 }}>{o.servicios}</div>}
                     </div>
                   ))}
+                  {pendingOrders.length === 0 && <div className="card" style={{ textAlign: 'center', padding: '2rem', opacity: 0.5, borderStyle: 'dashed' }}>Vacio</div>}
                 </div>
               </div>
-            )}
+              <div>
+                <h2 style={{ fontSize: '0.9rem', fontWeight: 800, textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}><CheckCircle size={14} color="var(--success)" /> En Trabajo ({authorizedOrders.length})</h2>
+                <div style={{ display: 'grid', gap: '1rem' }}>
+                  {authorizedOrders.map(o => (
+                    <div key={o.id} className="card" style={{ padding: '1.25rem', borderLeft: '4px solid var(--success)' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1rem' }}>
+                        <div>
+                          <div style={{ fontSize: '1.45rem', fontWeight: 900, lineHeight: 1 }}>{o.placa}</div>
+                          <div style={{ fontSize: '0.95rem', color: 'var(--text-muted)', fontWeight: 600 }}>{o.marca} {o.modelo}</div>
+                        </div>
+                        <div style={{ display: 'flex', gap: '0.4rem' }}>
+                          <button className="btn-secondary" onClick={() => setSelectedOrder(o)} style={{ padding: '0.3rem 0.6rem', fontSize: '0.85rem', fontWeight: 800 }}>Reportar</button>
+                          <button className="btn-success" onClick={() => setShowChecklist(o.id)} style={{ padding: '0.3rem 0.6rem', fontSize: '0.85rem', fontWeight: 800 }}>Terminar</button>
+                        </div>
+                      </div>
+                      <div style={{ background: 'var(--surface2)', borderRadius: 8, padding: '0.75rem', fontSize: '0.9rem', fontWeight: 600 }}>
+                        {o.quotes?.find(q => q.autorizada)?.items?.map(i => i.descripcion).join(', ')}
+                      </div>
+                    </div>
+                  ))}
+                  {authorizedOrders.length === 0 && <div className="card" style={{ textAlign: 'center', padding: '2rem', opacity: 0.5, borderStyle: 'dashed' }}>Vacio</div>}
+                </div>
+              </div>
+            </div>
           </div>
         </>
       )}
