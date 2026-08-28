@@ -239,8 +239,8 @@ export default function OrderDetailsModal({ order, onClose, fleetMode = false, i
         <td class="col-num">${i + 1}</td>
         <td class="col-desc"><strong>${it.item}</strong><br><small style="color: #64748b">${it.category}</small></td>
         <td style="text-align: center"><span class="badge ${stateBadge[it.state] || ''}">${it.state}</span></td>
-        <td style="text-align: center">${it.requiereRepuesto ? 'SI' : 'NO'}</td>
-        <td style="text-align: center">${it.recibeReparacion ? 'SI' : 'NO'}</td>
+        <td style="text-align: center">${(it.state === 'Necesario' || it.state === 'Realizar') ? '' : (it.requiereRepuesto ? 'SI' : 'NO')}</td>
+        <td style="text-align: center">${(it.state === 'Necesario' || it.state === 'Realizar') ? '' : (it.recibeReparacion ? 'SI' : 'NO')}</td>
       </tr>
     `).join('');
     printWindow(`Reporte Técnico ${order.placa}`, `
@@ -947,7 +947,7 @@ export default function OrderDetailsModal({ order, onClose, fleetMode = false, i
                             )}
                           </td>
                           <td style={{ fontSize: '0.82rem' }}>
-                            {it.requiereRepuesto ? (
+                            {it.state === 'Necesario' || it.state === 'Realizar' ? null : it.requiereRepuesto ? (
                                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
                                  <span style={{ fontWeight: 600, color: 'var(--warning)' }}>✓ Requiere</span>
                                  {!fleetMode && <div className="hide-on-print" style={{ display: 'flex', gap: '0.4rem' }}>
@@ -961,7 +961,7 @@ export default function OrderDetailsModal({ order, onClose, fleetMode = false, i
                             ) : <span style={{ color: 'var(--text-muted)' }}>—</span>}
                           </td>
                           <td>
-                            {it.recibeReparacion ? (
+                            {it.state === 'Necesario' || it.state === 'Realizar' ? null : it.recibeReparacion ? (
                               <>
                                 <span className={fleetMode ? undefined : 'show-on-print'}>{it.valorReparacion ? `$${fmt(it.valorReparacion)}` : 'Pendiente'}</span>
                                 {!fleetMode && <input className="hide-on-print price-input" type="text" placeholder="Pendiente"
