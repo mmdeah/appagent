@@ -135,7 +135,7 @@ export default function TechnicianView() {
     const fecha = new Date().toLocaleDateString('es-CO');
     const fmtNum = (n) => Number(n || 0).toLocaleString('es-CO', { minimumFractionDigits: 0 });
 
-    const conAtencion = items.filter(i => i.state === 'Malo' || i.state === 'Regular');
+    const conAtencion = items.filter(i => i.state === 'Malo');
     const insumos = items.filter(i => i.state === 'Necesario');
     const servicios = items.filter(i => i.state === 'Realizar');
 
@@ -364,7 +364,6 @@ export default function TechnicianView() {
                   }
 
                   const isGood = data?.state === 'Bueno';
-                  const isWarn = data?.state === 'Regular';
                   const isBad = data?.state === 'Malo';
                   const isPending = pendingPriority?.category === category && pendingPriority?.item === item;
                   const curPrio = PRIORIDADES.find(p => p.key === data?.prioridad);
@@ -398,12 +397,11 @@ export default function TechnicianView() {
                         ) : (
                           <div style={{ display: 'flex', gap: '0.3rem' }}>
                             <button type="button" className={isGood ? 'state-btn good' : 'state-btn'} style={{ padding: '0.3rem 0.6rem', fontSize: '0.85rem' }} onClick={() => handleItemStateChange(category, item, 'Bueno')}>Bueno</button>
-                            <button type="button" className={isWarn ? 'state-btn warn' : 'state-btn'} style={{ padding: '0.3rem 0.6rem', fontSize: '0.85rem' }} onClick={() => handleItemStateChange(category, item, 'Regular')}>Regular</button>
                             <button type="button" className={isBad ? 'state-btn bad' : 'state-btn'} style={{ padding: '0.3rem 0.6rem', fontSize: '0.85rem' }} onClick={() => handleItemStateChange(category, item, 'Malo')}>Malo</button>
                           </div>
                         )}
                       </div>
-                      {(isWarn || isBad) && (
+                      {isBad && (
                         <div className="form-grid-2" style={{ marginTop: '0.75rem', padding: '0.75rem', background: 'var(--bg)', borderRadius: 10, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
                           <label style={{ fontSize: '0.85rem', fontWeight: 700 }}>Mano de Obra ($):<input type="text" className="price-input" value={data?.manoObra ? fmt(data.manoObra) : ''} onChange={e => handleDetail(category, item, 'manoObra', e.target.value.replace(/\D/g, ''))} /></label>
                           <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', justifyContent: 'center' }}>

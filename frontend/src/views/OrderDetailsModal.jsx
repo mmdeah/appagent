@@ -256,6 +256,24 @@ export default function OrderDetailsModal({ order, onClose, fleetMode = false, i
         <tbody>${rows}</tbody>
       </table>
 
+      ${reportData.scannerCodes?.filter(c => c.code).length > 0 ? `
+        <div class="section-header">Códigos de Avería (Escáner)</div>
+        <table>
+          <thead>
+            <tr><th style="width: 90px">Código</th><th>Descripción de la falla</th></tr>
+          </thead>
+          <tbody>
+            ${reportData.scannerCodes.filter(c => c.code).map(c => `
+              <tr>
+                <td style="font-family: monospace; font-weight: 700; color: #b91c1c">${c.prefix}${c.code}</td>
+                <td>${c.description || '—'}</td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+        <p style="font-size: 10px; color: #94a3b8; margin-top: -6px; margin-bottom: 12px;">Códigos de diagnóstico obtenidos por escáner. Solo informativo, no representa ningún valor cotizado.</p>
+      ` : ''}
+
       ${order.servicios ? `<div class="section-header">Servicios Solicitados</div><p style="padding: 10px; background: #f8fafc; border-radius: 6px; margin-bottom: 12px;">${order.servicios}</p>` : ''}
       ${order.notas ? `<div class="section-header">Notas y Observaciones</div><p style="padding: 10px; background: #fffbeb; border-radius: 6px; color: #92400e;">${order.notas}</p>` : ''}
       ${renderChecklistHtml(order.checklistFinal)}
