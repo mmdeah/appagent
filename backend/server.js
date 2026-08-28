@@ -504,35 +504,47 @@ server.post('/api/generate-ai-report', async (req, res) => {
       ? itemsToAnalyze.map(item => `- ${item.descripcion} (Cantidad: ${item.cantidad}, Precio: $${item.precio})`).join('\n')
       : "No hay ítems específicos de cotización vinculados.";
 
-    const systemPrompt = `Actúas como el redactor de informes de un taller automotriz. Tu tarea es redactar un informe claro y ordenado (NO un informe técnico ni un peritaje) a partir de los datos del vehículo y los trabajos/cotizaciones seleccionados, usando lenguaje sencillo que cualquier cliente pueda entender, evitando jerga de ingeniería innecesaria.
+    const systemPrompt = `Actúas como el redactor de informes de un taller automotriz. Tu tarea es redactar un informe automotriz (NO un informe técnico ni un peritaje) a partir de los datos del vehículo y los trabajos/cotizaciones seleccionados. El informe es un documento profesional para presentar al cliente o a una aseguradora.
 Debes responder ESTRICTAMENTE en formato JSON válido que encaje exactamente con el siguiente esquema. No agregues introducciones, explicaciones ni formato markdown en la respuesta, solo el objeto JSON limpio.
 
-REGLA MÁS IMPORTANTE: NUNCA inventes ni asumas información que no te haya sido entregada explícitamente en los datos del vehículo, los ítems cotizados o las observaciones del administrador. No inventes causas técnicas, riesgos, mediciones, síntomas ni hallazgos que no se puedan deducir directamente de lo que se te dio. Si no hay información suficiente para un campo, escribe algo breve y genérico basado solo en la descripción del ítem cotizado (por ejemplo, repetir o parafrasear la descripción), en vez de inventar detalles específicos.
+REGLA MÁS IMPORTANTE — NO INVENTAR: nunca inventes ni asumas información que no te haya sido entregada explícitamente en los datos del vehículo, los ítems cotizados o las observaciones del administrador. No inventes causas, riesgos, mediciones, síntomas ni hallazgos que no se puedan deducir directamente de lo que se te dio. Si no hay información suficiente para un campo, escribe algo breve y genérico basado solo en la descripción del ítem cotizado (por ejemplo, repetir o parafrasear la descripción), en vez de inventar detalles específicos.
+
+REGLAS DE CONTENIDO:
+- Lenguaje sencillo, claro y directo, sin tecnicismos innecesarios — cualquier cliente debe poder entenderlo.
+- NO incluyas precios ni valores en pesos en ningún texto del informe, salvo que las observaciones del administrador lo pidan explícitamente.
+- No redactes firmas, secciones de notas ni de condiciones — esas partes no van en el JSON, el documento ya las maneja aparte.
+- Si algún ítem cotizado describe un componente que está en buen estado (no requiere cambio), menciónalo explícitamente en su hallazgo (ej: "Bujías en buen estado, no requieren cambio").
+- Si un trabajo aún no está confirmado con el cliente, márcalo con "pendiente_confirmar": true en ese diagnóstico — no inventes que ya fue aprobado.
+- Los trabajos preventivos y correctivos van diferenciados en "alcance" mediante el campo "tipo".
+- Si el reporte es para solicitar autorización de trabajos pendientes, redacta "objeto" y "conclusion" en futuro ("se realizará", "se requiere"), no en pasado.
+
+ESTADO GENERAL DEL VEHÍCULO — elige uno para "estado_general" según lo que indiquen los ítems cotizados y las observaciones:
+- "bueno": si no hay ítems que describan fallas o trabajos correctivos (todo es preventivo o está en buen estado). En este caso llena "inspeccion_sistemas" con una fila por cada ítem/sistema revisado y su resultado, y deja "diagnosticos" como un arreglo vacío.
+- "con_hallazgos": si hay una o más fallas o trabajos correctivos, pero ninguno representa un riesgo grave o inminente. Llena "diagnosticos" normalmente y deja "inspeccion_sistemas" vacío.
+- "critico": si algún hallazgo, por lo dado en los datos, representa un riesgo grave para la seguridad o el funcionamiento del vehículo si no se atiende de inmediato. Llena "diagnosticos" normalmente y usa "recomendacion_alerta" para advertir que se debe atender de inmediato o no operar el vehículo — solo basado en lo que los datos realmente indican, sin exagerar.
 
 Esquema del JSON esperado:
 {
-  "objeto": "Un párrafo breve que describa el objeto del presente informe (documentar el trabajo realizado o cotizado sobre el vehículo).",
-  "descripcion_ingreso": "Un párrafo breve que resuma por qué el vehículo ingresó al taller, basado solo en el motivo de ingreso y las observaciones dadas.",
+  "objeto": "Una o dos frases explicando para qué es el informe.",
+  "descripcion_ingreso": "Un párrafo breve que resuma por qué llegó el vehículo, incluyendo el kilometraje si está disponible en los datos.",
+  "estado_general": "bueno" | "con_hallazgos" | "critico",
+  "inspeccion_sistemas": [
+    { "sistema": "Nombre del sistema o ítem revisado", "resultado": "Bueno / breve resultado" }
+  ],
   "diagnosticos": [
     {
       "titulo": "Nombre del sistema o ítem (ej: Frenos, Dirección, etc.), tomado de los ítems cotizados",
-      "hallazgo": "Descripción clara y sencilla de lo que se encontró o del trabajo a realizar, basada únicamente en la descripción del ítem cotizado o las observaciones dadas — sin inventar detalles técnicos adicionales.",
-      "causas": [
-        "Causa mencionada o deducible directamente de los datos dados (si no hay ninguna evidente, deja este arreglo vacío)"
-      ],
-      "riesgos": [
-        "Riesgo mencionado o deducible directamente de los datos dados (si no hay ninguno evidente, deja este arreglo vacío)"
-      ]
+      "hallazgo": "Descripción clara y sencilla de lo que se encontró o del trabajo a realizar, basada únicamente en la descripción del ítem cotizado o las observaciones dadas — sin inventar detalles técnicos adicionales, sin precios.",
+      "causas": ["Causa mencionada o deducible directamente de los datos dados (si no hay ninguna evidente, deja este arreglo vacío)"],
+      "riesgos": ["Riesgo mencionado o deducible directamente de los datos dados (si no hay ninguno evidente, deja este arreglo vacío)"],
+      "pendiente_confirmar": false
     }
   ],
   "alcance": [
-    {
-      "tipo": "Preventivo" o "Correctivo",
-      "descripcion": "Descripción concisa y clara de la acción de mantenimiento o reparación realizada/cotizada, tomada del ítem cotizado."
-    }
+    { "tipo": "Preventivo" o "Correctivo", "descripcion": "Descripción concisa y clara de la acción de mantenimiento o reparación realizada/cotizada, tomada del ítem cotizado, sin precios." }
   ],
-  "conclusion": "Un párrafo breve que resuma el estado general y el trabajo realizado, sin agregar información no dada.",
-  "recomendacion_alerta": "Una recomendación breve sobre la importancia de realizar estas intervenciones, sin inventar plazos ni riesgos no mencionados."
+  "conclusion": "Un resumen breve del estado del vehículo y lo que se va a hacer, sin agregar información no dada.",
+  "recomendacion_alerta": "Solo cuando estado_general es 'critico': recomendación breve de no operar el vehículo o atenderlo de inmediato, basada solo en lo dado. Deja este campo como cadena vacía si estado_general no es 'critico'."
 }`;
 
     const userPrompt = `Datos del Vehículo:
@@ -591,10 +603,13 @@ Genera el informe en español enfocado únicamente en los ítems seleccionados y
         cliente: order.cliente,
         fecha: today,
         motivo: order.motivoIngreso || order.servicios || 'Mantenimiento General y Diagnóstico',
-        referencia: quote ? `COT-${quote.id}` : `ORD-${order.id}`
+        referencia: quote ? `COT-${quote.id}` : `ORD-${order.id}`,
+        kilometraje: order.kilometraje || 'N/A'
       },
       objeto: reportJson.objeto,
       descripcion_ingreso: reportJson.descripcion_ingreso,
+      estado_general: reportJson.estado_general || 'con_hallazgos',
+      inspeccion_sistemas: reportJson.inspeccion_sistemas || [],
       diagnosticos: reportJson.diagnosticos || [],
       alcance: reportJson.alcance || [],
       conclusion: reportJson.conclusion,

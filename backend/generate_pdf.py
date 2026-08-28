@@ -47,6 +47,7 @@ cliente = veh.get("cliente", "N/A")
 fecha = veh.get("fecha", "N/A")
 motivo = veh.get("motivo", "N/A")
 referencia = veh.get("referencia", "N/A")
+kilometraje = veh.get("kilometraje") or "N/A"
 
 doc = SimpleDocTemplate(
     OUTPUT, pagesize=letter,
@@ -124,11 +125,14 @@ veh_data = [
      Paragraph(motivo, value_style),
      Paragraph("<b>Ref.</b>", label_style),
      Paragraph(referencia, value_style)],
+    [Paragraph("<b>Kilometraje</b>", label_style),
+     Paragraph(str(kilometraje), value_style), "", ""],
 ]
 vt = Table(veh_data, colWidths=[3.5*cm,6.5*cm,3*cm,4.3*cm])
 vt.setStyle(TableStyle([
     ("BACKGROUND",(0,0),(-1,0),MID_BLUE),("SPAN",(0,0),(-1,0)),
     ("ALIGN",(0,0),(-1,0),"CENTER"),
+    ("SPAN",(1,4),(-1,4)),
     ("ROWBACKGROUNDS",(0,1),(-1,-1),[WHITE,LIGHT_GRAY]),
     ("GRID",(0,0),(-1,-1),0.5,MED_GRAY),
     ("TOPPADDING",(0,0),(-1,-1),5),("BOTTOMPADDING",(0,0),(-1,-1),5),
@@ -150,54 +154,109 @@ story.append(Paragraph("2. DESCRIPCIÓN DE INGRESO", section_title))
 story.append(Paragraph(data.get("descripcion_ingreso", ""), body))
 
 # ══════════════════════════════════════════════════════════════
-# 3. DIAGNÓSTICO TÉCNICO
+# 3. DIAGNÓSTICO
 # ══════════════════════════════════════════════════════════════
 story.append(Paragraph("3. DIAGNÓSTICO", section_title))
-story.append(Paragraph(
-    "Tras la inspección de los sistemas del vehículo se identificaron las siguientes condiciones:", body))
 
-def diag_block(num, titulo, hallazgo, causa_items, riesgo_items):
-    elems = []
-    elems.append(Paragraph(f"3.{num} {titulo}", subsection_title))
-    elems.append(HRFlowable(width="100%", thickness=0.5, color=MED_GRAY, spaceAfter=4))
-    elems.append(Paragraph(hallazgo, body))
+estado_general = data.get("estado_general", "con_hallazgos")
+inspeccion_sistemas = data.get("inspeccion_sistemas", [])
+diagnosticos = data.get("diagnosticos", [])
 
-    def ip(items, color):
-        if not items:
-            return [Paragraph("No especificado", s("Normal", fontName="Helvetica-Oblique", fontSize=9,
-                textColor=MED_GRAY, leading=13, spaceAfter=2))]
-        return [Paragraph(f"• {i}", s("Normal", fontName="Helvetica", fontSize=9,
-            textColor=color, leading=13, spaceAfter=2)) for i in items]
+# Good-condition case: a compact inspection table instead of causa/riesgo blocks
+if estado_general == "bueno" and inspeccion_sistemas:
+    story.append(Paragraph(
+        "Se inspeccionaron los siguientes sistemas del vehículo, sin encontrar novedades que requieran atención:", body))
 
-    inner = [[
-        [Paragraph("<b>Causa probable</b>", label_style)] + ip(causa_items, colors.HexColor("#1A4A8A")),
-        [Paragraph("<b>Riesgo si no se atiende</b>", s("Normal",
-            fontName="Helvetica-Bold", fontSize=9, textColor=RED_RISK, spaceAfter=2))] +
-        ip(riesgo_items, RED_RISK),
+    insp_data = [[
+        Paragraph("<b>Sistema</b>", s("Normal", fontName="Helvetica-Bold", fontSize=9, textColor=WHITE)),
+        Paragraph("<b>Resultado</b>", s("Normal", fontName="Helvetica-Bold", fontSize=9, textColor=WHITE)),
     ]]
-    it = Table(inner, colWidths=[8.65*cm, 8.65*cm])
-    it.setStyle(TableStyle([
-        ("VALIGN",(0,0),(-1,-1),"TOP"),
-        ("BACKGROUND",(0,0),(0,-1),colors.HexColor("#EBF1FB")),
-        ("BACKGROUND",(1,0),(1,-1),colors.HexColor("#FDF0EF")),
-        ("BOX",(0,0),(-1,-1),0.5,MED_GRAY),
-        ("INNERGRID",(0,0),(-1,-1),0.5,MED_GRAY),
-        ("TOPPADDING",(0,0),(-1,-1),7),("BOTTOMPADDING",(0,0),(-1,-1),7),
-        ("LEFTPADDING",(0,0),(-1,-1),9),
+    for item in inspeccion_sistemas:
+        insp_data.append([
+            Paragraph(item.get("sistema", ""), body),
+            Paragraph(item.get("resultado", "Bueno"), body),
+        ])
+    it2 = Table(insp_data, colWidths=[8.65*cm, 8.65*cm])
+    it2.setStyle(TableStyle([
+        ("BACKGROUND",    (0,0), (-1,0), MID_BLUE),
+        ("ROWBACKGROUNDS",(0,1), (-1,-1), [WHITE, LIGHT_GRAY]),
+        ("GRID",          (0,0), (-1,-1), 0.5, MED_GRAY),
+        ("TOPPADDING",    (0,0), (-1,-1), 5),
+        ("BOTTOMPADDING", (0,0), (-1,-1), 5),
+        ("LEFTPADDING",   (0,0), (-1,-1), 7),
+        ("VALIGN",        (0,0), (-1,-1), "MIDDLE"),
     ]))
-    elems.append(it)
-    elems.append(Spacer(1,0.3*cm))
-    return KeepTogether(elems)
+    story.append(it2)
+    story.append(Spacer(1, 0.3*cm))
 
-# Dynamically populate diagnostics
-for idx, diag in enumerate(data.get("diagnosticos", [])):
-    story.append(diag_block(
-        idx + 1,
-        diag.get("titulo", "Revisión"),
-        diag.get("hallazgo", ""),
-        diag.get("causas", []),
-        diag.get("riesgos", [])
-    ))
+    good_box = Table([[
+        Paragraph("<b>✓ ESTADO GENERAL: BUENO</b> — El vehículo se encuentra en buen estado mecánico general; "
+                  "no se requieren intervenciones adicionales a las descritas en este informe.",
+            s("Normal", fontName="Helvetica", fontSize=9, textColor=GREEN_OK, leading=14, alignment=TA_JUSTIFY))
+    ]], colWidths=[doc.width])
+    good_box.setStyle(TableStyle([
+        ("BACKGROUND",    (0,0), (-1,-1), colors.HexColor("#EAF7F0")),
+        ("BOX",           (0,0), (-1,-1), 1.5, GREEN_OK),
+        ("TOPPADDING",    (0,0), (-1,-1), 10),
+        ("BOTTOMPADDING", (0,0), (-1,-1), 10),
+        ("LEFTPADDING",   (0,0), (-1,-1), 12),
+        ("RIGHTPADDING",  (0,0), (-1,-1), 12),
+    ]))
+    story.append(good_box)
+    story.append(Spacer(1, 0.3*cm))
+
+# Findings case: one causa/riesgo block per diagnostico
+if diagnosticos:
+    if estado_general != "bueno":
+        story.append(Paragraph(
+            "Tras la inspección de los sistemas del vehículo se identificaron las siguientes condiciones:", body))
+
+    def diag_block(num, titulo, hallazgo, causa_items, riesgo_items, pendiente_confirmar=False):
+        elems = []
+        elems.append(Paragraph(f"3.{num} {titulo}", subsection_title))
+        elems.append(HRFlowable(width="100%", thickness=0.5, color=MED_GRAY, spaceAfter=4))
+        elems.append(Paragraph(hallazgo, body))
+        if pendiente_confirmar:
+            elems.append(Paragraph(
+                "⏳ Pendiente de confirmar — se informará al cliente antes de proceder.",
+                s("Normal", fontName="Helvetica-Oblique", fontSize=8.5, textColor=ORANGE, spaceAfter=4)))
+
+        def ip(items, color):
+            if not items:
+                return [Paragraph("No especificado", s("Normal", fontName="Helvetica-Oblique", fontSize=9,
+                    textColor=MED_GRAY, leading=13, spaceAfter=2))]
+            return [Paragraph(f"• {i}", s("Normal", fontName="Helvetica", fontSize=9,
+                textColor=color, leading=13, spaceAfter=2)) for i in items]
+
+        inner = [[
+            [Paragraph("<b>Causa probable</b>", label_style)] + ip(causa_items, colors.HexColor("#1A4A8A")),
+            [Paragraph("<b>Riesgo si no se atiende</b>", s("Normal",
+                fontName="Helvetica-Bold", fontSize=9, textColor=RED_RISK, spaceAfter=2))] +
+            ip(riesgo_items, RED_RISK),
+        ]]
+        it = Table(inner, colWidths=[8.65*cm, 8.65*cm])
+        it.setStyle(TableStyle([
+            ("VALIGN",(0,0),(-1,-1),"TOP"),
+            ("BACKGROUND",(0,0),(0,-1),colors.HexColor("#EBF1FB")),
+            ("BACKGROUND",(1,0),(1,-1),colors.HexColor("#FDF0EF")),
+            ("BOX",(0,0),(-1,-1),0.5,MED_GRAY),
+            ("INNERGRID",(0,0),(-1,-1),0.5,MED_GRAY),
+            ("TOPPADDING",(0,0),(-1,-1),7),("BOTTOMPADDING",(0,0),(-1,-1),7),
+            ("LEFTPADDING",(0,0),(-1,-1),9),
+        ]))
+        elems.append(it)
+        elems.append(Spacer(1,0.3*cm))
+        return KeepTogether(elems)
+
+    for idx, diag in enumerate(diagnosticos):
+        story.append(diag_block(
+            idx + 1,
+            diag.get("titulo", "Revisión"),
+            diag.get("hallazgo", ""),
+            diag.get("causas", []),
+            diag.get("riesgos", []),
+            diag.get("pendiente_confirmar", False)
+        ))
 
 # ══════════════════════════════════════════════════════════════
 # 4. ALCANCE
@@ -248,13 +307,13 @@ story.append(Paragraph("5. CONCLUSIÓN", section_title))
 story.append(Paragraph(data.get("conclusion", ""), body))
 story.append(Spacer(1, 0.2*cm))
 
-# Recommendation / Alert Box
+# Critical alert box — only for genuinely critical findings
 recom_text = data.get("recomendacion_alerta", "")
-if recom_text:
+if estado_general == "critico" and recom_text:
     alerta = Table([[
         Paragraph(
-            f"<b>⚠ RECOMENDACIÓN:</b> {recom_text}",
-            s("Normal", fontName="Helvetica", fontSize=9, textColor=RED_RISK,
+            f"<b>⚠ ATENCIÓN — NO OPERAR EL VEHÍCULO:</b> {recom_text}",
+            s("Normal", fontName="Helvetica-Bold", fontSize=9.5, textColor=RED_RISK,
               leading=14, alignment=TA_JUSTIFY))
     ]], colWidths=[doc.width])
     alerta.setStyle(TableStyle([
@@ -266,6 +325,24 @@ if recom_text:
         ("RIGHTPADDING",  (0,0), (-1,-1), 12),
     ]))
     story.append(alerta)
+    story.append(Spacer(1, 0.4*cm))
+elif recom_text:
+    # Non-critical recommendation: same info, neutral styling (no red "do not operate" framing)
+    nota = Table([[
+        Paragraph(
+            f"<b>Recomendación:</b> {recom_text}",
+            s("Normal", fontName="Helvetica", fontSize=9, textColor=DARK_BLUE,
+              leading=14, alignment=TA_JUSTIFY))
+    ]], colWidths=[doc.width])
+    nota.setStyle(TableStyle([
+        ("BACKGROUND",    (0,0), (-1,-1), colors.HexColor("#EBF1FB")),
+        ("BOX",           (0,0), (-1,-1), 1, MID_BLUE),
+        ("TOPPADDING",    (0,0), (-1,-1), 10),
+        ("BOTTOMPADDING", (0,0), (-1,-1), 10),
+        ("LEFTPADDING",   (0,0), (-1,-1), 12),
+        ("RIGHTPADDING",  (0,0), (-1,-1), 12),
+    ]))
+    story.append(nota)
     story.append(Spacer(1, 0.4*cm))
 
 # Visible-condition disclaimer
