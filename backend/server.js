@@ -12,7 +12,7 @@ const middlewares = jsonServer.defaults();
 // Free OpenRouter models are unreliable (rate limits, upstream overload, models
 // going paid). Try each in order and fall back to the next on a recoverable error.
 const OPENROUTER_MODEL_CHAIN = [
-  'nvidia/nemotron-3-ultra-550b-a55b:free',
+  'openai/gpt-oss-20b',
 ];
 const callOpenRouterWithFallback = async (openRouterKey, { systemPrompt, userPrompt, messages, temperature = 0.3 }) => {
   const chatMessages = messages || [
