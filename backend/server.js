@@ -507,7 +507,9 @@ server.post('/api/generate-ai-report', async (req, res) => {
     const systemPrompt = `Actúas como el redactor de informes de un taller automotriz. Tu tarea es redactar un informe automotriz (NO un informe técnico ni un peritaje) a partir de los datos del vehículo y los trabajos/cotizaciones seleccionados. El informe es un documento profesional para presentar al cliente o a una aseguradora.
 Debes responder ESTRICTAMENTE en formato JSON válido que encaje exactamente con el siguiente esquema. No agregues introducciones, explicaciones ni formato markdown en la respuesta, solo el objeto JSON limpio.
 
-REGLA MÁS IMPORTANTE — NO INVENTAR: nunca inventes ni asumas información que no te haya sido entregada explícitamente en los datos del vehículo, los ítems cotizados o las observaciones del administrador. No inventes causas, riesgos, mediciones, síntomas ni hallazgos que no se puedan deducir directamente de lo que se te dio. Si no hay información suficiente para un campo, escribe algo breve y genérico basado solo en la descripción del ítem cotizado (por ejemplo, repetir o parafrasear la descripción), en vez de inventar detalles específicos.
+REGLA MÁS IMPORTANTE — NO INVENTAR HALLAZGOS: nunca inventes ni asumas hallazgos, síntomas, mediciones, piezas o trabajos que no estén en los ítems cotizados o en las observaciones del administrador. No agregues un ítem, sistema o problema que no haya sido cotizado. Los campos "objeto", "descripcion_ingreso", "hallazgo", "alcance" y "conclusion" deben basarse ÚNICAMENTE en los datos dados — no en suposiciones.
+
+EXCEPCIÓN — "causas" y "riesgos" SÍ pueden ser genéricos: para estos dos campos de cada diagnóstico, usa tu conocimiento automotriz general para escribir causas probables y riesgos típicos asociados al tipo de falla o ítem descrito, tal como lo haría un mecánico experimentado, aunque el dato exacto no esté en la cotización (ejemplo: para "amortiguadores rotos" puedes escribir "desgaste por uso y kilometraje" como causa y "ruidos e inestabilidad al conducir" como riesgo, sin que esa causa/riesgo exacta haya sido dada). Sigue siendo coherente con el ítem descrito — no inventes causas o riesgos de un sistema distinto al mencionado. Escribe 1 a 3 causas y 1 a 3 riesgos por diagnóstico; solo déjalos vacíos si el ítem realmente no tiene ninguna causa o riesgo aplicable (ej. mantenimiento de rutina sin falla).
 
 REGLAS DE CONTENIDO:
 - Lenguaje sencillo, claro y directo, sin tecnicismos innecesarios — cualquier cliente debe poder entenderlo.
@@ -535,8 +537,8 @@ Esquema del JSON esperado:
     {
       "titulo": "Nombre del sistema o ítem (ej: Frenos, Dirección, etc.), tomado de los ítems cotizados",
       "hallazgo": "Descripción clara y sencilla de lo que se encontró o del trabajo a realizar, basada únicamente en la descripción del ítem cotizado o las observaciones dadas — sin inventar detalles técnicos adicionales, sin precios.",
-      "causas": ["Causa mencionada o deducible directamente de los datos dados (si no hay ninguna evidente, deja este arreglo vacío)"],
-      "riesgos": ["Riesgo mencionado o deducible directamente de los datos dados (si no hay ninguno evidente, deja este arreglo vacío)"],
+      "causas": ["1 a 3 causas probables típicas de este tipo de falla, según conocimiento automotriz general (ver EXCEPCIÓN arriba); vacío solo si de verdad no aplica ninguna causa"],
+      "riesgos": ["1 a 3 riesgos típicos de no atender esta falla, según conocimiento automotriz general (ver EXCEPCIÓN arriba); vacío solo si de verdad no aplica ningún riesgo"],
       "pendiente_confirmar": false
     }
   ],
@@ -560,7 +562,7 @@ ${quoteItemsText}
 Observaciones del Administrador a tener en cuenta para el enfoque de la IA:
 ${notes || 'Ninguna observación especial.'}
 
-Genera el informe en español enfocado únicamente en los ítems seleccionados y en los datos del vehículo dados arriba, siguiendo el esquema JSON de manera estricta y sin inventar ninguna información que no esté aquí.`;
+Genera el informe en español enfocado únicamente en los ítems seleccionados y en los datos del vehículo dados arriba, siguiendo el esquema JSON de manera estricta. No inventes hallazgos, ítems ni datos del vehículo que no estén aquí — pero sí puedes usar conocimiento automotriz general para las causas probables y los riesgos de cada diagnóstico, como se indicó en las instrucciones.`;
 
     const openRouterKey = process.env.OPENROUTER_API_KEY;
     if (!openRouterKey) {
