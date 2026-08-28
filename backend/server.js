@@ -18,7 +18,8 @@ const OPENROUTER_MODEL_CHAIN = [
   'mistralai/mistral-small-3.2-24b-instruct:free',
   'google/gemma-3-27b-it:free',
   'meta-llama/llama-4-scout:free',
-  'deepseek/deepseek-r1:free',
+  'z-ai/glm-4.5-air:free',
+  'tngtech/deepseek-r1t2-chimera:free',
 ];
 const callOpenRouterWithFallback = async (openRouterKey, { systemPrompt, userPrompt, messages, temperature = 0.3 }) => {
   const chatMessages = messages || [
@@ -26,7 +27,9 @@ const callOpenRouterWithFallback = async (openRouterKey, { systemPrompt, userPro
     { role: 'user', content: userPrompt }
   ];
   let lastErrText = '';
+  const attempted = [];
   for (const model of OPENROUTER_MODEL_CHAIN) {
+    attempted.push(model);
     console.log(`Calling OpenRouter with model: ${model}...`);
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 20000); // 20s budget per model
@@ -64,7 +67,10 @@ const callOpenRouterWithFallback = async (openRouterKey, { systemPrompt, userPro
     // 429 (rate limit), 502/503 (upstream overload) and 404 (model gone) are all worth retrying with the next model
     if (![429, 404, 500, 502, 503].includes(resp.status)) break;
   }
-  return { ok: false, error: lastErrText };
+  const summary = attempted.length > 1
+    ? `Se intentaron ${attempted.length} modelos gratuitos (${attempted.join(', ')}) y todos fallaron. Último error (${attempted[attempted.length - 1]}): ${lastErrText}`
+    : lastErrText;
+  return { ok: false, error: summary };
 };
 
 // Use Railway volume path if available, otherwise use local directory
