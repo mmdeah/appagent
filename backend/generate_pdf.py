@@ -52,7 +52,7 @@ doc = SimpleDocTemplate(
     OUTPUT, pagesize=letter,
     leftMargin=2*cm, rightMargin=2*cm,
     topMargin=2.5*cm, bottomMargin=2.5*cm,
-    title=f"Informe Técnico – {marca_modelo} {placa}",
+    title=f"Informe – {marca_modelo} {placa}",
     author="Automotriz Online SD"
 )
 
@@ -89,7 +89,7 @@ story = []
 header_data = [[
     Paragraph("<b>AUTOMOTRIZ ONLINE SD</b>", s("Normal",
         fontName="Helvetica-Bold", fontSize=13, textColor=WHITE, alignment=TA_LEFT)),
-    Paragraph("INFORME TÉCNICO DE MANTENIMIENTO", s("Normal",
+    Paragraph("INFORME DE MANTENIMIENTO", s("Normal",
         fontName="Helvetica-Bold", fontSize=14, textColor=WHITE, alignment=TA_CENTER)),
     Paragraph("Av. 6 Norte #18-22, Granada<br/>Cali, Colombia<br/>301 469 7942", s("Normal",
         fontName="Helvetica", fontSize=8, textColor=WHITE, alignment=TA_CENTER)),
@@ -152,7 +152,7 @@ story.append(Paragraph(data.get("descripcion_ingreso", ""), body))
 # ══════════════════════════════════════════════════════════════
 # 3. DIAGNÓSTICO TÉCNICO
 # ══════════════════════════════════════════════════════════════
-story.append(Paragraph("3. DIAGNÓSTICO TÉCNICO", section_title))
+story.append(Paragraph("3. DIAGNÓSTICO", section_title))
 story.append(Paragraph(
     "Tras la inspección de los sistemas del vehículo se identificaron las siguientes condiciones:", body))
 
@@ -163,6 +163,9 @@ def diag_block(num, titulo, hallazgo, causa_items, riesgo_items):
     elems.append(Paragraph(hallazgo, body))
 
     def ip(items, color):
+        if not items:
+            return [Paragraph("No especificado", s("Normal", fontName="Helvetica-Oblique", fontSize=9,
+                textColor=MED_GRAY, leading=13, spaceAfter=2))]
         return [Paragraph(f"• {i}", s("Normal", fontName="Helvetica", fontSize=9,
             textColor=color, leading=13, spaceAfter=2)) for i in items]
 
@@ -241,7 +244,7 @@ story.append(Spacer(1, 0.5*cm))
 # ══════════════════════════════════════════════════════════════
 # 5. CONCLUSIÓN
 # ══════════════════════════════════════════════════════════════
-story.append(Paragraph("5. CONCLUSIÓN TÉCNICA", section_title))
+story.append(Paragraph("5. CONCLUSIÓN", section_title))
 story.append(Paragraph(data.get("conclusion", ""), body))
 story.append(Spacer(1, 0.2*cm))
 
@@ -292,7 +295,7 @@ story.append(Spacer(1, 0.3*cm))
 # ══════════════════════════════════════════════════════════════
 story.append(Paragraph("6. SOLICITUD DE AUTORIZACIÓN", section_title))
 story.append(Paragraph(
-    "Con base en el diagnóstico técnico realizado, se solicita la autorización para ejecutar "
+    "Con base en el diagnóstico realizado, se solicita la autorización para ejecutar "
     "los trabajos de mantenimiento preventivo y correctivo descritos en el presente informe, "
     "con el fin de garantizar el correcto funcionamiento, la seguridad operativa y la "
     "continuidad del vehículo.",

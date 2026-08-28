@@ -504,35 +504,35 @@ server.post('/api/generate-ai-report', async (req, res) => {
       ? itemsToAnalyze.map(item => `- ${item.descripcion} (Cantidad: ${item.cantidad}, Precio: $${item.precio})`).join('\n')
       : "No hay ítems específicos de cotización vinculados.";
 
-    const systemPrompt = `Actúas como un ingeniero automotriz y perito técnico de primer nivel. Tu tarea es redactar un informe técnico automotriz sumamente detallado y estructurado a partir de los datos del vehículo y los trabajos/cotizaciones seleccionados.
+    const systemPrompt = `Actúas como el redactor de informes de un taller automotriz. Tu tarea es redactar un informe claro y ordenado (NO un informe técnico ni un peritaje) a partir de los datos del vehículo y los trabajos/cotizaciones seleccionados, usando lenguaje sencillo que cualquier cliente pueda entender, evitando jerga de ingeniería innecesaria.
 Debes responder ESTRICTAMENTE en formato JSON válido que encaje exactamente con el siguiente esquema. No agregues introducciones, explicaciones ni formato markdown en la respuesta, solo el objeto JSON limpio.
+
+REGLA MÁS IMPORTANTE: NUNCA inventes ni asumas información que no te haya sido entregada explícitamente en los datos del vehículo, los ítems cotizados o las observaciones del administrador. No inventes causas técnicas, riesgos, mediciones, síntomas ni hallazgos que no se puedan deducir directamente de lo que se te dio. Si no hay información suficiente para un campo, escribe algo breve y genérico basado solo en la descripción del ítem cotizado (por ejemplo, repetir o parafrasear la descripción), en vez de inventar detalles específicos.
 
 Esquema del JSON esperado:
 {
-  "objeto": "Un párrafo formal que describa el objeto del presente informe (diagnosticar y documentar el estado técnico del vehículo, justificando las intervenciones).",
-  "descripcion_ingreso": "Un párrafo formal que detalle por qué el vehículo ingresó al taller y qué novedades generales iniciales se detectaron.",
+  "objeto": "Un párrafo breve que describa el objeto del presente informe (documentar el trabajo realizado o cotizado sobre el vehículo).",
+  "descripcion_ingreso": "Un párrafo breve que resuma por qué el vehículo ingresó al taller, basado solo en el motivo de ingreso y las observaciones dadas.",
   "diagnosticos": [
     {
-      "titulo": "Nombre del Sistema o Falla (ej: Sistema de Frenos, Dirección, etc.)",
-      "hallazgo": "Descripción sumamente técnica y detallada de lo que se encontró en este sistema.",
+      "titulo": "Nombre del sistema o ítem (ej: Frenos, Dirección, etc.), tomado de los ítems cotizados",
+      "hallazgo": "Descripción clara y sencilla de lo que se encontró o del trabajo a realizar, basada únicamente en la descripción del ítem cotizado o las observaciones dadas — sin inventar detalles técnicos adicionales.",
       "causas": [
-        "Causa técnica probable 1",
-        "Causa técnica probable 2"
+        "Causa mencionada o deducible directamente de los datos dados (si no hay ninguna evidente, deja este arreglo vacío)"
       ],
       "riesgos": [
-        "Riesgo técnico/seguridad 1 si no se interviene",
-        "Riesgo técnico/seguridad 2 si no se interviene"
+        "Riesgo mencionado o deducible directamente de los datos dados (si no hay ninguno evidente, deja este arreglo vacío)"
       ]
     }
   ],
   "alcance": [
     {
       "tipo": "Preventivo" o "Correctivo",
-      "descripcion": "Descripción concisa pero clara de la acción de mantenimiento o reparación realizada/cotizada."
+      "descripcion": "Descripción concisa y clara de la acción de mantenimiento o reparación realizada/cotizada, tomada del ítem cotizado."
     }
   ],
-  "conclusion": "Un párrafo formal que resuma la conclusión técnica general, enfatizando el restablecimiento de la seguridad del vehículo.",
-  "recomendacion_alerta": "Una recomendación crítica final sobre la importancia de ejecutar estas intervenciones de manera integral."
+  "conclusion": "Un párrafo breve que resuma el estado general y el trabajo realizado, sin agregar información no dada.",
+  "recomendacion_alerta": "Una recomendación breve sobre la importancia de realizar estas intervenciones, sin inventar plazos ni riesgos no mencionados."
 }`;
 
     const userPrompt = `Datos del Vehículo:
@@ -548,7 +548,7 @@ ${quoteItemsText}
 Observaciones del Administrador a tener en cuenta para el enfoque de la IA:
 ${notes || 'Ninguna observación especial.'}
 
-Genera el informe técnico formal en español enfocado en los ítems seleccionados y en los datos del vehículo, siguiendo el esquema JSON proporcionado de manera estricta.`;
+Genera el informe en español enfocado únicamente en los ítems seleccionados y en los datos del vehículo dados arriba, siguiendo el esquema JSON de manera estricta y sin inventar ninguna información que no esté aquí.`;
 
     const openRouterKey = process.env.OPENROUTER_API_KEY;
     if (!openRouterKey) {
