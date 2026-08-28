@@ -226,11 +226,28 @@ export default function TechnicianView() {
       fecha: new Date().toISOString()
     };
     try {
-      await fetch(`${API_URL}/reports`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
-      });
+      // Un pedido activo tiene un solo reporte "vigente": si el técnico ya había
+      // subido uno para esta orden, lo actualizamos en vez de crear otro — antes
+      // cada envío creaba una fila nueva y el admin podía quedarse viendo la vieja.
+      const existingRes = await fetch(`${API_URL}/reports?orderId=${selectedOrder.id}`);
+      const existingReports = await existingRes.json();
+      const existing = Array.isArray(existingReports) && existingReports.length > 0
+        ? existingReports.sort((a, b) => new Date(b.fecha) - new Date(a.fecha))[0]
+        : null;
+
+      if (existing) {
+        await fetch(`${API_URL}/reports/${existing.id}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ ...payload, id: existing.id })
+        });
+      } else {
+        await fetch(`${API_URL}/reports`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+      }
       setStatusMsg({ text: '✓ Reporte subido — revisa WhatsApp', type: 'success' });
       setTimeout(() => {
         setSelectedOrder(null);

@@ -221,8 +221,10 @@ export default function ClientView() {
 
   // ── Pantalla de detalle ───────────────────────────────────────────
   const order = selectedOrder;
-  const report = order?.reports?.[0];
-  const quote = order?.quotes?.[0];
+  // Usa siempre el reporte/cotización más reciente por fecha, no el primero del arreglo
+  // (una orden puede acumular más de uno si se subió/guardó varias veces).
+  const report = (order?.reports || []).slice().sort((a, b) => new Date(b.fecha) - new Date(a.fecha))[0];
+  const quote = (order?.quotes || []).slice().sort((a, b) => new Date(b.fecha) - new Date(a.fecha))[0];
   const totals = quote?.items?.reduce((acc, it) => {
     const lt = (parseFloat(it.precio) || 0) * (parseFloat(it.cantidad) || 0);
     acc.sub += lt;

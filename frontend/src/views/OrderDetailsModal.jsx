@@ -8,11 +8,16 @@ const PAYMENT_METHODS = ['Efectivo', 'Nequi', 'Bancolombia', 'Banco de Bogota', 
 
 export default function OrderDetailsModal({ order, onClose, fleetMode = false, initialTab = 'info', onUpdate }) {
   const [activeTab, setActiveTab] = useState(initialTab);
-  const [reportData, setReportData] = useState(order.reports?.[0] || null);
+  // Un pedido puede tener más de un reporte histórico si el técnico subió varios;
+  // usamos siempre el más reciente por fecha, no el primero del arreglo.
+  const latestReport = (order.reports || []).slice().sort((a, b) => new Date(b.fecha) - new Date(a.fecha))[0] || null;
+  const [reportData, setReportData] = useState(latestReport);
+  // Misma protección para cotizaciones: usar la más reciente, no order.quotes[0].
+  const latestQuote = (order.quotes || []).slice().sort((a, b) => new Date(b.fecha) - new Date(a.fecha))[0] || null;
   const [quoteItems, setQuoteItems] = useState(
-    order.quotes?.[0]?.items || [{ descripcion: '', cantidad: 1, precio: 0, aplicaIva: false }]
+    latestQuote?.items || [{ descripcion: '', cantidad: 1, precio: 0, aplicaIva: false }]
   );
-  const [quoteId, setQuoteId] = useState(order.quotes?.[0]?.id ?? null);
+  const [quoteId, setQuoteId] = useState(latestQuote?.id ?? null);
   const [savingQuote, setSavingQuote] = useState(false);
   const [statusMsg, setStatusMsg] = useState({ text: '', type: '' });
   const [showConfirm, setShowConfirm] = useState(false);
