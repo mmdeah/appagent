@@ -13,13 +13,6 @@ const middlewares = jsonServer.defaults();
 // going paid). Try each in order and fall back to the next on a recoverable error.
 const OPENROUTER_MODEL_CHAIN = [
   'nvidia/nemotron-3-ultra-550b-a55b:free',
-  'deepseek/deepseek-chat-v3-0324:free',
-  'qwen/qwen3-14b:free',
-  'mistralai/mistral-small-3.2-24b-instruct:free',
-  'google/gemma-3-27b-it:free',
-  'meta-llama/llama-4-scout:free',
-  'z-ai/glm-4.5-air:free',
-  'tngtech/deepseek-r1t2-chimera:free',
 ];
 const callOpenRouterWithFallback = async (openRouterKey, { systemPrompt, userPrompt, messages, temperature = 0.3 }) => {
   const chatMessages = messages || [
