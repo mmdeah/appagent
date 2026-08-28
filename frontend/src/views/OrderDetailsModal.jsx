@@ -224,8 +224,17 @@ export default function OrderDetailsModal({ order, onClose, fleetMode = false, i
   const printReport = () => {
     if (!reportData || !reportData.items) return;
     const stateBadge = { Bueno: 'badge-good', Regular: 'badge-warn', Malo: 'badge-bad', Necesario: 'badge-warn', Realizar: 'badge-warn' };
-    // Ítems sin estado real (ej. checkbox desmarcado que quedó guardado con state null en datos viejos) no son un resultado, no se imprimen.
-    const rows = reportData.items.filter(it => it.state).map((it, i) => `
+    // Los ítems de Insumos/Servicios Especializados solo llegan aquí si el técnico los marcó,
+    // así que si por datos viejos quedaron sin estado, se muestran con el estado que les corresponde
+    // en vez de "NULL". Cualquier otro ítem sin estado real (checkbox desmarcado) no es un resultado y no se imprime.
+    const rows = reportData.items
+      .map(it => {
+        if (it.category === 'Insumos' && !it.state) return { ...it, state: 'Necesario' };
+        if (it.category === 'Servicios Especializados' && !it.state) return { ...it, state: 'Realizar' };
+        return it;
+      })
+      .filter(it => it.state)
+      .map((it, i) => `
       <tr>
         <td class="col-num">${i + 1}</td>
         <td class="col-desc"><strong>${it.item}</strong><br><small style="color: #64748b">${it.category}</small></td>
@@ -525,9 +534,9 @@ export default function OrderDetailsModal({ order, onClose, fleetMode = false, i
       const cRepuesto = parseInt(it.cantidadRepuesto) || 1;
 
       const prio = it.prioridad || 'urgente';
-      if (it.category === 'Insumos' && it.state === 'Necesario') {
+      if (it.category === 'Insumos' && (it.state === 'Necesario' || !it.state)) {
         newItems.push({ descripcion: `Insumo: ${it.item}`, cantidad: parseInt(it.cantidad) || 1, precio: 0, aplicaIva: false, prioridad: prio });
-      } else if (it.category === 'Servicios Especializados' && it.state === 'Realizar') {
+      } else if (it.category === 'Servicios Especializados' && (it.state === 'Realizar' || !it.state)) {
         const desc = it.item === 'Diagnostico Profundo en' ? `Diagnóstico Profundo (${it.area || 'General'})` : it.item;
         newItems.push({ descripcion: desc, cantidad: 1, precio: mO, aplicaIva: false, prioridad: prio });
       } else {
@@ -923,7 +932,9 @@ export default function OrderDetailsModal({ order, onClose, fleetMode = false, i
                             {it.cantidad && <span style={{ color: 'var(--text-muted)', fontSize: '0.8rem', marginLeft: '0.4rem' }}>x{it.cantidad}</span>}
                           </td>
                           <td>
-                            <span style={{ color: stateColor[it.state] || 'var(--text)', fontWeight: 600, fontSize: '0.82rem' }}>{it.state || '—'}</span>
+                            <span style={{ color: stateColor[it.state] || 'var(--text)', fontWeight: 600, fontSize: '0.82rem' }}>
+                              {it.state || (it.category === 'Insumos' ? 'Necesario' : it.category === 'Servicios Especializados' ? 'Realizar' : '—')}
+                            </span>
                           </td>
                           <td>
                             {it.state === 'Bueno' ? <span style={{ color: 'var(--text-muted)' }}>—</span> : (

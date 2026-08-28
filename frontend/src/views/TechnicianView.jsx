@@ -195,7 +195,15 @@ export default function TechnicianView() {
   };
 
   const submitReport = async () => {
-    const items = Object.values(reportData);
+    // Cualquier ítem de Insumos/Servicios Especializados solo llega a reportData
+    // marcado por el técnico (el checkbox); nunca debe subirse con estado vacío —
+    // si así queda, se ve como "NULL" en el reporte y además transferToQuote() en
+    // la vista de admin lo descarta silenciosamente al armar la cotización.
+    const items = Object.values(reportData).map(it => {
+      if (it.category === 'Insumos' && !it.state) return { ...it, state: 'Necesario' };
+      if (it.category === 'Servicios Especializados' && !it.state) return { ...it, state: 'Realizar' };
+      return it;
+    });
     const validCodes = scannerCodes.filter(c => c.code.length > 0);
     const precioDiag = validCodes.length > 0 ? (parseFloat(precioDiagnostico.replace(/\D/g,'')) || 0) : 0;
 

@@ -349,7 +349,9 @@ export default function ClientView() {
                           <span style={{ fontWeight: 600, fontSize: 14 }}>{it.item}</span>
                           <span style={{ marginLeft: 8, fontSize: 12, color: '#6b7488' }}>{it.category}</span>
                         </div>
-                        <span style={{ flexShrink: 0, color: stateColor[it.state] || '#c7cbdb', fontWeight: 700, fontSize: 12.5 }}>{it.state}</span>
+                        <span style={{ flexShrink: 0, color: stateColor[it.state] || '#c7cbdb', fontWeight: 700, fontSize: 12.5 }}>
+                          {it.state || (it.category === 'Insumos' ? 'Necesario' : it.category === 'Servicios Especializados' ? 'Realizar' : '—')}
+                        </span>
                       </div>
                     ))}
                   </div>
