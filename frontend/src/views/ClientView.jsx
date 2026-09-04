@@ -4,6 +4,10 @@ import { API_URL, getPicoYPlaca } from '../api';
 
 const fmt = (n) => '$' + (parseFloat(n) || 0).toLocaleString('es-CO', { minimumFractionDigits: 0 });
 
+// order.fotos mezcla strings antiguos (sin descripción) y objetos { src, descripcion } nuevos.
+const fotoSrc = (f) => (typeof f === 'string' ? f : f?.src);
+const fotoDesc = (f) => (typeof f === 'string' ? '' : (f?.descripcion || ''));
+
 const SHOP = {
   name: 'Automotriz Online SD',
   phone: '301 469 7942',
@@ -272,9 +276,12 @@ export default function ClientView() {
                   <Camera size={13} /> Fotos de Recepción
                 </div>
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(90px, 1fr))', gap: 8 }}>
-                  {order.fotos.map((src, i) => (
-                    <img key={i} src={src} alt={`foto-${i}`} onClick={() => setLightboxSrc(src)}
-                      style={{ width: '100%', aspectRatio: '1', objectFit: 'cover', borderRadius: 10, border: '1px solid rgba(255,255,255,.08)', cursor: 'pointer' }} />
+                  {order.fotos.map((f, i) => (
+                    <div key={i}>
+                      <img src={fotoSrc(f)} alt={`foto-${i}`} onClick={() => setLightboxSrc(fotoSrc(f))}
+                        style={{ width: '100%', aspectRatio: '1', objectFit: 'cover', borderRadius: 10, border: '1px solid rgba(255,255,255,.08)', cursor: 'pointer' }} />
+                      {fotoDesc(f) && <div style={{ fontSize: 10.5, color: '#8992a8', textAlign: 'center', marginTop: 4 }}>{fotoDesc(f)}</div>}
+                    </div>
                   ))}
                 </div>
               </div>

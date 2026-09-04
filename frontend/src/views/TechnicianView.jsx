@@ -12,7 +12,8 @@ import {
   Camera,
   AlertTriangle,
   Info,
-  CheckCircle
+  CheckCircle,
+  X
 } from 'lucide-react';
 
 const fmt = (n) => {
@@ -116,6 +117,13 @@ export default function TechnicianView() {
     }));
   };
 
+  const handlePhotoCapture = (category, item, file) => {
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = ev => handleDetail(category, item, 'foto', ev.target.result);
+    reader.readAsDataURL(file);
+  };
+
   const buildWhatsAppMessage = (items, validCodes, precioDiag) => {
     const o = selectedOrder;
     const fecha = new Date().toLocaleDateString('es-CO');
@@ -199,11 +207,17 @@ export default function TechnicianView() {
     // marcado por el técnico (el checkbox); nunca debe subirse con estado vacío —
     // si así queda, se ve como "NULL" en el reporte y además transferToQuote() en
     // la vista de admin lo descarta silenciosamente al armar la cotización.
-    const items = Object.values(reportData).map(it => {
+    const itemsRaw = Object.values(reportData).map(it => {
       if (it.category === 'Insumos' && !it.state) return { ...it, state: 'Necesario' };
       if (it.category === 'Servicios Especializados' && !it.state) return { ...it, state: 'Realizar' };
       return it;
     });
+    // Las fotos de hallazgos se suben a order.fotos (igual que las demás fotos de la
+    // orden) para no duplicar la imagen en base64 dentro del reporte también.
+    const fotosHallazgos = itemsRaw
+      .filter(it => it.foto)
+      .map(it => ({ src: it.foto, descripcion: `${it.item} — ${it.category} (Malo)` }));
+    const items = itemsRaw.map(({ foto, ...rest }) => rest);
     const validCodes = scannerCodes.filter(c => c.code.length > 0);
     const precioDiag = validCodes.length > 0 ? (parseFloat(precioDiagnostico.replace(/\D/g,'')) || 0) : 0;
 
@@ -220,6 +234,16 @@ export default function TechnicianView() {
       fecha: new Date().toISOString()
     };
     try {
+      if (fotosHallazgos.length > 0) {
+        const orderRes = await fetch(`${API_URL}/orders/${selectedOrder.id}`);
+        const orderActual = await orderRes.json();
+        const fotosActuales = orderActual.fotos || [];
+        await fetch(`${API_URL}/orders/${selectedOrder.id}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ fotos: [...fotosActuales, ...fotosHallazgos] })
+        });
+      }
       // Un pedido activo tiene un solo reporte "vigente": si el técnico ya había
       // subido uno para esta orden, lo actualizamos en vez de crear otro — antes
       // cada envío creaba una fila nueva y el admin podía quedarse viendo la vieja.
@@ -418,6 +442,24 @@ export default function TechnicianView() {
                             <label style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '1rem', fontWeight: 600 }}><input type="checkbox" checked={data?.requiereRepuesto || false} onChange={e => handleDetail(category, item, 'requiereRepuesto', e.target.checked)} />Repuesto</label>
                             <label style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '1rem', fontWeight: 600 }}><input type="checkbox" checked={data?.recibeReparacion || false} onChange={e => handleDetail(category, item, 'recibeReparacion', e.target.checked)} />Reparación</label>
                           </div>
+                        </div>
+                      )}
+                      {isBad && (
+                        <div style={{ marginTop: '0.6rem' }}>
+                          {data?.foto ? (
+                            <div style={{ position: 'relative', display: 'inline-block' }}>
+                              <img src={data.foto} alt="foto del hallazgo" style={{ width: 90, height: 90, objectFit: 'cover', borderRadius: 8, border: '1px solid var(--border)', display: 'block' }} />
+                              <button type="button" onClick={() => handleDetail(category, item, 'foto', null)}
+                                style={{ position: 'absolute', top: -6, right: -6, background: 'var(--error)', border: 'none', borderRadius: '50%', width: 20, height: 20, color: 'white', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                <X size={12} />
+                              </button>
+                            </div>
+                          ) : (
+                            <label style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem', padding: '0.5rem 0.8rem', border: '1.5px dashed var(--warning)', borderRadius: 8, color: 'var(--warning)', fontSize: '0.85rem', fontWeight: 700, cursor: 'pointer' }}>
+                              <Camera size={16} /> Tomar foto del hallazgo
+                              <input type="file" accept="image/*" capture="environment" style={{ display: 'none' }} onChange={e => handlePhotoCapture(category, item, e.target.files?.[0])} />
+                            </label>
+                          )}
                         </div>
                       )}
                     </div>

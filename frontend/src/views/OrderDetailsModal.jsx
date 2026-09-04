@@ -6,6 +6,11 @@ const fmt = (n) => (parseFloat(n) || 0).toLocaleString('es-CO', { minimumFractio
 
 const PAYMENT_METHODS = ['Efectivo', 'Nequi', 'Bancolombia', 'Banco de Bogota', 'Tarjeta'];
 
+// order.fotos mezcla dos formatos: strings antiguos (sin descripción) y objetos
+// nuevos { src, descripcion } (fotos de hallazgos marcados como Malo en la revisión).
+const fotoSrc = (f) => (typeof f === 'string' ? f : f?.src);
+const fotoDesc = (f) => (typeof f === 'string' ? '' : (f?.descripcion || ''));
+
 export default function OrderDetailsModal({ order, onClose, fleetMode = false, initialTab = 'info', onUpdate }) {
   const [activeTab, setActiveTab] = useState(initialTab);
   // Un pedido puede tener más de un reporte histórico si el técnico subió varios;
@@ -287,6 +292,18 @@ export default function OrderDetailsModal({ order, onClose, fleetMode = false, i
           </tbody>
         </table>
         <p style="font-size: 10px; color: #94a3b8; margin-top: -6px; margin-bottom: 12px;">Códigos de diagnóstico obtenidos por escáner. Solo informativo, no representa ningún valor cotizado.</p>
+      ` : ''}
+
+      ${order.fotos?.length > 0 ? `
+        <div class="section-header">Fotos de la Revisión</div>
+        <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 12px; margin-bottom: 16px;">
+          ${order.fotos.map(f => `
+            <div>
+              <img src="${fotoSrc(f)}" style="width: 100%; height: 130px; object-fit: cover; border-radius: 6px; border: 1px solid #e2e8f0;" />
+              ${fotoDesc(f) ? `<div style="font-size: 10px; color: #64748b; text-align: center; margin-top: 4px;">${fotoDesc(f)}</div>` : ''}
+            </div>
+          `).join('')}
+        </div>
       ` : ''}
 
       ${order.servicios ? `<div class="section-header">Servicios Solicitados</div><p style="padding: 10px; background: #f8fafc; border-radius: 6px; margin-bottom: 12px;">${order.servicios}</p>` : ''}
@@ -750,10 +767,13 @@ export default function OrderDetailsModal({ order, onClose, fleetMode = false, i
                 <>
                   <p className="section-title"><Camera size={12} style={{ display: 'inline', marginRight: 4 }} />Fotos de Ingreso</p>
                   <div className="img-grid" style={{ marginBottom: '1.5rem', gridTemplateColumns: 'repeat(auto-fill, minmax(120px, 1fr))' }}>
-                    {order.fotos.map((src, i) => (
-                      <img key={i} src={src} className="img-thumb" alt={`ingreso-${i}`}
-                        onClick={() => setLightboxSrc(src)}
-                        title="Clic para ver en grande" />
+                    {order.fotos.map((f, i) => (
+                      <div key={i}>
+                        <img src={fotoSrc(f)} className="img-thumb" alt={`ingreso-${i}`}
+                          onClick={() => setLightboxSrc(fotoSrc(f))}
+                          title={fotoDesc(f) || 'Clic para ver en grande'} />
+                        {fotoDesc(f) && <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginTop: '0.25rem', textAlign: 'center' }}>{fotoDesc(f)}</div>}
+                      </div>
                     ))}
                   </div>
                 </>
