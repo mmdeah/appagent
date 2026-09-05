@@ -294,17 +294,24 @@ export default function OrderDetailsModal({ order, onClose, fleetMode = false, i
         <p style="font-size: 10px; color: #94a3b8; margin-top: -6px; margin-bottom: 12px;">Códigos de diagnóstico obtenidos por escáner. Solo informativo, no representa ningún valor cotizado.</p>
       ` : ''}
 
-      ${order.fotos?.length > 0 ? `
+      ${(() => {
+        // Solo se imprimen las fotos con descripción: esas son las que el técnico tomó
+        // al marcar un ítem como Malo. Las fotos sin descripción (recepción, u otras
+        // subidas sueltas) no demuestran un hallazgo puntual y no van en este reporte.
+        const fotosHallazgo = (order.fotos || []).filter(f => fotoDesc(f));
+        if (fotosHallazgo.length === 0) return '';
+        return `
         <div class="section-header">Fotos de la Revisión</div>
         <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 12px; margin-bottom: 16px;">
-          ${order.fotos.map(f => `
+          ${fotosHallazgo.map(f => `
             <div>
               <img src="${fotoSrc(f)}" style="width: 100%; height: 130px; object-fit: cover; border-radius: 6px; border: 1px solid #e2e8f0;" />
-              ${fotoDesc(f) ? `<div style="font-size: 10px; color: #64748b; text-align: center; margin-top: 4px;">${fotoDesc(f)}</div>` : ''}
+              <div style="font-size: 10px; color: #64748b; text-align: center; margin-top: 4px;">${fotoDesc(f)}</div>
             </div>
           `).join('')}
         </div>
-      ` : ''}
+        `;
+      })()}
 
       ${order.servicios ? `<div class="section-header">Servicios Solicitados</div><p style="padding: 10px; background: #f8fafc; border-radius: 6px; margin-bottom: 12px;">${order.servicios}</p>` : ''}
       ${order.notas ? `<div class="section-header">Notas y Observaciones</div><p style="padding: 10px; background: #fffbeb; border-radius: 6px; color: #92400e;">${order.notas}</p>` : ''}
