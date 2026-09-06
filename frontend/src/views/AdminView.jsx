@@ -631,6 +631,13 @@ export default function AdminView() {
   const colColor = { 'Recepción': '#6366f1', 'Proceso': '#f59e0b', 'Calidad': '#10b981', 'Ingresos Rápidos': '#ec4899' };
   const colBg   = { 'Recepción': 'rgba(99,102,241,0.08)', 'Proceso': 'rgba(245,158,11,0.08)', 'Calidad': 'rgba(16,185,129,0.08)', 'Ingresos Rápidos': 'rgba(236,72,153,0.08)' };
 
+  // Usados tanto por la barra de navegación (badge compacto) como por el tab Kanban.
+  const { date: corteDate, days: corteDays } = getNextCorteALD();
+  const aldVehiculosMes = orders.filter(o => IS_FLOTA(o.cliente) && o.estado !== 'Entregado');
+  const vencidas = aldBillings.filter(b => !b.pagado && b.fechaVencimiento && new Date(b.fechaVencimiento) < new Date());
+  const corteColor = corteDays <= 3 ? '#ef4444' : corteDays <= 7 ? '#f59e0b' : '#10b981';
+  const corteBg = corteDays <= 3 ? 'rgba(239,68,68,0.1)' : corteDays <= 7 ? 'rgba(245,158,11,0.1)' : 'rgba(16,185,129,0.1)';
+
   return (
     <div style={{ minHeight: '100vh', background: 'var(--bg)' }}>
       <style>{`
@@ -670,6 +677,15 @@ export default function AdminView() {
             flex: 1 1 auto; justify-content: center; padding: 0.55rem 0.7rem; font-size: 0.85rem;
           }
         }
+        @media (max-width: 640px) {
+          .todo-bar { flex-direction: column; align-items: stretch !important; }
+        }
+        .todo-pill-delete { opacity: 0.35; transition: opacity 0.15s; }
+        .todo-pill:hover .todo-pill-delete { opacity: 1; }
+        .stat-card-hero-blue { background: linear-gradient(135deg, #4338ca 0%, #1e1b4b 100%); border-color: transparent; }
+        .stat-card-hero-red  { background: linear-gradient(135deg, #7f1d1d 0%, #271418 100%); border-color: transparent; }
+        [data-theme="light"] .stat-card-hero-blue { background: linear-gradient(135deg, #dbeafe 0%, #ede9fe 100%); }
+        [data-theme="light"] .stat-card-hero-red  { background: linear-gradient(135deg, #fee2e2 0%, #fdf2f8 100%); }
       `}</style>
       {/* Top nav */}
       <div className="admin-topbar" style={{ background: 'var(--bg-card)', borderBottom: '1px solid var(--border)', padding: '1rem 2rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', position: 'sticky', top: 0, zIndex: 50, flexWrap: 'wrap', rowGap: '0.6rem' }}>
@@ -679,11 +695,14 @@ export default function AdminView() {
           </div>
           <div>
             <div style={{ fontWeight: 700, lineHeight: 1 }}>Panel Admin</div>
-            <div style={{ fontSize: '0.82rem', color: 'var(--text-muted)' }}>Taller Automotriz</div>
+            <div style={{ fontSize: '0.82rem', color: 'var(--text-muted)' }}>Taller Automotriz · {MESES[new Date().getMonth()]} {new Date().getFullYear()}</div>
           </div>
         </div>
           <div className="admin-topbar-actions" style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
-            <button onClick={toggleTheme} className="theme-toggle" title={theme === 'dark' ? 'Cambiar a tema claro' : 'Cambiar a tema oscuro'} />
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)', fontWeight: 600 }}>{theme === 'dark' ? 'Oscuro' : 'Claro'}</span>
+              <button onClick={toggleTheme} className="theme-toggle" title={theme === 'dark' ? 'Cambiar a tema claro' : 'Cambiar a tema oscuro'} />
+            </div>
             <button className="btn-secondary" style={{ gap: '0.5rem' }} onClick={() => setShowPhotoUpload(true)}>
               <Camera size={16} /> Subir Foto
             </button>
@@ -727,61 +746,61 @@ export default function AdminView() {
 
           return (
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '1rem', marginBottom: '1.75rem' }}>
+              <div className="stat-card stat-card-hero-blue">
+                <div className="label">Facturado</div>
+                <div className="value">${fmt(factMes)}</div>
+                <Delta cur={factMes} prev={factPrev} />
+              </div>
+              <div className="stat-card stat-card-hero-red">
+                <div className="label">Por facturar</div>
+                <div className="value">${fmt(porFacturar)}</div>
+                <div className="sub">En el taller · órdenes activas</div>
+              </div>
               <div className="stat-card">
-                <div className="label">Órdenes Activas</div>
+                <div className="label">Órdenes activas</div>
                 <div className="value" style={{ color: '#818cf8' }}>{stats.active}</div>
                 <div className="sub">En progreso actualmente</div>
               </div>
               <div className="stat-card">
-                <div className="label">Facturado ({MESES[now.getMonth()]})</div>
-                <div className="value">${fmt(factMes)}</div>
-                <Delta cur={factMes} prev={factPrev} />
-              </div>
-              <div className="stat-card">
-                <div className="label">Gastos ({MESES[now.getMonth()]})</div>
+                <div className="label">Gastos</div>
                 <div className="value" style={{ color: 'var(--error)' }}>${fmt(gastMes)}</div>
                 <Delta cur={gastMes} prev={gastPrev} invert />
               </div>
               <div className="stat-card">
-                <div className="label">Ganancia ({MESES[now.getMonth()]})</div>
+                <div className="label">Ganancia</div>
                 <div className="value" style={{ color: ganMes >= 0 ? '#10b981' : '#ef4444' }}>${fmt(ganMes)}</div>
                 <Delta cur={ganMes} prev={ganPrev} />
-              </div>
-              <div className="stat-card">
-                <div className="label">Por Facturar</div>
-                <div className="value" style={{ color: '#f59e0b' }}>${fmt(porFacturar)}</div>
-                <div className="sub">Dinero en el taller (órdenes activas)</div>
               </div>
             </div>
           );
         })()}
 
         {/* Compact To-Do List Row */}
-        <div className="card" style={{ padding: '1rem 1.5rem', marginBottom: '1.75rem', display: 'flex', alignItems: 'center', gap: '2rem', overflow: 'hidden' }}>
+        <div className="card todo-bar" style={{ padding: '1rem 1.5rem', marginBottom: '1.75rem', display: 'flex', alignItems: 'center', gap: '1.25rem' }}>
           <div style={{ flexShrink: 0, minWidth: 220 }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.4rem' }}>
-              <PlusCircle size={16} color="var(--primary)" />
-              <h2 style={{ fontSize: '1rem', fontWeight: 800 }}>Tareas Pendientes</h2>
+            <h2 style={{ fontSize: '1rem', fontWeight: 800 }}>Tareas Pendientes</h2>
+            <div style={{ fontSize: '0.82rem', color: 'var(--text-muted)', marginBottom: '0.6rem' }}>
+              {todos.filter(t => !t.completed).length} tarea{todos.filter(t => !t.completed).length !== 1 ? 's' : ''} abierta{todos.filter(t => !t.completed).length !== 1 ? 's' : ''}
             </div>
-            <form onSubmit={addTodo} style={{ display: 'flex', gap: '0.4rem' }}>
-              <input type="text" placeholder="Nueva tarea..." value={newTodo} onChange={e => setNewTodo(e.target.value)} style={{ flex: 1, fontSize: '0.9rem', padding: '0.4rem 0.6rem' }} />
-              <button type="submit" className="btn-primary" style={{ padding: '0.4rem' }}><PlusCircle size={16} /></button>
-            </form>
           </div>
-          
-          <div style={{ display: 'flex', gap: '0.75rem', overflowX: 'auto', paddingBottom: '0.25rem', flex: 1, scrollbarWidth: 'none' }}>
+
+          <div style={{ display: 'flex', gap: '0.75rem', overflowX: 'auto', paddingBottom: '0.25rem', flex: 1, scrollbarWidth: 'none', alignItems: 'center' }}>
             {todos.filter(t => !t.completed).length === 0 && (
               <span style={{ color: 'var(--text-muted)', fontSize: '0.95rem' }}>No hay pendientes importantes hoy.</span>
             )}
             {todos.filter(t => !t.completed).map(t => (
-              <div key={t.id} style={{ flexShrink: 0, padding: '0.5rem 0.85rem', background: 'var(--bg)', borderRadius: 10, display: 'flex', alignItems: 'center', gap: '0.6rem', border: '1px solid var(--border)', transition: 'all 0.2s' }}>
-                <input type="checkbox" checked={t.completed} onChange={() => toggleTodo(t)} style={{ cursor: 'pointer' }} />
+              <div key={t.id} className="todo-pill" style={{ flexShrink: 0, padding: '0.5rem 0.85rem', background: 'var(--bg)', borderRadius: 999, display: 'flex', alignItems: 'center', gap: '0.6rem', border: '1px solid var(--border)', transition: 'all 0.2s' }}>
+                <input type="checkbox" checked={t.completed} onChange={() => toggleTodo(t)} style={{ cursor: 'pointer', borderRadius: '50%' }} />
                 <span style={{ fontSize: '0.92rem', fontWeight: 500, whiteSpace: 'nowrap' }}>{t.text}</span>
-                <button onClick={() => deleteTodo(t.id)} style={{ background: 'none', border: 'none', color: 'var(--error)', cursor: 'pointer', padding: 0, opacity: 0.4 }}>
+                <button onClick={() => deleteTodo(t.id)} className="todo-pill-delete" style={{ background: 'none', border: 'none', color: 'var(--error)', cursor: 'pointer', padding: 0 }}>
                   <X size={12} />
                 </button>
               </div>
             ))}
+            <form onSubmit={addTodo} style={{ display: 'flex', gap: '0.4rem', flexShrink: 0 }}>
+              <input type="text" placeholder="Nueva tarea..." value={newTodo} onChange={e => setNewTodo(e.target.value)} style={{ fontSize: '0.9rem', padding: '0.4rem 0.6rem', width: 160 }} />
+              <button type="submit" className="btn-primary" style={{ padding: '0.4rem' }}><PlusCircle size={16} /></button>
+            </form>
           </div>
         </div>
 
@@ -829,7 +848,7 @@ export default function AdminView() {
                             padding: '0.45rem 0.9rem',
                             background: isGroupActive ? 'var(--primary)' : 'transparent',
                             color: isGroupActive ? 'white' : 'var(--text-muted)',
-                            border: isGroupActive ? 'none' : '1px solid var(--border)',
+                            border: isGroupActive ? 'none' : '1px solid transparent',
                             borderRadius: 'var(--radius-sm)', cursor: 'pointer',
                             fontWeight: 700, fontSize: '0.88rem', transition: 'all 0.15s',
                             whiteSpace: 'nowrap',
@@ -874,7 +893,7 @@ export default function AdminView() {
                       padding: '0.45rem 0.9rem',
                       background: activeTab === 'Gastos' ? 'var(--primary)' : 'transparent',
                       color: activeTab === 'Gastos' ? 'white' : 'var(--text-muted)',
-                      border: activeTab === 'Gastos' ? 'none' : '1px solid var(--border)',
+                      border: activeTab === 'Gastos' ? 'none' : '1px solid transparent',
                       borderRadius: 'var(--radius-sm)', cursor: 'pointer',
                       fontWeight: 700, fontSize: '0.88rem', transition: 'all 0.15s',
                       whiteSpace: 'nowrap',
@@ -889,7 +908,7 @@ export default function AdminView() {
                       padding: '0.45rem 0.9rem',
                       background: activeTab === 'Citas' ? 'var(--primary)' : 'transparent',
                       color: activeTab === 'Citas' ? 'white' : 'var(--text-muted)',
-                      border: activeTab === 'Citas' ? 'none' : '1px solid var(--border)',
+                      border: activeTab === 'Citas' ? 'none' : '1px solid transparent',
                       borderRadius: 'var(--radius-sm)', cursor: 'pointer',
                       fontWeight: 700, fontSize: '0.88rem', transition: 'all 0.15s',
                       whiteSpace: 'nowrap',
@@ -897,42 +916,30 @@ export default function AdminView() {
                     <Calendar size={15} />
                     Calendario de Citas
                   </button>
+
+                  {activeTab === 'Kanban' && (
+                    <div style={{ display: 'flex', gap: '0.5rem', marginLeft: 'auto', flexWrap: 'wrap' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', background: corteBg, border: `1px solid ${corteColor}`, borderRadius: 999, padding: '0.35rem 0.85rem', fontSize: '0.82rem', whiteSpace: 'nowrap' }}>
+                        <Clock size={14} color={corteColor} />
+                        <span style={{ color: 'var(--text-muted)' }}>Próximo corte ALD</span>
+                        <strong style={{ color: corteColor }}>{corteDays === 0 ? '¡Hoy!' : `${corteDays} día${corteDays !== 1 ? 's' : ''}`}</strong>
+                        <span style={{ color: 'var(--text-muted)' }}>· 20 {MESES[corteDate.getMonth()].slice(0, 3)} · {aldVehiculosMes.length} vehículo{aldVehiculosMes.length !== 1 ? 's' : ''}</span>
+                      </div>
+                      {vencidas.length > 0 && (
+                        <button onClick={() => setActiveTab('ALD')} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', background: 'rgba(239,68,68,0.1)', border: '1px solid #ef4444', borderRadius: 999, padding: '0.35rem 0.85rem', fontSize: '0.82rem', whiteSpace: 'nowrap', cursor: 'pointer' }}>
+                          <Ban size={14} color="#ef4444" />
+                          <strong style={{ color: '#ef4444' }}>{vencidas.length} factura{vencidas.length !== 1 ? 's' : ''} vencida{vencidas.length !== 1 ? 's' : ''}</strong>
+                        </button>
+                      )}
+                    </div>
+                  )}
                 </div>
               );
             })()}
 
             {/* Tab Content */}
             {activeTab === 'Kanban' && (() => {
-              const { date: corteDate, days: corteDays } = getNextCorteALD();
-              const aldVehiculosMes = orders.filter(o => IS_FLOTA(o.cliente) && o.estado !== 'Entregado');
-              const vencidas = aldBillings.filter(b => !b.pagado && b.fechaVencimiento && new Date(b.fechaVencimiento) < new Date());
-              const corteColor = corteDays <= 3 ? '#ef4444' : corteDays <= 7 ? '#f59e0b' : '#10b981';
-              const corteBg = corteDays <= 3 ? 'rgba(239,68,68,0.1)' : corteDays <= 7 ? 'rgba(245,158,11,0.1)' : 'rgba(16,185,129,0.1)';
               return (<>
-              <div style={{ display: 'flex', gap: '0.75rem', marginBottom: '1.25rem', flexWrap: 'wrap' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', background: corteBg, border: `1px solid ${corteColor}`, borderRadius: 10, padding: '0.6rem 1.1rem', flex: '0 0 auto' }}>
-                  <Clock size={18} color={corteColor} />
-                  <div>
-                    <div style={{ fontSize: '0.75rem', fontWeight: 700, color: corteColor, textTransform: 'uppercase', lineHeight: 1 }}>Próximo corte ALD</div>
-                    <div style={{ fontSize: '1.1rem', fontWeight: 900, color: corteColor, lineHeight: 1.3 }}>
-                      {corteDays === 0 ? '¡Hoy!' : `${corteDays} día${corteDays !== 1 ? 's' : ''}`}
-                    </div>
-                    <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>
-                      20 de {MESES[corteDate.getMonth()]} · {aldVehiculosMes.length} vehículo{aldVehiculosMes.length !== 1 ? 's' : ''} ALD activo{aldVehiculosMes.length !== 1 ? 's' : ''}
-                    </div>
-                  </div>
-                </div>
-                {vencidas.length > 0 && (
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', background: 'rgba(239,68,68,0.1)', border: '1px solid #ef4444', borderRadius: 10, padding: '0.6rem 1.1rem', cursor: 'pointer', flex: '0 0 auto' }} onClick={() => setActiveTab('ALD')}>
-                    <Ban size={18} color="#ef4444" />
-                    <div>
-                      <div style={{ fontSize: '0.75rem', fontWeight: 700, color: '#ef4444', textTransform: 'uppercase', lineHeight: 1 }}>Pago vencido</div>
-                      <div style={{ fontSize: '1.1rem', fontWeight: 900, color: '#ef4444', lineHeight: 1.3 }}>{vencidas.length} factura{vencidas.length !== 1 ? 's' : ''}</div>
-                      <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>Ver en pestaña ALD</div>
-                    </div>
-                  </div>
-                )}
-              </div>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1.25rem' }}>
                 {COLUMNS.map(col => (
                   <div key={col} className="kanban-column"
