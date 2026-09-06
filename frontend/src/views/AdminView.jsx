@@ -777,7 +777,6 @@ export default function AdminView() {
                 {
                   id: 'finanzas', label: 'Finanzas', icon: <Receipt size={15} />,
                   items: [
-                    { id: 'Gastos',           icon: <Receipt size={14} />,    label: 'Gastos' },
                     { id: 'ALD',              icon: <CreditCard size={14} />, label: 'ALD / Ayvens' },
                     { id: 'ConsultNetworks',  icon: <CreditCard size={14} />, label: 'Consult Networks' },
                     { id: 'LaAscension',      icon: <CreditCard size={14} />, label: 'La Ascensión' },
@@ -846,6 +845,21 @@ export default function AdminView() {
                     );
                   })}
                   <div style={{ width: 1, alignSelf: 'stretch', background: 'var(--border)', margin: '0 0.2rem' }} />
+                  <button
+                    onClick={() => { setActiveTab('Gastos'); setOpenMenu(null); }}
+                    style={{
+                      display: 'flex', alignItems: 'center', gap: '0.4rem',
+                      padding: '0.45rem 0.9rem',
+                      background: activeTab === 'Gastos' ? 'var(--primary)' : 'transparent',
+                      color: activeTab === 'Gastos' ? 'white' : 'var(--text-muted)',
+                      border: activeTab === 'Gastos' ? 'none' : '1px solid var(--border)',
+                      borderRadius: 'var(--radius-sm)', cursor: 'pointer',
+                      fontWeight: 700, fontSize: '0.88rem', transition: 'all 0.15s',
+                      whiteSpace: 'nowrap',
+                    }}>
+                    <Receipt size={15} />
+                    Gastos
+                  </button>
                   <button
                     onClick={() => { setActiveTab('Citas'); setOpenMenu(null); }}
                     style={{
