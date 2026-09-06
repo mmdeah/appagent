@@ -9,6 +9,7 @@
   "ald_billings": [],
   "cn_billings": [],
   "la_ascension_billings": [],
+  "citas": [],
   "fleet_users": [
     { "id": 1, "nombre": "Ayvens Fleet", "empresa": "ald", "usuario": "ayvens", "password": "ayvens123" },
     { "id": 2, "nombre": "Consult Networks Fleet", "empresa": "cn", "usuario": "consult", "password": "cn123" }

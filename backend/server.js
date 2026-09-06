@@ -85,7 +85,7 @@ if (dataDir !== __dirname && !fs.existsSync(dbFile)) {
 // (Migrations and structure fixes were removed on purpose to protect the data.)
 try {
   const dbData = JSON.parse(fs.readFileSync(dbFile, 'utf8'));
-  const requiredKeys = ['orders', 'quotes', 'reports', 'expenses', 'archived_orders', 'ai_reports', 'todos', 'ald_billings', 'cn_billings', 'la_ascension_billings', 'fleet_users'];
+  const requiredKeys = ['orders', 'quotes', 'reports', 'expenses', 'archived_orders', 'ai_reports', 'todos', 'ald_billings', 'cn_billings', 'la_ascension_billings', 'fleet_users', 'citas'];
   const missing = requiredKeys.filter(k => !dbData[k]);
   if (missing.length > 0) console.warn(`WARNING: db.json is missing collections: ${missing.join(', ')} (not modified)`);
   console.log(`DB loaded: ${(dbData.orders || []).length} orders, ${(dbData.expenses || []).length} expenses.`);
