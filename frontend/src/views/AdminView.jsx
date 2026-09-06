@@ -44,6 +44,8 @@ export default function AdminView() {
   const [quickOrderForm, setQuickOrderForm] = useState({ placa: '', cliente: '', marca: '', modelo: '', anio: '', servicios: '' });
   const [formStatus, setFormStatus] = useState({ text: '', type: '' });
   const [orderToDelete, setOrderToDelete] = useState(null);
+  const [draggedOrderId, setDraggedOrderId] = useState(null);
+  const [dragOverCol, setDragOverCol] = useState(null);
   const [todos, setTodos] = useState([]);
   const [citas, setCitas] = useState([]);
   const [citasMonth, setCitasMonth] = useState(() => { const n = new Date(); return new Date(n.getFullYear(), n.getMonth(), 1); });
@@ -385,6 +387,26 @@ export default function AdminView() {
       body: JSON.stringify({ estado })
     });
     fetchOrders();
+  };
+
+  const handleCardDragStart = (e, id) => {
+    setDraggedOrderId(id);
+    e.dataTransfer.effectAllowed = 'move';
+  };
+
+  const handleCardDragEnd = () => {
+    setDraggedOrderId(null);
+    setDragOverCol(null);
+  };
+
+  const handleColumnDrop = (e, col) => {
+    e.preventDefault();
+    setDragOverCol(null);
+    if (draggedOrderId != null) {
+      const dragged = orders.find(o => o.id === draggedOrderId);
+      if (dragged && dragged.estado !== col) moveOrder(draggedOrderId, col);
+    }
+    setDraggedOrderId(null);
   };
 
   // Mejora #2: Convertir fotos a Base64 para guardarlas en la orden
@@ -913,7 +935,11 @@ export default function AdminView() {
               </div>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1.25rem' }}>
                 {COLUMNS.map(col => (
-                  <div key={col} className="kanban-column">
+                  <div key={col} className="kanban-column"
+                    onDragOver={e => { e.preventDefault(); if (dragOverCol !== col) setDragOverCol(col); }}
+                    onDragLeave={() => setDragOverCol(prev => prev === col ? null : prev)}
+                    onDrop={e => handleColumnDrop(e, col)}
+                    style={dragOverCol === col ? { borderColor: 'var(--primary)', background: 'rgba(99,102,241,0.06)' } : undefined}>
                     <div className="kanban-header">
                       <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                         <span style={{ width: 10, height: 10, borderRadius: '50%', background: colColor[col], display: 'inline-block' }}></span>
@@ -925,7 +951,11 @@ export default function AdminView() {
                     </div>
 
                     {orders.filter(o => o.estado === col).map(o => (
-                      <div key={o.id} className="kanban-card" onClick={() => setSelectedOrder(o)}>
+                      <div key={o.id} className="kanban-card" onClick={() => setSelectedOrder(o)}
+                        draggable
+                        onDragStart={e => handleCardDragStart(e, o.id)}
+                        onDragEnd={handleCardDragEnd}
+                        style={{ opacity: draggedOrderId === o.id ? 0.4 : 1, cursor: draggedOrderId === o.id ? 'grabbing' : 'pointer' }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '0.5rem' }}>
                           <div>
                             <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
