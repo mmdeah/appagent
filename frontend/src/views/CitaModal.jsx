@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { API_URL } from '../api';
-import { Calendar, X, Trash2, Save } from 'lucide-react';
+import { Calendar, X, Trash2, Save, LogIn } from 'lucide-react';
 
 export const SERVICIOS = {
   Revision:       { label: 'Revisión',       badgeClass: 'badge-blue',  hex: '#818cf8' },
@@ -16,8 +16,9 @@ export const SERVICIOS = {
  *  - initialFecha: 'YYYY-MM-DD' (solo en modo create, para prellenar desde el día clicado)
  *  - onClose: () => void
  *  - onSuccess: () => void  (recargar lista de citas)
+ *  - onIngresar: (cita) => void  (solo en modo edit: convertir la cita en una orden nueva)
  */
-export default function CitaModal({ mode, cita, initialFecha, onClose, onSuccess }) {
+export default function CitaModal({ mode, cita, initialFecha, onClose, onSuccess, onIngresar }) {
   const [form, setForm] = useState(() => cita
     ? { nombre: cita.nombre || '', vehiculo: cita.vehiculo || '', placa: cita.placa || '', telefono: cita.telefono || '', servicio: cita.servicio || 'Revision', fecha: cita.fecha || '', hora: cita.hora || '09:00', notas: cita.notas || '' }
     : { nombre: '', vehiculo: '', placa: '', telefono: '', servicio: 'Revision', fecha: initialFecha || (() => { const n = new Date(); return `${n.getFullYear()}-${String(n.getMonth() + 1).padStart(2, '0')}-${String(n.getDate()).padStart(2, '0')}`; })(), hora: '09:00', notas: '' }
@@ -132,6 +133,12 @@ export default function CitaModal({ mode, cita, initialFecha, onClose, onSuccess
           </div>
 
           <textarea placeholder="Notas (opcional)" value={form.notas} onChange={e => setForm({ ...form, notas: e.target.value })} style={{ minHeight: 55, marginBottom: '1.25rem' }} />
+
+          {mode === 'edit' && (
+            <button type="button" className="btn-success" style={{ width: '100%', justifyContent: 'center', marginBottom: '0.75rem' }} onClick={() => onIngresar?.(cita)}>
+              <LogIn size={16} /> Ingresar
+            </button>
+          )}
 
           <div style={{ display: 'flex', gap: '0.75rem' }}>
             {mode === 'edit' && (

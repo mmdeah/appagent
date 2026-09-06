@@ -397,6 +397,25 @@ export default function AdminView() {
     }))).then(results => setPhotos(prev => [...prev, ...results]));
   };
 
+  const handleIngresarDesdeCita = (cita) => {
+    // El campo "vehiculo" de la cita es un texto libre (Ej. "Mazda 3"); se separa
+    // en marca/modelo por la primera palabra como punto de partida, el admin
+    // completa/corrige el resto en el formulario de ingreso.
+    const [marca, ...resto] = (cita.vehiculo || '').split(' ');
+    setForm({
+      ...emptyForm,
+      placa: cita.placa || '',
+      cliente: cita.nombre || '',
+      telefono: cita.telefono || '',
+      marca: marca || '',
+      modelo: resto.join(' '),
+      servicios: SERVICIOS[cita.servicio]?.label || cita.servicio || '',
+      notas: cita.notas || '',
+    });
+    setShowCitaModal(null);
+    setShowNewOrder(true);
+  };
+
   const handleCreateOrder = async (e) => {
     e.preventDefault();
     if (!form.placa) return;
@@ -753,7 +772,6 @@ export default function AdminView() {
                     { id: 'Kanban',           icon: <LayoutDashboard size={14} />, label: 'Kanban' },
                     { id: 'Historial',        icon: <History size={14} />,         label: 'Historial' },
                     { id: 'Ingresos Rápidos', icon: <Zap size={14} />,             label: 'Ingresos Rápidos' },
-                    { id: 'Citas',            icon: <Calendar size={14} />,        label: 'Calendario de Citas' },
                   ]
                 },
                 {
@@ -827,6 +845,22 @@ export default function AdminView() {
                       </div>
                     );
                   })}
+                  <div style={{ width: 1, alignSelf: 'stretch', background: 'var(--border)', margin: '0 0.2rem' }} />
+                  <button
+                    onClick={() => { setActiveTab('Citas'); setOpenMenu(null); }}
+                    style={{
+                      display: 'flex', alignItems: 'center', gap: '0.4rem',
+                      padding: '0.45rem 0.9rem',
+                      background: activeTab === 'Citas' ? 'var(--primary)' : 'transparent',
+                      color: activeTab === 'Citas' ? 'white' : 'var(--text-muted)',
+                      border: activeTab === 'Citas' ? 'none' : '1px solid var(--border)',
+                      borderRadius: 'var(--radius-sm)', cursor: 'pointer',
+                      fontWeight: 700, fontSize: '0.88rem', transition: 'all 0.15s',
+                      whiteSpace: 'nowrap',
+                    }}>
+                    <Calendar size={15} />
+                    Calendario de Citas
+                  </button>
                 </div>
               );
             })()}
@@ -2324,6 +2358,7 @@ ${PAYMENT_METHODS.map(m => `<tr><td>${m}</td><td style="text-align:right;font-we
           initialFecha={showCitaModal.fecha}
           onClose={() => setShowCitaModal(null)}
           onSuccess={fetchCitas}
+          onIngresar={handleIngresarDesdeCita}
         />
       )}
 
