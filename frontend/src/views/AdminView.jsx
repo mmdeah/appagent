@@ -682,7 +682,6 @@ export default function AdminView() {
         @media (max-width: 640px) {
           .todo-bar { flex-direction: column; align-items: stretch !important; }
         }
-        @keyframes slideInRight { from { transform: translateX(100%); } to { transform: translateX(0); } }
         .todo-pill-delete { opacity: 0.35; transition: opacity 0.15s; }
         .todo-pill:hover .todo-pill-delete { opacity: 1; }
         .stat-card-hero-blue { background: linear-gradient(135deg, #4338ca 0%, #1e1b4b 100%); border-color: transparent; }

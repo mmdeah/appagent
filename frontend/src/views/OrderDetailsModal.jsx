@@ -1,6 +1,6 @@
 import React, { useState, useRef } from 'react';
 import { API_URL, BACKEND_URL } from '../api';
-import { MessageCircle, Printer, CheckCircle, X, Plus, Trash2, Camera, Edit2, Save, FileText, Upload, Download } from 'lucide-react';
+import { MessageCircle, Printer, CheckCircle, X, Plus, Trash2, Camera, Edit2, Save, FileText, Upload, Download, Search } from 'lucide-react';
 
 const fmt = (n) => (parseFloat(n) || 0).toLocaleString('es-CO', { minimumFractionDigits: 0 });
 
@@ -35,6 +35,26 @@ export default function OrderDetailsModal({ order, onClose, fleetMode = false, i
   const [showAddItem, setShowAddItem] = useState(false);
   const [newItem, setNewItem] = useState({ category: '', item: '', state: 'Malo', manoObra: '', requiereRepuesto: false, cantidadRepuesto: 1, valorRepuesto: '', recibeReparacion: false, valorReparacion: '' });
   const [savingApprovals, setSavingApprovals] = useState(false);
+  const [showPriceLookup, setShowPriceLookup] = useState(false);
+  const [priceLookupForm, setPriceLookupForm] = useState({ marca: order.marca || '', modelo: order.modelo || '', anio: order.anio || '', repuesto: '' });
+  const [priceLookupOrders, setPriceLookupOrders] = useState(null); // null = aún no cargado
+  const [loadingPriceLookup, setLoadingPriceLookup] = useState(false);
+
+  const openPriceLookup = async () => {
+    setShowPriceLookup(true);
+    if (priceLookupOrders !== null) return; // ya se cargó una vez, no repetir la consulta
+    setLoadingPriceLookup(true);
+    try {
+      const res = await fetch(`${API_URL}/orders?_embed=quotes`);
+      const data = await res.json();
+      setPriceLookupOrders(Array.isArray(data) ? data : []);
+    } catch (e) {
+      console.error(e);
+      setPriceLookupOrders([]);
+    } finally {
+      setLoadingPriceLookup(false);
+    }
+  };
 
   const REPORT_CATEGORIES = ['Suspensión','Frenos','Dirección','Transmisión','Fugas','Batería / Eléctrico','Chequeo Visual Motor','Niveles','Otros','Insumos','Servicios Especializados'];
   const ITEM_STATES = ['Bueno','Regular','Malo'];
@@ -1039,7 +1059,14 @@ export default function OrderDetailsModal({ order, onClose, fleetMode = false, i
           {/* ── COTIZACIÓN TAB ── */}
           {activeTab === 'cotizacion' && (
             <div>
-              <p className="section-title">Cotización / Cuenta de Cobro</p>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <p className="section-title" style={{ flex: 1 }}>Cotización / Cuenta de Cobro</p>
+                {!fleetMode && (
+                  <button className="btn-secondary hide-on-print" style={{ fontSize: '0.82rem', marginBottom: '1rem' }} onClick={openPriceLookup}>
+                    <Search size={14} /> Historial de Precios
+                  </button>
+                )}
+              </div>
               <table className="data-table">
                 <thead>
                   <tr>
@@ -1304,5 +1331,116 @@ export default function OrderDetailsModal({ order, onClose, fleetMode = false, i
         <img src={lightboxSrc} alt="foto ampliada" onClick={e => e.stopPropagation()} />
       </div>
     )}
+
+    {/* Historial de Precios — panel lateral derecho */}
+    {showPriceLookup && (() => {
+      const norm = (s) => (s || '').toString().toLowerCase().trim();
+      const { marca, modelo, anio, repuesto } = priceLookupForm;
+      const hasFilter = marca.trim() || modelo.trim() || anio.trim() || repuesto.trim();
+
+      const results = [];
+      if (hasFilter && priceLookupOrders) {
+        priceLookupOrders.forEach(o => {
+          if (marca.trim() && !norm(o.marca).includes(norm(marca))) return;
+          if (modelo.trim() && !norm(o.modelo).includes(norm(modelo))) return;
+          if (anio.trim() && !norm(o.anio).includes(norm(anio))) return;
+          (o.quotes || []).forEach(q => {
+            (q.items || []).forEach(it => {
+              const precio = parseFloat(it.precio) || 0;
+              if (!it.descripcion || precio <= 0) return;
+              if (repuesto.trim() && !norm(it.descripcion).includes(norm(repuesto))) return;
+              results.push({
+                key: `${o.id}-${it.descripcion}-${results.length}`,
+                placa: o.placa, marca: o.marca, modelo: o.modelo, anio: o.anio,
+                cliente: o.cliente, fecha: o.fecha,
+                descripcion: it.descripcion, cantidad: parseFloat(it.cantidad) || 1,
+                precio, aplicaIva: it.aplicaIva,
+              });
+            });
+          });
+        });
+        results.sort((a, b) => new Date(b.fecha || 0) - new Date(a.fecha || 0));
+      }
+      const precios = results.map(r => r.precio);
+      const promedio = precios.length ? precios.reduce((s, p) => s + p, 0) / precios.length : 0;
+
+      return (
+        <div className="modal-overlay hide-on-print" style={{ justifyContent: 'flex-end', padding: 0, zIndex: 2500 }} onClick={() => setShowPriceLookup(false)}>
+          <div onClick={e => e.stopPropagation()} style={{ background: 'var(--bg-card)', borderLeft: '1px solid var(--border)', height: '100vh', width: 'min(440px, 100vw)', padding: '1.5rem', overflowY: 'auto', animation: 'slideInRight 0.25s ease' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+                <div style={{ width: 34, height: 34, borderRadius: 9, background: 'linear-gradient(135deg,#6366f1,#4f46e5)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <Search size={17} color="white" />
+                </div>
+                <div style={{ fontWeight: 700, fontSize: '1.05rem' }}>Historial de Precios</div>
+              </div>
+              <button onClick={() => setShowPriceLookup(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)' }}>
+                <X size={20} />
+              </button>
+            </div>
+
+            <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: '1rem' }}>
+              Busca por cualquier combinación de datos — no hace falta llenarlos todos.
+            </p>
+
+            <div style={{ display: 'grid', gap: '0.75rem', marginBottom: '1.25rem' }}>
+              <input placeholder="Marca (Ej. Mazda)" value={marca} onChange={e => setPriceLookupForm({ ...priceLookupForm, marca: e.target.value })} />
+              <input placeholder="Modelo (Ej. 3)" value={modelo} onChange={e => setPriceLookupForm({ ...priceLookupForm, modelo: e.target.value })} />
+              <input placeholder="Año (Ej. 2018)" value={anio} onChange={e => setPriceLookupForm({ ...priceLookupForm, anio: e.target.value })} />
+              <input placeholder="Repuesto o servicio (Ej. Amortiguador)" value={repuesto} onChange={e => setPriceLookupForm({ ...priceLookupForm, repuesto: e.target.value })} />
+              {hasFilter && (
+                <button className="btn-secondary" style={{ justifyContent: 'center' }} onClick={() => setPriceLookupForm({ marca: '', modelo: '', anio: '', repuesto: '' })}>
+                  Limpiar filtros
+                </button>
+              )}
+            </div>
+
+            {loadingPriceLookup && (
+              <p style={{ color: 'var(--text-muted)', textAlign: 'center', padding: '1.5rem 0' }}>Cargando historial...</p>
+            )}
+
+            {!loadingPriceLookup && !hasFilter && (
+              <p style={{ color: 'var(--text-muted)', textAlign: 'center', padding: '1.5rem 0' }}>
+                Escribe al menos un dato para buscar.
+              </p>
+            )}
+
+            {!loadingPriceLookup && hasFilter && results.length === 0 && (
+              <p style={{ color: 'var(--text-muted)', textAlign: 'center', padding: '1.5rem 0' }}>
+                No se encontraron coincidencias.
+              </p>
+            )}
+
+            {!loadingPriceLookup && hasFilter && results.length > 0 && (
+              <>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0.6rem 0.85rem', background: 'var(--bg)', borderRadius: 8, marginBottom: '1rem', fontSize: '0.85rem' }}>
+                  <span style={{ color: 'var(--text-muted)' }}>{results.length} resultado{results.length !== 1 ? 's' : ''}</span>
+                  {results.length > 1 && <span>Promedio: <strong>${fmt(promedio)}</strong></span>}
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                  {results.map(r => (
+                    <div key={r.key} style={{ background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: 10, padding: '0.85rem 1rem' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '0.5rem' }}>
+                        <div style={{ fontWeight: 700, fontSize: '0.92rem' }}>{r.descripcion}</div>
+                        <div style={{ fontWeight: 800, fontSize: '1rem', color: 'var(--primary)', whiteSpace: 'nowrap' }}>
+                          ${fmt(r.precio)}{r.cantidad > 1 ? ` × ${r.cantidad}` : ''}
+                        </div>
+                      </div>
+                      <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginTop: '0.3rem' }}>
+                        {r.marca} {r.modelo} {r.anio ? `(${r.anio})` : ''} · {r.placa}
+                      </div>
+                      <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginTop: '0.15rem', display: 'flex', justifyContent: 'space-between' }}>
+                        <span>{r.cliente}</span>
+                        <span>{r.fecha ? new Date(r.fecha).toLocaleDateString('es-CO') : ''}{r.aplicaIva ? ' · +IVA' : ''}</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+      );
+    })()}
   </>);
 }
