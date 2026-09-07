@@ -51,6 +51,8 @@ export default function AdminView() {
   const [citasMonth, setCitasMonth] = useState(() => { const n = new Date(); return new Date(n.getFullYear(), n.getMonth(), 1); });
   const [showCitaModal, setShowCitaModal] = useState(null); // null | {mode:'create', fecha} | {mode:'edit', cita}
   const [showRecordatorios, setShowRecordatorios] = useState(false);
+  const [showPriceSearch, setShowPriceSearch] = useState(false);
+  const [priceSearchForm, setPriceSearchForm] = useState({ marca: '', modelo: '', anio: '', repuesto: '' });
   const [newTodo, setNewTodo] = useState('');
   const [formConfig, setFormConfig] = useState(null);
   const [newCategoryName, setNewCategoryName] = useState('');
@@ -680,6 +682,7 @@ export default function AdminView() {
         @media (max-width: 640px) {
           .todo-bar { flex-direction: column; align-items: stretch !important; }
         }
+        @keyframes slideInRight { from { transform: translateX(100%); } to { transform: translateX(0); } }
         .todo-pill-delete { opacity: 0.35; transition: opacity 0.15s; }
         .todo-pill:hover .todo-pill-delete { opacity: 1; }
         .stat-card-hero-blue { background: linear-gradient(135deg, #4338ca 0%, #1e1b4b 100%); border-color: transparent; }
@@ -705,6 +708,9 @@ export default function AdminView() {
             </div>
             <button className="btn-secondary" style={{ gap: '0.5rem' }} onClick={() => setShowPhotoUpload(true)}>
               <Camera size={16} /> Subir Foto
+            </button>
+            <button className="btn-secondary" style={{ gap: '0.5rem' }} onClick={() => setShowPriceSearch(true)}>
+              <Search size={16} /> Historial de Precios
             </button>
             <button className="btn-primary" style={{ gap: '0.5rem' }} onClick={() => setShowNewOrder(true)}>
               <PlusCircle size={16} /> Nueva Orden
@@ -2416,6 +2422,113 @@ ${PAYMENT_METHODS.map(m => `<tr><td>${m}</td><td style="text-align:right;font-we
       {showRecordatorios && (
         <RecordatoriosModal citas={citas} onClose={() => setShowRecordatorios(false)} onRefresh={fetchCitas} />
       )}
+
+      {showPriceSearch && (() => {
+        const norm = (s) => (s || '').toString().toLowerCase().trim();
+        const { marca, modelo, anio, repuesto } = priceSearchForm;
+        const hasFilter = marca.trim() || modelo.trim() || anio.trim() || repuesto.trim();
+
+        const results = [];
+        if (hasFilter) {
+          orders.forEach(o => {
+            if (marca.trim() && !norm(o.marca).includes(norm(marca))) return;
+            if (modelo.trim() && !norm(o.modelo).includes(norm(modelo))) return;
+            if (anio.trim() && !norm(o.anio).includes(norm(anio))) return;
+            (o.quotes || []).forEach(q => {
+              (q.items || []).forEach(it => {
+                const precio = parseFloat(it.precio) || 0;
+                if (!it.descripcion || precio <= 0) return;
+                if (repuesto.trim() && !norm(it.descripcion).includes(norm(repuesto))) return;
+                results.push({
+                  key: `${o.id}-${it.descripcion}-${results.length}`,
+                  placa: o.placa, marca: o.marca, modelo: o.modelo, anio: o.anio,
+                  cliente: o.cliente, fecha: o.fecha,
+                  descripcion: it.descripcion, cantidad: parseFloat(it.cantidad) || 1,
+                  precio, aplicaIva: it.aplicaIva,
+                });
+              });
+            });
+          });
+          results.sort((a, b) => new Date(b.fecha || 0) - new Date(a.fecha || 0));
+        }
+
+        const precios = results.map(r => r.precio);
+        const promedio = precios.length ? precios.reduce((s, p) => s + p, 0) / precios.length : 0;
+
+        return (
+          <div className="modal-overlay" style={{ justifyContent: 'flex-end', padding: 0 }} onClick={() => setShowPriceSearch(false)}>
+            <div onClick={e => e.stopPropagation()} style={{ background: 'var(--bg-card)', borderLeft: '1px solid var(--border)', height: '100vh', width: 'min(440px, 100vw)', padding: '1.5rem', overflowY: 'auto', animation: 'slideInRight 0.25s ease' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+                  <div style={{ width: 34, height: 34, borderRadius: 9, background: 'linear-gradient(135deg,#6366f1,#4f46e5)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <Search size={17} color="white" />
+                  </div>
+                  <div style={{ fontWeight: 700, fontSize: '1.05rem' }}>Historial de Precios</div>
+                </div>
+                <button onClick={() => setShowPriceSearch(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)' }}>
+                  <X size={20} />
+                </button>
+              </div>
+
+              <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: '1rem' }}>
+                Busca por cualquier combinación de datos — no hace falta llenarlos todos.
+              </p>
+
+              <div style={{ display: 'grid', gap: '0.75rem', marginBottom: '1.25rem' }}>
+                <input placeholder="Marca (Ej. Mazda)" value={marca} onChange={e => setPriceSearchForm({ ...priceSearchForm, marca: e.target.value })} />
+                <input placeholder="Modelo (Ej. 3)" value={modelo} onChange={e => setPriceSearchForm({ ...priceSearchForm, modelo: e.target.value })} />
+                <input placeholder="Año (Ej. 2018)" value={anio} onChange={e => setPriceSearchForm({ ...priceSearchForm, anio: e.target.value })} />
+                <input placeholder="Repuesto o servicio (Ej. Amortiguador)" value={repuesto} onChange={e => setPriceSearchForm({ ...priceSearchForm, repuesto: e.target.value })} />
+                {hasFilter && (
+                  <button className="btn-secondary" style={{ justifyContent: 'center' }} onClick={() => setPriceSearchForm({ marca: '', modelo: '', anio: '', repuesto: '' })}>
+                    Limpiar filtros
+                  </button>
+                )}
+              </div>
+
+              {!hasFilter && (
+                <p style={{ color: 'var(--text-muted)', textAlign: 'center', padding: '1.5rem 0' }}>
+                  Escribe al menos un dato para buscar.
+                </p>
+              )}
+
+              {hasFilter && results.length === 0 && (
+                <p style={{ color: 'var(--text-muted)', textAlign: 'center', padding: '1.5rem 0' }}>
+                  No se encontraron coincidencias.
+                </p>
+              )}
+
+              {hasFilter && results.length > 0 && (
+                <>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0.6rem 0.85rem', background: 'var(--bg)', borderRadius: 8, marginBottom: '1rem', fontSize: '0.85rem' }}>
+                    <span style={{ color: 'var(--text-muted)' }}>{results.length} resultado{results.length !== 1 ? 's' : ''}</span>
+                    {results.length > 1 && <span>Promedio: <strong>${fmt(promedio)}</strong></span>}
+                  </div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                    {results.map(r => (
+                      <div key={r.key} style={{ background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: 10, padding: '0.85rem 1rem' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '0.5rem' }}>
+                          <div style={{ fontWeight: 700, fontSize: '0.92rem' }}>{r.descripcion}</div>
+                          <div style={{ fontWeight: 800, fontSize: '1rem', color: 'var(--primary)', whiteSpace: 'nowrap' }}>
+                            ${fmt(r.precio)}{r.cantidad > 1 ? ` × ${r.cantidad}` : ''}
+                          </div>
+                        </div>
+                        <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginTop: '0.3rem' }}>
+                          {r.marca} {r.modelo} {r.anio ? `(${r.anio})` : ''} · {r.placa}
+                        </div>
+                        <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginTop: '0.15rem', display: 'flex', justifyContent: 'space-between' }}>
+                          <span>{r.cliente}</span>
+                          <span>{r.fecha ? new Date(r.fecha).toLocaleDateString('es-CO') : ''}{r.aplicaIva ? ' · +IVA' : ''}</span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </>
+              )}
+            </div>
+          </div>
+        );
+      })()}
 
       {/* Delete Confirmation Modal */}
       {orderToDelete && (
