@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Search, ChevronLeft, ChevronRight, ArrowRight, Calendar, Gauge, Car, Camera, ShieldCheck, CheckCircle2, Users } from 'lucide-react';
 import { API_URL, getPicoYPlaca } from '../api';
+import { getQuoteSlot, calcQuoteTotals } from '../quoteUtils';
 
 const fmt = (n) => '$' + (parseFloat(n) || 0).toLocaleString('es-CO', { minimumFractionDigits: 0 });
 
@@ -228,13 +229,10 @@ export default function ClientView() {
   // Usa siempre el reporte/cotización más reciente por fecha, no el primero del arreglo
   // (una orden puede acumular más de uno si se subió/guardó varias veces).
   const report = (order?.reports || []).slice().sort((a, b) => new Date(b.fecha) - new Date(a.fecha))[0];
-  const quote = (order?.quotes || []).slice().sort((a, b) => new Date(b.fecha) - new Date(a.fecha))[0];
-  const totals = quote?.items?.reduce((acc, it) => {
-    const lt = (parseFloat(it.precio) || 0) * (parseFloat(it.cantidad) || 0);
-    acc.sub += lt;
-    if (it.aplicaIva) acc.iva += lt * 0.19;
-    return acc;
-  }, { sub: 0, iva: 0 }) || { sub: 0, iva: 0 };
+  // El cliente solo ve la cotización real (slot 1) — el borrador privado del
+  // admin (slot 2) nunca se le muestra.
+  const quote = getQuoteSlot(order, 1);
+  const totals = calcQuoteTotals(quote?.items);
   const st = statusOf(order.estado);
   const dateShort = order.fecha ? new Date(order.fecha).toLocaleDateString('es-CO') : 'N/A';
   const kmText = order.kilometraje ? `${(parseFloat(order.kilometraje) || 0).toLocaleString('es-CO')} km` : 'N/A';
@@ -411,7 +409,7 @@ export default function ClientView() {
                   </div>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 8, paddingTop: 14, borderTop: '1px solid rgba(255,255,255,.09)' }}>
                     <span style={{ fontSize: 13, fontWeight: 800, letterSpacing: '.04em', textTransform: 'uppercase', color: '#f4f6fb' }}>Total</span>
-                    <span style={{ fontSize: 25, fontWeight: 800, color: '#9a9dfc' }}>{fmt(totals.sub + totals.iva)}</span>
+                    <span style={{ fontSize: 25, fontWeight: 800, color: '#9a9dfc' }}>{fmt(totals.total)}</span>
                   </div>
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 16, padding: '12px 14px', borderRadius: 12, background: 'rgba(61,220,151,.08)', border: '1px solid rgba(61,220,151,.18)' }}>

@@ -7,6 +7,7 @@ import RecordatoriosModal from './RecordatoriosModal';
 import { ThemeContext } from '../App';
 import { PlusCircle, BarChart3, Camera, X, Car, Trash2, Zap, LayoutDashboard, History, Receipt, CheckCircle, AlertTriangle, ClipboardList, Save, Settings, FileText, Plus, Sparkles, CreditCard, Clock, BadgeCheck, Ban, Search, ChevronDown, Calendar, MessageCircle } from 'lucide-react';
 import BillingCycleTab from './BillingCycleTab';
+import { getQuoteSlot, getRealQuoteTotal, getRealQuoteIva } from '../quoteUtils';
 
 const fmt = (n) => Math.round(parseFloat(n) || 0).toLocaleString('es-CO');
 const fmtCompact = (n) => {
@@ -111,23 +112,13 @@ export default function AdminView() {
   const [statsDesde, setStatsDesde] = useState('');
   const [statsHasta, setStatsHasta] = useState('');
 
-  const calcOrderTotal = (o) => {
-    const q = o.quotes?.find(q => q.autorizada) || o.quotes?.[0];
-    if (!q) return 0;
-    return (q.items || []).reduce((sum, i) => {
-      const lt = (Number(i.precio) || 0) * (Number(i.cantidad) || 1);
-      return sum + lt + (i.aplicaIva ? lt * 0.19 : 0);
-    }, 0);
-  };
-
-  const calcOrderIva = (o) => {
-    const q = o.quotes?.find(q => q.autorizada) || o.quotes?.[0];
-    if (!q) return 0;
-    return (q.items || []).reduce((sum, i) => {
-      const lt = (Number(i.precio) || 0) * (Number(i.cantidad) || 1);
-      return sum + (i.aplicaIva ? lt * 0.19 : 0);
-    }, 0);
-  };
+  // Suma sobre TODAS las cotizaciones autorizadas de la orden (una orden
+  // puede tener sus 2 cotizaciones autorizadas); si ninguna está autorizada
+  // aún, usa solo la primera como estimado (igual que antes).
+  // Solo la cotización real (slot 1) cuenta para ingresos/facturación — el
+  // borrador privado del admin (slot 2) nunca se suma aquí.
+  const calcOrderTotal = (o) => getRealQuoteTotal(o);
+  const calcOrderIva = (o) => getRealQuoteIva(o);
 
   const getStatsRange = () => {
     const now = new Date();
@@ -993,7 +984,7 @@ export default function AdminView() {
                           </div>
                         )}
                         {(() => {
-                          const items = o.quotes?.[0]?.items || [];
+                          const items = getQuoteSlot(o, 1)?.items || [];
                           const ap = items.filter(it => it.aprobadoFlota === true).length;
                           const rech = items.filter(it => it.aprobadoFlota === false).length;
                           if (ap === 0 && rech === 0) return null;
@@ -2151,12 +2142,8 @@ ${PAYMENT_METHODS.map(m => `<tr><td>${m}</td><td style="text-align:right;font-we
                       setReportOrderId(ordId);
                       setAllQuotes(true);
                       const selectedOrd = orders.find(o => String(o.id) === String(ordId));
-                      const q = selectedOrd?.quotes?.[0];
-                      if (q && q.items) {
-                        setSelectedQuoteItems(q.items.map(item => item.descripcion));
-                      } else {
-                        setSelectedQuoteItems([]);
-                      }
+                      const items = getQuoteSlot(selectedOrd, 1)?.items || [];
+                      setSelectedQuoteItems(items.map(item => item.descripcion));
                     }}
                     style={{ width: '100%', padding: '0.9rem 1.2rem', fontSize: '1.1rem', fontWeight: 700, borderRadius: 12, border: '2px solid var(--border)', background: 'var(--bg)', cursor: 'pointer', transition: 'border-color 0.2s' }}
                   >
@@ -2173,8 +2160,10 @@ ${PAYMENT_METHODS.map(m => `<tr><td>${m}</td><td style="text-align:right;font-we
                 {reportOrderId && (() => {
                   const selectedOrder = orders.find(o => String(o.id) === String(reportOrderId));
                   if (!selectedOrder) return null;
-                  const quote = selectedOrder.quotes?.[0];
-                  const hasQuote = quote && quote.items && quote.items.length > 0;
+                  // El informe IA solo usa la cotización real (slot 1) — el
+                  // borrador privado del admin (slot 2) no participa aquí.
+                  const quoteItemsAll = getQuoteSlot(selectedOrder, 1)?.items || [];
+                  const hasQuote = quoteItemsAll.length > 0;
 
                   return (
                     <div style={{ animation: 'fadeIn 0.3s ease-out' }}>
@@ -2216,7 +2205,7 @@ ${PAYMENT_METHODS.map(m => `<tr><td>${m}</td><td style="text-align:right;font-we
                                 type="button"
                                 onClick={() => {
                                   setAllQuotes(true);
-                                  setSelectedQuoteItems(quote.items.map(item => item.descripcion));
+                                  setSelectedQuoteItems(quoteItemsAll.map(item => item.descripcion));
                                 }}
                                 style={{ flex: 1, padding: '0.75rem', borderRadius: 10, border: '1px solid var(--border)', background: allQuotes ? 'var(--primary)' : 'transparent', color: allQuotes ? 'white' : 'var(--text)', fontWeight: 600, cursor: 'pointer', transition: 'all 0.2s', fontSize: '0.9rem' }}
                               >
@@ -2237,7 +2226,7 @@ ${PAYMENT_METHODS.map(m => `<tr><td>${m}</td><td style="text-align:right;font-we
                                 <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '0.6rem', fontWeight: 600 }}>
                                   Marca los ítems que deseas que la IA analice para el informe técnico:
                                 </div>
-                                {quote.items.map((item, idx) => {
+                                {quoteItemsAll.map((item, idx) => {
                                   const isChecked = selectedQuoteItems.includes(item.descripcion);
                                   return (
                                     <label 

@@ -8,6 +8,7 @@ import {
   AlertTriangle, Download, Settings, TrendingUp, TrendingDown,
   BarChart2, DollarSign,
 } from 'lucide-react';
+import { getQuoteSlot, getRealQuoteTotal } from '../quoteUtils';
 
 const IS_ALD = (c) => /(ald|ayvens)/i.test(c || '');
 const IS_CN  = (c) => /consult.?networks/i.test(c || '');
@@ -22,14 +23,9 @@ const ESTADO_COLOR = {
 };
 const KANBAN_COLS = ['Recepción', 'Proceso', 'Calidad', 'Ingresos Rápidos'];
 
-const calcTotal = (o) => {
-  if (!o.quotes?.length) return 0;
-  const q = o.quotes[0];
-  return (q.items || []).reduce((s, it) => {
-    const base = (parseFloat(it.precio) || 0) * (parseFloat(it.cantidad) || 1);
-    return s + base + (it.aplicaIva ? base * 0.19 : 0);
-  }, 0);
-};
+// Solo la cotización real (slot 1) cuenta — el borrador privado (slot 2) es
+// interno del admin y la flota nunca lo ve.
+const calcTotal = (o) => getRealQuoteTotal(o);
 
 const sameMonth = (dateStr, y, m) => {
   if (!dateStr) return false;
@@ -447,8 +443,8 @@ export default function FleetView() {
                             const dias = o.fecha ? Math.floor((Date.now() - new Date(o.fecha)) / 86400000) : null;
                             const overDays = dias !== null && dias > daysThreshold;
                             const total = calcTotal(o);
-                            const hasQuote = o.quotes?.length > 0 && (o.quotes[0].items || []).length > 0;
-                            const quoteItems = o.quotes?.[0]?.items || [];
+                            const quoteItems = getQuoteSlot(o, 1)?.items || [];
+                            const hasQuote = quoteItems.length > 0;
                             const aprobados  = quoteItems.filter(it => it.aprobadoFlota === true).length;
                             const rechazados = quoteItems.filter(it => it.aprobadoFlota === false).length;
                             const pendientes = quoteItems.filter(it => it.aprobadoFlota == null).length;

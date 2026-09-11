@@ -4,6 +4,7 @@ import { ThemeContext } from '../App';
 import OrderDetailsModal from './OrderDetailsModal';
 import { CreditCard, Building2, Banknote, ChevronRight, Search, X } from 'lucide-react';
 import BillingCycleTab from './BillingCycleTab';
+import { getRealQuoteTotal } from '../quoteUtils';
 
 const IS_FLOTA = (c) => /(ald|ayvens)/i.test(c || '');
 const IS_CN    = (c) => /consult.?networks/i.test(c || '');
@@ -12,16 +13,8 @@ const fmt = (n) => (parseFloat(n) || 0).toLocaleString('es-CO', { minimumFractio
 
 const BANK_METHODS = ['Bancolombia', 'Tarjeta', 'Banco de Bogota'];
 
-const calcOrderTotal = (o) => {
-  if (!o.quotes || o.quotes.length === 0) return 0;
-  const q = o.quotes[0];
-  if (!q.items || q.items.length === 0) return 0;
-  return q.items.reduce((sum, item) => {
-    const base = (parseFloat(item.precio) || 0) * (parseFloat(item.cantidad) || 1);
-    const iva  = item.aplicaIva ? base * 0.19 : 0;
-    return sum + base + iva;
-  }, 0);
-};
+// Solo la cotización real (slot 1) cuenta — el borrador privado (slot 2) no.
+const calcOrderTotal = (o) => getRealQuoteTotal(o);
 
 export default function ContableView() {
   const { theme, toggleTheme } = useContext(ThemeContext);

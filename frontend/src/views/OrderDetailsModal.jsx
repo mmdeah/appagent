@@ -1,6 +1,7 @@
 import React, { useState, useRef } from 'react';
 import { API_URL, BACKEND_URL } from '../api';
-import { MessageCircle, Printer, CheckCircle, X, Plus, Trash2, Camera, Edit2, Save, FileText, Upload, Download, Search } from 'lucide-react';
+import { MessageCircle, Printer, CheckCircle, X, Plus, Trash2, Camera, Edit2, Save, FileText, Upload, Download, Search, MoveRight } from 'lucide-react';
+import { getQuoteSlot } from '../quoteUtils';
 
 const fmt = (n) => (parseFloat(n) || 0).toLocaleString('es-CO', { minimumFractionDigits: 0 });
 
@@ -17,12 +18,25 @@ export default function OrderDetailsModal({ order, onClose, fleetMode = false, i
   // usamos siempre el más reciente por fecha, no el primero del arreglo.
   const latestReport = (order.reports || []).slice().sort((a, b) => new Date(b.fecha) - new Date(a.fecha))[0] || null;
   const [reportData, setReportData] = useState(latestReport);
-  // Misma protección para cotizaciones: usar la más reciente, no order.quotes[0].
-  const latestQuote = (order.quotes || []).slice().sort((a, b) => new Date(b.fecha) - new Date(a.fecha))[0] || null;
-  const [quoteItems, setQuoteItems] = useState(
-    latestQuote?.items || [{ descripcion: '', cantidad: 1, precio: 0, aplicaIva: false }]
-  );
-  const [quoteId, setQuoteId] = useState(latestQuote?.id ?? null);
+  // Cada orden puede tener hasta 2 cotizaciones independientes ("slots").
+  // Se guarda todo en un solo estado indexado por slot (en vez de dos pares
+  // useState paralelos) para que persistQuote() nunca lea un cierre viejo de
+  // quoteId/quoteItems del slot equivocado. quoteItems/quoteId de abajo son
+  // variables derivadas del slot activo, no su propio useState — así el
+  // resto del archivo que ya las usa (tabla, calcTotals, printQuote) no
+  // necesita cambios, solo los escritores (setQuoteItems, persistQuote...).
+  const [activeSlot, setActiveSlot] = useState(1);
+  const [quotes, setQuotes] = useState(() => {
+    const q1 = getQuoteSlot(order, 1);
+    const q2 = getQuoteSlot(order, 2);
+    return {
+      1: { id: q1?.id ?? null, items: q1?.items || [{ descripcion: '', cantidad: 1, precio: 0, aplicaIva: false }], autorizada: q1?.autorizada || false },
+      2: q2 ? { id: q2.id, items: q2.items, autorizada: q2.autorizada || false } : null,
+    };
+  });
+  const quoteItems = quotes[activeSlot]?.items || [];
+  const quoteId = quotes[activeSlot]?.id ?? null;
+  const setQuoteItems = (items) => setQuotes(prev => ({ ...prev, [activeSlot]: { ...(prev[activeSlot] || { id: null }), items } }));
   const [savingQuote, setSavingQuote] = useState(false);
   const [statusMsg, setStatusMsg] = useState({ text: '', type: '' });
   const [showConfirm, setShowConfirm] = useState(false);
@@ -342,7 +356,7 @@ export default function OrderDetailsModal({ order, onClose, fleetMode = false, i
 
   const printQuote = (forcedTitle = null) => {
     const sub = totals.sub, iva = totals.iva, total = totals.total;
-    const mainTitle = forcedTitle || ((order.estado === 'Entregado' || order.estado === 'Ingresos Rápidos') ? 'CUENTA DE COBRO' : 'COTIZACIÓN');
+    const mainTitle = (forcedTitle || ((order.estado === 'Entregado' || order.estado === 'Ingresos Rápidos') ? 'CUENTA DE COBRO' : 'COTIZACIÓN')) + (activeSlot === 2 ? ' (BORRADOR)' : '');
     const isCuentaCobro = mainTitle === 'CUENTA DE COBRO' || !showPriority;
     const prioOrder = ['urgente', 'plazo_medio', 'plazo_largo'];
     const prioMap = {
@@ -483,16 +497,21 @@ export default function OrderDetailsModal({ order, onClose, fleetMode = false, i
     showStatus('Precios del reporte actualizados');
   };
 
-  // Guarda o crea la cotización, devolviendo el id real de la fila usada.
-  // Nunca vuelve a crear una fila nueva una vez que ya se creó una en esta sesión
-  // (eso era el bug: cada "Guardar Borrador" posterior hacía POST otra vez en vez
-  // de PUT, dejando la edición más reciente huérfana en una cotización que nadie
-  // volvía a leer).
-  const persistQuote = async (extra = {}) => {
-    const payload = { orderId: order.id, items: quoteItems, fecha: new Date().toISOString(), ...extra };
+  // Guarda o crea la cotización de un slot, devolviendo el id real de la fila
+  // usada. Nunca vuelve a crear una fila nueva una vez que ya se creó una en
+  // esta sesión para ese slot (eso era el bug: cada "Guardar Borrador"
+  // posterior hacía POST otra vez en vez de PUT, dejando la edición más
+  // reciente huérfana en una cotización que nadie volvía a leer). Siempre
+  // manda "slot" en el payload: si no lo hiciéramos, una cotización nueva del
+  // slot 2 quedaría sin marcar y getQuoteSlot() la confundiría con la del
+  // slot 1 la próxima vez que se cargue la orden.
+  const persistQuote = async (slot = activeSlot, extra = {}) => {
+    const id = quotes[slot]?.id;
+    const items = quotes[slot]?.items || [];
+    const payload = { orderId: order.id, items, slot, fecha: new Date().toISOString(), ...extra };
     let res;
-    if (quoteId) {
-      res = await fetch(`${API_URL}/quotes/${quoteId}`, {
+    if (id) {
+      res = await fetch(`${API_URL}/quotes/${id}`, {
         method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload)
       });
     } else {
@@ -502,14 +521,14 @@ export default function OrderDetailsModal({ order, onClose, fleetMode = false, i
     }
     if (!res.ok) throw new Error('El servidor rechazó el guardado de la cotización');
     const saved = await res.json();
-    if (!quoteId && saved?.id) setQuoteId(saved.id);
+    setQuotes(prev => ({ ...prev, [slot]: { ...prev[slot], id: saved.id, autorizada: saved.autorizada || false } }));
     return saved;
   };
 
   const saveQuote = async () => {
     setSavingQuote(true);
     try {
-      await persistQuote();
+      await persistQuote(activeSlot);
       showStatus('Cotización guardada exitosamente');
       onUpdate && onUpdate();
     } catch (e) {
@@ -524,7 +543,7 @@ export default function OrderDetailsModal({ order, onClose, fleetMode = false, i
   const authorizeQuote = async () => {
     setSavingQuote(true);
     try {
-      await persistQuote({ autorizada: true });
+      await persistQuote(activeSlot, { autorizada: true });
 
       const res = await fetch(`${API_URL}/orders/${order.id}`, {
         method: 'PATCH', headers: { 'Content-Type': 'application/json' },
@@ -545,8 +564,11 @@ export default function OrderDetailsModal({ order, onClose, fleetMode = false, i
 
   const doDeliver = async () => {
     try {
-      // Primero guardamos la cotización para asegurar que las estadísticas se actualicen
-      await persistQuote();
+      // Primero guardamos las cotizaciones (las 2, si existen) para asegurar
+      // que las estadísticas se actualicen y no se pierdan ediciones sin
+      // guardar del slot que no estaba activo.
+      await persistQuote(1);
+      if (quotes[2]) await persistQuote(2);
 
       const res = await fetch(`${API_URL}/orders/${order.id}`, {
         method: 'PATCH', headers: { 'Content-Type': 'application/json' },
@@ -1067,6 +1089,37 @@ export default function OrderDetailsModal({ order, onClose, fleetMode = false, i
                   </button>
                 )}
               </div>
+
+              {/* Slot 1 = la cotización real (visible para cliente/flota, la que se
+                  autoriza y cuenta para facturación). Slot 2 = un borrador privado
+                  del admin, solo visible aquí, para ir moviendo ítems antes de
+                  decidir cuáles quedan en la cotización real. */}
+              <div className="hide-on-print" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '1rem' }}>
+                <button
+                  className={`tab-btn ${activeSlot === 1 ? 'active' : ''}`}
+                  style={{ flex: 'none', padding: '0.5rem 1rem' }}
+                  onClick={() => setActiveSlot(1)}>
+                  Cotización{quotes[1]?.autorizada ? ' ✓' : ''}
+                </button>
+                {quotes[2] && (
+                  <button
+                    className={`tab-btn ${activeSlot === 2 ? 'active' : ''}`}
+                    style={{ flex: 'none', padding: '0.5rem 1rem' }}
+                    onClick={() => setActiveSlot(2)}>
+                    Borrador (solo yo)
+                  </button>
+                )}
+                {!quotes[2] && !fleetMode && (
+                  <button className="btn-secondary" style={{ fontSize: '0.8rem' }}
+                    onClick={() => {
+                      setQuotes(prev => ({ ...prev, 2: { id: null, items: [{ descripcion: '', cantidad: 1, precio: 0, aplicaIva: false, prioridad: 'urgente' }], autorizada: false } }));
+                      setActiveSlot(2);
+                    }}>
+                    <Plus size={14} /> Agregar borrador
+                  </button>
+                )}
+              </div>
+
               <table className="data-table">
                 <thead>
                   <tr>
@@ -1155,10 +1208,29 @@ export default function OrderDetailsModal({ order, onClose, fleetMode = false, i
                                   color: it.aprobadoFlota === false ? '#ef4444' : 'var(--text-muted)' }}>✗</button>
                             </div>
                           ) : (
-                            <button onClick={() => setQuoteItems(quoteItems.filter((_, i) => i !== idx))}
-                              style={{ background: 'none', border: 'none', color: 'var(--danger)', cursor: 'pointer' }}>
-                              <Trash2 size={16} />
-                            </button>
+                            <div style={{ display: 'flex', gap: '0.35rem', justifyContent: 'center' }}>
+                              <button title={activeSlot === 1 ? 'Mover al borrador' : 'Mover a la cotización real'}
+                                onClick={() => {
+                                  const otherSlot = activeSlot === 1 ? 2 : 1;
+                                  const item = quoteItems[idx];
+                                  setQuotes(prev => {
+                                    const activeItems = (prev[activeSlot]?.items || []).filter((_, i) => i !== idx);
+                                    const other = prev[otherSlot] || { id: null, items: [], autorizada: false };
+                                    return {
+                                      ...prev,
+                                      [activeSlot]: { ...prev[activeSlot], items: activeItems },
+                                      [otherSlot]: { ...other, items: [...other.items, item] },
+                                    };
+                                  });
+                                }}
+                                style={{ background: 'none', border: 'none', color: 'var(--primary)', cursor: 'pointer' }}>
+                                <MoveRight size={16} />
+                              </button>
+                              <button onClick={() => setQuoteItems(quoteItems.filter((_, i) => i !== idx))}
+                                style={{ background: 'none', border: 'none', color: 'var(--danger)', cursor: 'pointer' }}>
+                                <Trash2 size={16} />
+                              </button>
+                            </div>
                           )}
                         </td>
                       </tr>
@@ -1215,7 +1287,10 @@ export default function OrderDetailsModal({ order, onClose, fleetMode = false, i
 
               <div className="hide-on-print" style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap', alignItems: 'center' }}>
                 {!fleetMode && <button onClick={saveQuote} disabled={savingQuote} className="btn-secondary">{savingQuote ? 'Guardando...' : 'Guardar Borrador'}</button>}
-                {!fleetMode && <button onClick={authorizeQuote} disabled={savingQuote} className="btn-primary" style={{ background: 'var(--success)', borderColor: 'var(--success)' }}>
+                {/* Autorizar solo tiene sentido en la cotización real (slot 1) — el
+                    slot 2 es un borrador privado que nunca se autoriza ni cambia el
+                    estado de la orden. */}
+                {!fleetMode && activeSlot === 1 && <button onClick={authorizeQuote} disabled={savingQuote} className="btn-primary" style={{ background: 'var(--success)', borderColor: 'var(--success)' }}>
                   <CheckCircle size={16} /> {savingQuote ? 'Guardando...' : 'Autorizar y Empezar Trabajo'}
                 </button>}
                 {fleetMode && (

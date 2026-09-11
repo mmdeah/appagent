@@ -221,9 +221,12 @@ server.post('/api/chat-analytics', async (req, res) => {
     (db.quotes || []).forEach(q => { (quotesByOrder[q.orderId] = quotesByOrder[q.orderId] || []).push(q); });
     const calcTotals = (o) => {
       const qs = quotesByOrder[o.id] || [];
-      const q = qs.find(x => x.autorizada) || qs[0];
+      // Una orden puede tener hasta 2 cotizaciones, pero solo la real (slot 1,
+      // o sin "slot" en cotizaciones viejas) cuenta aquí — el slot 2 es un
+      // borrador privado del admin y nunca debe aparecer en analítica.
+      const real = qs.find(x => x.slot === 1) || qs.find(x => x.slot !== 2);
       let total = 0, iva = 0; const items = [];
-      (q?.items || []).forEach(i => {
+      (real?.items || []).forEach(i => {
         const lt = (Number(i.precio) || 0) * (Number(i.cantidad) || 1);
         total += lt + (i.aplicaIva ? lt * 0.19 : 0);
         if (i.aplicaIva) iva += lt * 0.19;
@@ -479,17 +482,21 @@ server.post('/api/generate-ai-report', async (req, res) => {
       return res.status(404).json({ error: `Order with ID ${orderId} not found` });
     }
 
-    // Find quote for the order
-    const quote = db.get('quotes').find(q => String(q.orderId) === String(order.id)).value();
-    
+    // La orden puede tener hasta 2 cotizaciones, pero el informe IA solo usa
+    // la real (slot 1, o sin "slot" en cotizaciones viejas) — el slot 2 es un
+    // borrador privado del admin que nunca debe salir en un informe oficial.
+    const orderQuotes = db.get('quotes').filter(q => String(q.orderId) === String(order.id)).value() || [];
+    const realQuote = orderQuotes.find(q => q.slot === 1) || orderQuotes.find(q => q.slot !== 2);
+    const allItems = realQuote?.items || [];
+
     // Determine which items to include
     let itemsToAnalyze = [];
-    if (quote && quote.items && quote.items.length > 0) {
+    if (allItems.length > 0) {
       if (allQuotes) {
-        itemsToAnalyze = quote.items;
+        itemsToAnalyze = allItems;
       } else if (selectedItems && Array.isArray(selectedItems)) {
         // Handle both index (number) and description (string) matching
-        itemsToAnalyze = quote.items.filter((item, index) => 
+        itemsToAnalyze = allItems.filter((item, index) =>
           selectedItems.includes(index) || 
           selectedItems.includes(item.descripcion) ||
           selectedItems.includes(String(index))
@@ -604,7 +611,7 @@ Genera el informe en español enfocado únicamente en los ítems seleccionados y
         cliente: order.cliente,
         fecha: today,
         motivo: order.motivoIngreso || order.servicios || 'Mantenimiento General y Diagnóstico',
-        referencia: quote ? `COT-${quote.id}` : `ORD-${order.id}`,
+        referencia: realQuote ? `COT-${realQuote.id}` : `ORD-${order.id}`,
         kilometraje: order.kilometraje || 'N/A'
       },
       objeto: reportJson.objeto,

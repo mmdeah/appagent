@@ -1,18 +1,13 @@
 import React, { useState } from 'react';
 import { API_URL } from '../api';
 import { BadgeCheck, Ban, Clock, X, MoveRight, Plus, Trash2, EyeOff } from 'lucide-react';
+import { getRealQuoteTotal } from '../quoteUtils';
 
 const fmt = n => (parseFloat(n) || 0).toLocaleString('es-CO', { minimumFractionDigits: 0 });
 const MESES = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
 
-const calcOrderTotal = (o) => {
-  const q = o.quotes?.find(q => q.autorizada) || o.quotes?.[0];
-  if (!q) return 0;
-  return (q.items || []).reduce((sum, i) => {
-    const lt = (Number(i.precio) || 0) * (Number(i.cantidad) || 1);
-    return sum + lt + (i.aplicaIva ? lt * 0.19 : 0);
-  }, 0);
-};
+// Solo la cotización real (slot 1) cuenta — el borrador privado (slot 2) no.
+const calcOrderTotal = (o) => getRealQuoteTotal(o);
 
 const getCyclePeriodLabel = (year, month, noCutDate = false) => {
   if (noCutDate) {
