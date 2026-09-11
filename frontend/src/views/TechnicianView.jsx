@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useContext } from 'react';
+import React, { useState, useEffect, useContext, useRef } from 'react';
 import { API_URL, getPicoYPlaca } from '../api';
 import { ThemeContext } from '../App';
 import PhotoUploadModal from './PhotoUploadModal';
@@ -13,7 +13,9 @@ import {
   AlertTriangle,
   Info,
   CheckCircle,
-  X
+  X,
+  RefreshCw,
+  WifiOff
 } from 'lucide-react';
 
 const fmt = (n) => {
@@ -47,6 +49,8 @@ export default function TechnicianView() {
   const [precioDiagnostico, setPrecioDiagnostico] = useState('');
   const [statusMsg, setStatusMsg] = useState({ text: '', type: '' });
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
+  const [retryCount, setRetryCount] = useState(0);
   const [showPhotoUpload, setShowPhotoUpload] = useState(false);
   const [showChecklist, setShowChecklist] = useState(null);
   const [checklist, setChecklist] = useState({ pruebaRuta: false, limpio: false, herramientas: false });
@@ -66,15 +70,48 @@ export default function TechnicianView() {
     }
   };
 
+  // Con internet lento en el taller, esta carga puede tardar o fallar — antes
+  // eso se veía igual que "no hay vehículos" (la variable loading nunca se
+  // usaba en el render). Ahora se distingue cargando / error de conexión /
+  // realmente vacío, y un fallo reintenta solo unas pocas veces antes de
+  // pedirle al técnico que reintente a mano.
+  //
+  // fetchGenRef evita que dos llamadas a fetchOrders() se pisen entre sí —
+  // en particular, el doble montaje de React (StrictMode en desarrollo)
+  // dispara este efecto dos veces, y sin esta guarda cada montaje arranca su
+  // propia cadena de reintentos por separado, haciendo que los reintentos
+  // nunca terminen (una cadena "vieja" seguía reintentando después de que la
+  // "nueva" ya había mostrado el error).
+  const fetchGenRef = useRef(0);
+  const MAX_RETRIES = 3;
+
   const fetchOrders = () => {
+    const gen = ++fetchGenRef.current;
     setLoading(true);
-    fetch(`${API_URL}/orders?_embed=quotes`)
-      .then(res => res.json())
-      .then(data => {
-        setOrders(data.filter(o => o.estado !== 'Entregado'));
-        setLoading(false);
-      })
-      .catch(() => setLoading(false));
+    setLoadError(false);
+    setRetryCount(0);
+
+    const tryFetch = (retryNum) => {
+      fetch(`${API_URL}/orders?_embed=quotes`)
+        .then(res => { if (!res.ok) throw new Error('respuesta no OK'); return res.json(); })
+        .then(data => {
+          if (fetchGenRef.current !== gen) return; // una llamada más nueva ya tomó el control
+          setOrders(data.filter(o => o.estado !== 'Entregado'));
+          setLoading(false);
+        })
+        .catch(() => {
+          if (fetchGenRef.current !== gen) return;
+          if (retryNum < MAX_RETRIES) {
+            const next = retryNum + 1;
+            setRetryCount(next);
+            setTimeout(() => { if (fetchGenRef.current === gen) tryFetch(next); }, next * 3000);
+          } else {
+            setLoading(false);
+            setLoadError(true);
+          }
+        });
+    };
+    tryFetch(0);
   };
 
   useEffect(() => {
@@ -297,8 +334,13 @@ export default function TechnicianView() {
     } catch (e) { console.error(e); }
   };
 
-  const pendingOrders = orders.filter(o => o.estado !== 'Proceso' && o.estado !== 'Calidad');
-  const authorizedOrders = orders.filter(o => o.estado === 'Proceso' && o.quotes?.some(q => q.autorizada));
+  // Los técnicos deben ver TODOS los vehículos activos (Recepción, Ingresos
+  // Rápidos, Proceso, Calidad, etc.) — solo los ya Entregados quedan afuera
+  // (eso ya se filtra en fetchOrders). La división entre las dos columnas es
+  // simplemente "¿ya tiene una cotización autorizada?", no el estado del
+  // Kanban — así ningún vehículo activo queda sin aparecer en ninguna lista.
+  const authorizedOrders = orders.filter(o => o.quotes?.some(q => q.autorizada));
+  const pendingOrders = orders.filter(o => !o.quotes?.some(q => q.autorizada));
 
   return (
     <div style={{ minHeight: '100vh', background: 'var(--bg)', color: 'var(--text)' }}>
@@ -506,50 +548,71 @@ export default function TechnicianView() {
           <div style={{ padding: '1rem', maxWidth: 1600, margin: '0 auto' }}>
             {statusMsg.text && <div className={`toast toast-${statusMsg.type}`} style={{ marginBottom: '1.5rem' }}>{statusMsg.text}</div>}
 
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 350px), 1fr))', gap: '1.5rem' }}>
-              <div>
-                <h2 style={{ fontSize: '0.9rem', fontWeight: 800, textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}><AlertTriangle size={14} color="var(--warning)" /> Revision Pendiente ({pendingOrders.length})</h2>
-                <div style={{ display: 'grid', gap: '1rem' }}>
-                  {pendingOrders.map(o => (
-                    <div key={o.id} className="card card-hover" style={{ cursor: 'pointer', padding: '1.25rem', borderLeft: '4px solid var(--primary)' }} onClick={() => setSelectedOrder(o)}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
-                        <div>
-                          <div style={{ fontSize: '1.45rem', fontWeight: 900, lineHeight: 1 }}>{o.placa}</div>
-                          <div style={{ fontSize: '0.95rem', color: 'var(--text-muted)', fontWeight: 600 }}>{o.marca} {o.modelo}</div>
-                          {getPicoYPlaca(o.placa) && <div style={{ fontSize: '0.85rem', color: '#f59e0b', fontWeight: 800, marginTop: '0.2rem' }}>⚠️ {getPicoYPlaca(o.placa)}</div>}
+            {loading && (
+              <div className="card" style={{ textAlign: 'center', padding: '2.5rem', color: 'var(--text-muted)' }}>
+                <RefreshCw size={24} className="spin" style={{ marginBottom: '0.6rem' }} />
+                <div style={{ fontWeight: 600 }}>Cargando vehículos...{retryCount > 0 ? ` (reintento ${retryCount}/3)` : ''}</div>
+                {retryCount > 0 && <div style={{ fontSize: '0.85rem', marginTop: '0.3rem' }}>La conexión está lenta, sigue intentando.</div>}
+              </div>
+            )}
+
+            {!loading && loadError && (
+              <div className="card" style={{ textAlign: 'center', padding: '2.5rem' }}>
+                <WifiOff size={28} color="var(--error)" style={{ marginBottom: '0.75rem' }} />
+                <div style={{ fontWeight: 700, marginBottom: '0.4rem' }}>No se pudieron cargar los vehículos</div>
+                <div style={{ color: 'var(--text-muted)', fontSize: '0.9rem', marginBottom: '1.25rem' }}>Revisa la conexión a internet e intenta de nuevo.</div>
+                <button className="btn-primary" onClick={() => fetchOrders()} style={{ margin: '0 auto' }}>
+                  <RefreshCw size={16} /> Reintentar
+                </button>
+              </div>
+            )}
+
+            {!loading && !loadError && (
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 350px), 1fr))', gap: '1.5rem' }}>
+                <div>
+                  <h2 style={{ fontSize: '0.9rem', fontWeight: 800, textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}><AlertTriangle size={14} color="var(--warning)" /> Revision Pendiente ({pendingOrders.length})</h2>
+                  <div style={{ display: 'grid', gap: '1rem' }}>
+                    {pendingOrders.map(o => (
+                      <div key={o.id} className="card card-hover" style={{ cursor: 'pointer', padding: '1.25rem', borderLeft: '4px solid var(--primary)' }} onClick={() => setSelectedOrder(o)}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
+                          <div>
+                            <div style={{ fontSize: '1.45rem', fontWeight: 900, lineHeight: 1 }}>{o.placa}</div>
+                            <div style={{ fontSize: '0.95rem', color: 'var(--text-muted)', fontWeight: 600 }}>{o.marca} {o.modelo}</div>
+                            {getPicoYPlaca(o.placa) && <div style={{ fontSize: '0.85rem', color: '#f59e0b', fontWeight: 800, marginTop: '0.2rem' }}>⚠️ {getPicoYPlaca(o.placa)}</div>}
+                          </div>
+                          <div style={{ background: 'var(--primary)', color: 'white', padding: '0.3rem 0.6rem', borderRadius: 6, fontWeight: 900 }}>{o.kilometraje ? `${fmt(o.kilometraje)} KM` : 'S/K'}</div>
                         </div>
-                        <div style={{ background: 'var(--primary)', color: 'white', padding: '0.3rem 0.6rem', borderRadius: 6, fontWeight: 900 }}>{o.kilometraje ? `${fmt(o.kilometraje)} KM` : 'S/K'}</div>
+                        {o.servicios && <div style={{ padding: '0.6rem', background: 'rgba(99,102,241,0.1)', borderRadius: 6, fontSize: '1rem', fontWeight: 600 }}>{o.servicios}</div>}
                       </div>
-                      {o.servicios && <div style={{ padding: '0.6rem', background: 'rgba(99,102,241,0.1)', borderRadius: 6, fontSize: '1rem', fontWeight: 600 }}>{o.servicios}</div>}
-                    </div>
-                  ))}
-                  {pendingOrders.length === 0 && <div className="card" style={{ textAlign: 'center', padding: '2rem', opacity: 0.5, borderStyle: 'dashed' }}>Vacio</div>}
+                    ))}
+                    {pendingOrders.length === 0 && <div className="card" style={{ textAlign: 'center', padding: '2rem', opacity: 0.5, borderStyle: 'dashed' }}>Vacio</div>}
+                  </div>
+                </div>
+                <div>
+                  <h2 style={{ fontSize: '0.9rem', fontWeight: 800, textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}><CheckCircle size={14} color="var(--success)" /> En Trabajo ({authorizedOrders.length})</h2>
+                  <div style={{ display: 'grid', gap: '1rem' }}>
+                    {authorizedOrders.map(o => (
+                      <div key={o.id} className="card" style={{ padding: '1.25rem', borderLeft: '4px solid var(--success)' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1rem' }}>
+                          <div>
+                            <div style={{ fontSize: '1.45rem', fontWeight: 900, lineHeight: 1 }}>{o.placa}</div>
+                            <div style={{ fontSize: '0.95rem', color: 'var(--text-muted)', fontWeight: 600 }}>{o.marca} {o.modelo}</div>
+                          </div>
+                          <div style={{ display: 'flex', gap: '0.4rem' }}>
+                            <button className="btn-secondary" onClick={() => setSelectedOrder(o)} style={{ padding: '0.3rem 0.6rem', fontSize: '0.85rem', fontWeight: 800 }}>Reportar</button>
+                            <button className="btn-success" onClick={() => setShowChecklist(o.id)} style={{ padding: '0.3rem 0.6rem', fontSize: '0.85rem', fontWeight: 800 }}>Terminar</button>
+                          </div>
+                        </div>
+                        <div style={{ background: 'var(--surface2)', borderRadius: 8, padding: '0.75rem', fontSize: '0.9rem', fontWeight: 600 }}>
+                          {o.quotes?.find(q => q.autorizada)?.items?.map(i => i.descripcion).join(', ')}
+                        </div>
+                      </div>
+                    ))}
+                    {authorizedOrders.length === 0 && <div className="card" style={{ textAlign: 'center', padding: '2rem', opacity: 0.5, borderStyle: 'dashed' }}>Vacio</div>}
+                  </div>
                 </div>
               </div>
-              <div>
-                <h2 style={{ fontSize: '0.9rem', fontWeight: 800, textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}><CheckCircle size={14} color="var(--success)" /> En Trabajo ({authorizedOrders.length})</h2>
-                <div style={{ display: 'grid', gap: '1rem' }}>
-                  {authorizedOrders.map(o => (
-                    <div key={o.id} className="card" style={{ padding: '1.25rem', borderLeft: '4px solid var(--success)' }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1rem' }}>
-                        <div>
-                          <div style={{ fontSize: '1.45rem', fontWeight: 900, lineHeight: 1 }}>{o.placa}</div>
-                          <div style={{ fontSize: '0.95rem', color: 'var(--text-muted)', fontWeight: 600 }}>{o.marca} {o.modelo}</div>
-                        </div>
-                        <div style={{ display: 'flex', gap: '0.4rem' }}>
-                          <button className="btn-secondary" onClick={() => setSelectedOrder(o)} style={{ padding: '0.3rem 0.6rem', fontSize: '0.85rem', fontWeight: 800 }}>Reportar</button>
-                          <button className="btn-success" onClick={() => setShowChecklist(o.id)} style={{ padding: '0.3rem 0.6rem', fontSize: '0.85rem', fontWeight: 800 }}>Terminar</button>
-                        </div>
-                      </div>
-                      <div style={{ background: 'var(--surface2)', borderRadius: 8, padding: '0.75rem', fontSize: '0.9rem', fontWeight: 600 }}>
-                        {o.quotes?.find(q => q.autorizada)?.items?.map(i => i.descripcion).join(', ')}
-                      </div>
-                    </div>
-                  ))}
-                  {authorizedOrders.length === 0 && <div className="card" style={{ textAlign: 'center', padding: '2rem', opacity: 0.5, borderStyle: 'dashed' }}>Vacio</div>}
-                </div>
-              </div>
-            </div>
+            )}
           </div>
         </>
       )}
