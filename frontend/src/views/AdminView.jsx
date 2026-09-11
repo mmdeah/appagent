@@ -286,23 +286,9 @@ export default function AdminView() {
       const ordersArr = Array.isArray(data) ? data : [];
       setOrders(ordersArr);
       
-      let incomeTotal = 0;
       const entregadas = ordersArr.filter(o => o.estado === 'Entregado');
-      
-      entregadas.forEach(o => {
-        if (o.quotes && Array.isArray(o.quotes)) {
-          o.quotes.forEach(q => {
-            if (q.items && Array.isArray(q.items)) {
-              q.items.forEach(it => {
-                const precio = parseFloat(it.precio) || 0;
-                const cantidad = parseFloat(it.cantidad) || 0;
-                const sub = precio * cantidad;
-                incomeTotal += it.aplicaIva ? sub * 1.19 : sub;
-              });
-            }
-          });
-        }
-      });
+      // Solo la cotización real (slot 1) cuenta — nunca el borrador privado.
+      const incomeTotal = entregadas.reduce((sum, o) => sum + calcOrderTotal(o), 0);
 
       const active = ordersArr.filter(o => o.estado !== 'Entregado').length;
       setStats({ 
@@ -720,8 +706,11 @@ export default function AdminView() {
           const pFin = new Date(now.getFullYear(), now.getMonth() - 1, Math.min(now.getDate(), prevMonthDays), 23, 59, 59, 999);
           const enRango = (f, a, b) => { if (!f) return false; const d = new Date(f); return d >= a && d <= b; };
 
-          const factMes  = orders.filter(o => o.estado === 'Entregado' && enRango(o.fecha, mIni, mFin)).reduce((s, o) => s + calcOrderTotal(o), 0);
-          const factPrev = orders.filter(o => o.estado === 'Entregado' && enRango(o.fecha, pIni, pFin)).reduce((s, o) => s + calcOrderTotal(o), 0);
+          // Se factura cuando se entrega el vehículo, no cuando ingresó — si
+          // usáramos o.fecha (ingreso), una orden que entró en agosto y se
+          // entregó/cobró en septiembre contaría como facturación de agosto.
+          const factMes  = orders.filter(o => o.estado === 'Entregado' && enRango(o.fechaEntrega || o.fecha, mIni, mFin)).reduce((s, o) => s + calcOrderTotal(o), 0);
+          const factPrev = orders.filter(o => o.estado === 'Entregado' && enRango(o.fechaEntrega || o.fecha, pIni, pFin)).reduce((s, o) => s + calcOrderTotal(o), 0);
           const gastMes  = expenses.filter(g => enRango(g.fecha, mIni, mFin)).reduce((s, g) => s + (parseFloat(g.monto) || 0), 0);
           const gastPrev = expenses.filter(g => enRango(g.fecha, pIni, pFin)).reduce((s, g) => s + (parseFloat(g.monto) || 0), 0);
           const ganMes = factMes - gastMes;
@@ -1417,7 +1406,9 @@ export default function AdminView() {
               };
               const { desde: sDesde, hasta: sHasta } = getGastosStatsRange();
               const inStatRange = f => { if (!f) return false; const d = new Date(f); return (!sDesde || d >= sDesde) && (!sHasta || d <= sHasta); };
-              const ordenesPeriodo    = orders.filter(o => o.estado === 'Entregado' && inStatRange(o.fecha));
+              // Igual que en las tarjetas de arriba: se factura al entregar, no al
+              // ingresar el vehículo.
+              const ordenesPeriodo    = orders.filter(o => o.estado === 'Entregado' && inStatRange(o.fechaEntrega || o.fecha));
               const gastosPeriodo     = expenses.filter(g => inStatRange(g.fecha));
               const ingresosPeriodo   = ordenesPeriodo.reduce((s, o) => s + calcOrderTotal(o), 0);
               const gastosTotalPeriodo= gastosPeriodo.reduce((s, g) => s + (parseFloat(g.monto)||0), 0);
@@ -1441,7 +1432,7 @@ export default function AdminView() {
               };
               const { desde: pDesde, hasta: pHasta } = getPrevGastosRange();
               const inPrevRange = f => { if (!f || !pDesde || !pHasta) return false; const d = new Date(f); return d >= pDesde && d <= pHasta; };
-              const ordenesPrev  = orders.filter(o => o.estado === 'Entregado' && inPrevRange(o.fecha));
+              const ordenesPrev  = orders.filter(o => o.estado === 'Entregado' && inPrevRange(o.fechaEntrega || o.fecha));
               const ingresosPrev = ordenesPrev.reduce((s, o) => s + calcOrderTotal(o), 0);
               const gastosPrev   = expenses.filter(g => inPrevRange(g.fecha)).reduce((s, g) => s + (parseFloat(g.monto)||0), 0);
               const gananciaPrev = ingresosPrev - gastosPrev;
@@ -1466,7 +1457,9 @@ export default function AdminView() {
 
               const servTotals = {};
               ordenesPeriodo.forEach(o => {
-                const q = o.quotes?.find(q => q.autorizada) || o.quotes?.[0];
+                // Solo la cotización real (slot 1) — el borrador privado no debe
+                // aparecer en el ranking de servicios más facturados.
+                const q = getQuoteSlot(o, 1);
                 (q?.items || []).forEach(it => {
                   const d = (it.descripcion || '').trim();
                   if (!d) return;

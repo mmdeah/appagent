@@ -67,13 +67,15 @@ export default function ContableView() {
              (o.servicios || '').toLowerCase().includes(q);
     })
     .filter(o => {
-      if (!o.fecha) return !pagosDesde && !pagosHasta;
-      const d = new Date(o.fecha);
+      // El pago se recibe al entregar el vehículo, no al ingresarlo.
+      const fechaPago = o.fechaEntrega || o.fecha;
+      if (!fechaPago) return !pagosDesde && !pagosHasta;
+      const d = new Date(fechaPago);
       if (pagosDesde && d < new Date(pagosDesde)) return false;
       if (pagosHasta && d > new Date(pagosHasta + 'T23:59:59')) return false;
       return true;
     })
-    .sort((a, b) => new Date(b.fecha || 0) - new Date(a.fecha || 0));
+    .sort((a, b) => new Date(b.fechaEntrega || b.fecha || 0) - new Date(a.fechaEntrega || a.fecha || 0));
 
   const pagosTotal = allBankOrders.reduce((s, o) => s + calcOrderTotal(o), 0);
   const hasFilters = q || pagosDesde || pagosHasta || pagosFiltro !== 'Todos';
@@ -246,7 +248,7 @@ export default function ContableView() {
                     {allBankOrders.map(o => (
                       <tr key={o.id} onClick={() => setSelectedOrder(o)} style={{ cursor: 'pointer' }}>
                         <td style={{ whiteSpace: 'nowrap', color: 'var(--text-muted)', fontSize: '0.85rem' }}>
-                          {o.fecha ? new Date(o.fecha).toLocaleDateString('es-CO') : '—'}
+                          {(o.fechaEntrega || o.fecha) ? new Date(o.fechaEntrega || o.fecha).toLocaleDateString('es-CO') : '—'}
                         </td>
                         <td><span style={{ fontWeight: 800, fontSize: '0.95rem' }}>{o.placa}</span></td>
                         <td style={{ maxWidth: 160 }}>
