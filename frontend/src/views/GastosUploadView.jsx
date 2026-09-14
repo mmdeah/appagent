@@ -2,7 +2,7 @@ import React, { useState, useRef, useContext } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { API_URL, BACKEND_URL } from '../api';
 import { ThemeContext } from '../App';
-import { Camera, CheckCircle, ArrowLeft, RefreshCw, Image as ImageIcon } from 'lucide-react';
+import { Camera, CheckCircle, ArrowLeft, RefreshCw, Image as ImageIcon, ChevronDown, ChevronUp, HelpCircle } from 'lucide-react';
 
 // Mismas listas que en el panel Admin (frontend/src/views/AdminView.jsx) — se
 // duplican aquí a propósito, siguiendo la convención ya usada en el resto del
@@ -18,7 +18,8 @@ const emptyForm = () => ({
 
 const fmtMiles = (digitsOnly) => digitsOnly ? parseInt(digitsOnly, 10).toLocaleString('es-CO') : '';
 
-const label = { display: 'block', fontSize: '0.95rem', fontWeight: 700, color: 'var(--text)', marginBottom: '0.4rem' };
+const label = { display: 'block', fontSize: '1.05rem', fontWeight: 800, color: 'var(--text)', marginBottom: '0.5rem' };
+const detailLabel = { display: 'block', fontSize: '0.92rem', fontWeight: 700, color: 'var(--text-muted)', marginBottom: '0.4rem' };
 
 /**
  * Vista independiente pensada para celular, con pasos simples y grandes,
@@ -39,6 +40,7 @@ export default function GastosUploadView() {
   const [analyzeError, setAnalyzeError] = useState(false);
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState(false);
+  const [showDetails, setShowDetails] = useState(false);
 
   const stepNum = step === 'foto' ? 1 : step === 'listo' ? 3 : 2;
 
@@ -185,82 +187,109 @@ export default function GastosUploadView() {
 
           {step === 'revisar' && (
             <div>
-              <h1 style={{ fontSize: '1.3rem', fontWeight: 800, marginBottom: '0.25rem', textAlign: 'center' }}>Paso 2: Revisa los datos</h1>
+              <h1 style={{ fontSize: '1.3rem', fontWeight: 800, marginBottom: '0.25rem', textAlign: 'center' }}>Paso 2: Confirma 3 cositas</h1>
               <p style={{ color: 'var(--text-muted)', fontSize: '0.95rem', textAlign: 'center', marginBottom: '1.5rem' }}>
-                Confirma que todo esté correcto antes de guardar.
+                Revisa que esté bien y ya. Fácil.
               </p>
 
               {photoPreview && (
                 <div style={{ textAlign: 'center', marginBottom: '1.25rem' }}>
-                  <img src={photoPreview} alt="recibo" style={{ maxHeight: 150, borderRadius: 12, border: '1px solid var(--border)' }} />
+                  <img src={photoPreview} alt="recibo" style={{ maxHeight: 130, borderRadius: 12, border: '1px solid var(--border)' }} />
                 </div>
               )}
 
               {analyzeError && (
                 <div className="toast toast-error" style={{ marginBottom: '1.25rem', fontSize: '0.9rem' }}>
-                  No pudimos leer el recibo automáticamente (revisa tu conexión). Llena los datos a mano abajo.
+                  No pudimos leer el recibo solos (revisa tu conexión). No hay problema, llena tú los datos abajo. 🙂
                 </div>
               )}
 
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '1.1rem', marginBottom: '1.5rem' }}>
+              {/* ── Las 3 preguntas que de verdad importan ─────────────── */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '1.4rem', marginBottom: '1.5rem' }}>
                 <div>
-                  <label style={label}>¿Qué compraste?</label>
+                  <label style={label}>📝 ¿Qué compraste?</label>
                   <input type="text" required placeholder="Ej. Aceite de motor, filtro..." value={form.concepto}
-                    onChange={e => setForm({ ...form, concepto: e.target.value })} />
+                    onChange={e => setForm({ ...form, concepto: e.target.value })}
+                    style={{ fontSize: '1.15rem' }} />
                 </div>
+
                 <div>
-                  <label style={label}>¿Cuánto costó?</label>
+                  <label style={label}>💰 ¿Cuánto costó?</label>
                   <div style={{ position: 'relative' }}>
-                    <span style={{ position: 'absolute', left: '1rem', top: '50%', transform: 'translateY(-50%)', fontSize: '1.3rem', fontWeight: 800, color: 'var(--success)', pointerEvents: 'none' }}>$</span>
+                    <span style={{ position: 'absolute', left: '1rem', top: '50%', transform: 'translateY(-50%)', fontSize: '1.4rem', fontWeight: 800, color: 'var(--success)', pointerEvents: 'none' }}>$</span>
                     <input type="text" inputMode="numeric" required placeholder="0" className="price-input"
                       value={fmtMiles(form.monto)} onChange={e => setForm({ ...form, monto: e.target.value.replace(/\D/g, '') })}
-                      style={{ paddingLeft: '2.15rem', fontSize: '1.35rem', fontWeight: 800 }} />
+                      style={{ paddingLeft: '2.15rem', fontSize: '1.5rem', fontWeight: 800 }} />
                   </div>
                 </div>
+
                 <div>
-                  <label style={label}>Vendedor</label>
-                  <input type="text" placeholder="Ej. Repuestos del Valle" value={form.vendedor}
-                    onChange={e => setForm({ ...form, vendedor: e.target.value })} />
-                </div>
-                <div>
-                  <label style={label}>Fecha</label>
-                  <input type="date" required value={form.fecha} onChange={e => setForm({ ...form, fecha: e.target.value })} />
-                </div>
-                <div>
-                  <label style={label}>Categoría</label>
-                  <select value={form.categoria} onChange={e => setForm({ ...form, categoria: e.target.value })}>
-                    {EXPENSE_CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
-                  </select>
-                </div>
-                <div>
-                  <label style={label}>Método de Pago</label>
-                  <select value={form.metodoPago} onChange={e => setForm({ ...form, metodoPago: e.target.value })}>
-                    {PAYMENT_METHODS.map(m => <option key={m} value={m}>{m}</option>)}
-                  </select>
-                </div>
-                <div>
-                  <label style={label}>¿Factura con IVA?</label>
+                  <label style={label}>🧾 ¿Tenía IVA?</label>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', color: 'var(--text-muted)', fontSize: '0.88rem', marginBottom: '0.6rem', lineHeight: 1.4 }}>
+                    <HelpCircle size={14} style={{ flexShrink: 0 }} />
+                    <span>El IVA es un impuesto. A veces la factura dice "IVA" o un número con % (ej. 19%).</span>
+                  </div>
                   <div style={{ display: 'flex', gap: '0.75rem' }}>
-                    {['No', 'Sí'].map(opt => (
-                      <button key={opt} type="button" onClick={() => setForm({ ...form, facturaIva: opt })}
-                        style={{
-                          flex: 1, padding: '0.85rem', borderRadius: 12, cursor: 'pointer', fontWeight: 800, fontSize: '1.05rem',
-                          border: form.facturaIva === opt ? '2px solid var(--primary)' : '1.5px solid var(--border)',
-                          background: form.facturaIva === opt ? 'rgba(99,102,241,0.12)' : 'var(--bg)',
-                          color: form.facturaIva === opt ? 'var(--primary)' : 'var(--text)',
-                        }}>
-                        {opt}
-                      </button>
-                    ))}
+                    <button type="button" onClick={() => setForm({ ...form, facturaIva: 'Sí' })}
+                      style={{
+                        flex: 1, padding: '1rem', borderRadius: 14, cursor: 'pointer', fontWeight: 800, fontSize: '1.15rem',
+                        border: form.facturaIva === 'Sí' ? '2px solid var(--success)' : '1.5px solid var(--border)',
+                        background: form.facturaIva === 'Sí' ? 'rgba(16,185,129,0.15)' : 'var(--bg)',
+                        color: form.facturaIva === 'Sí' ? 'var(--success)' : 'var(--text)',
+                      }}>
+                      ✅ Sí
+                    </button>
+                    <button type="button" onClick={() => setForm({ ...form, facturaIva: 'No' })}
+                      style={{
+                        flex: 1, padding: '1rem', borderRadius: 14, cursor: 'pointer', fontWeight: 800, fontSize: '1.15rem',
+                        border: form.facturaIva === 'No' ? '2px solid var(--error)' : '1.5px solid var(--border)',
+                        background: form.facturaIva === 'No' ? 'rgba(239,68,68,0.12)' : 'var(--bg)',
+                        color: form.facturaIva === 'No' ? 'var(--error)' : 'var(--text)',
+                      }}>
+                      ❌ No
+                    </button>
                   </div>
                 </div>
               </div>
 
+              {/* ── Todo lo demás, escondido para no marear ─────────────── */}
+              <button type="button" onClick={() => setShowDetails(v => !v)}
+                style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.4rem', background: 'none', border: 'none', color: 'var(--text-muted)', fontSize: '0.92rem', fontWeight: 700, cursor: 'pointer', padding: '0.6rem 0', marginBottom: showDetails ? '1.25rem' : '1.5rem' }}>
+                {showDetails ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+                {showDetails ? 'Ocultar otros datos' : 'Ver otros datos (opcional)'}
+              </button>
+
+              {showDetails && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', marginBottom: '1.5rem', padding: '1rem', background: 'var(--bg)', borderRadius: 14, border: '1px solid var(--border)' }}>
+                  <div>
+                    <label style={detailLabel}>🏪 Vendedor</label>
+                    <input type="text" placeholder="Ej. Repuestos del Valle" value={form.vendedor}
+                      onChange={e => setForm({ ...form, vendedor: e.target.value })} />
+                  </div>
+                  <div>
+                    <label style={detailLabel}>📅 Fecha</label>
+                    <input type="date" required value={form.fecha} onChange={e => setForm({ ...form, fecha: e.target.value })} />
+                  </div>
+                  <div>
+                    <label style={detailLabel}>🏷️ Categoría</label>
+                    <select value={form.categoria} onChange={e => setForm({ ...form, categoria: e.target.value })}>
+                      {EXPENSE_CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
+                    </select>
+                  </div>
+                  <div>
+                    <label style={detailLabel}>💳 Método de Pago</label>
+                    <select value={form.metodoPago} onChange={e => setForm({ ...form, metodoPago: e.target.value })}>
+                      {PAYMENT_METHODS.map(m => <option key={m} value={m}>{m}</option>)}
+                    </select>
+                  </div>
+                </div>
+              )}
+
               {saveError && <div className="toast toast-error" style={{ marginBottom: '1rem' }}>No se pudo guardar. Revisa tu conexión e intenta de nuevo.</div>}
 
               <button onClick={handleSave} disabled={saving || !form.monto || !form.concepto} className="btn-primary"
-                style={{ width: '100%', justifyContent: 'center', padding: '1.1rem', fontSize: '1.15rem', fontWeight: 800, borderRadius: 14, marginBottom: '0.85rem', opacity: (saving || !form.monto || !form.concepto) ? 0.6 : 1 }}>
-                <CheckCircle size={20} /> {saving ? 'Guardando...' : 'Guardar Gasto'}
+                style={{ width: '100%', justifyContent: 'center', padding: '1.15rem', fontSize: '1.2rem', fontWeight: 800, borderRadius: 14, marginBottom: '0.85rem', opacity: (saving || !form.monto || !form.concepto) ? 0.6 : 1 }}>
+                <CheckCircle size={22} /> {saving ? 'Guardando...' : 'Listo, Guardar'}
               </button>
               <button onClick={handleRetakePhoto} className="btn-secondary" style={{ width: '100%', justifyContent: 'center', padding: '0.85rem', fontSize: '0.95rem' }}>
                 <Camera size={16} /> Tomar otra foto
