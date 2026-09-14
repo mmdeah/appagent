@@ -153,11 +153,46 @@ export default function TechnicianView() {
     }));
   };
 
-  const handlePhotoCapture = (category, item, file) => {
-    if (!file) return;
+  // Las fotos de cámara vienen sin comprimir (varios MB cada una) — al subir
+  // varias de una sola vez en submitReport(), la petición fácilmente supera
+  // el límite del servidor y falla en silencio (antes no se revisaba el
+  // resultado de esa petición). Se reduce cada foto aquí antes de guardarla
+  // en el estado, así el reporte completo pesa una fracción de lo que pesaba.
+  const compressImage = (file, maxDim = 1280, quality = 0.72) => new Promise((resolve, reject) => {
     const reader = new FileReader();
-    reader.onload = ev => handleDetail(category, item, 'foto', ev.target.result);
+    reader.onload = (ev) => {
+      const img = new Image();
+      img.onload = () => {
+        let { width, height } = img;
+        if (width > maxDim || height > maxDim) {
+          if (width >= height) { height = Math.round(height * maxDim / width); width = maxDim; }
+          else { width = Math.round(width * maxDim / height); height = maxDim; }
+        }
+        const canvas = document.createElement('canvas');
+        canvas.width = width;
+        canvas.height = height;
+        canvas.getContext('2d').drawImage(img, 0, 0, width, height);
+        resolve(canvas.toDataURL('image/jpeg', quality));
+      };
+      img.onerror = reject;
+      img.src = ev.target.result;
+    };
+    reader.onerror = reject;
     reader.readAsDataURL(file);
+  });
+
+  const handlePhotoCapture = async (category, item, file) => {
+    if (!file) return;
+    try {
+      const dataUrl = await compressImage(file);
+      handleDetail(category, item, 'foto', dataUrl);
+    } catch {
+      // Si por algo falla comprimir (formato raro, etc), se usa la foto
+      // original tal cual en vez de perderla.
+      const reader = new FileReader();
+      reader.onload = ev => handleDetail(category, item, 'foto', ev.target.result);
+      reader.readAsDataURL(file);
+    }
   };
 
   const buildWhatsAppMessage = (items, validCodes, precioDiag) => {
@@ -272,13 +307,18 @@ export default function TechnicianView() {
     try {
       if (fotosHallazgos.length > 0) {
         const orderRes = await fetch(`${API_URL}/orders/${selectedOrder.id}`);
+        if (!orderRes.ok) throw new Error('No se pudo leer la orden para guardar las fotos');
         const orderActual = await orderRes.json();
         const fotosActuales = orderActual.fotos || [];
-        await fetch(`${API_URL}/orders/${selectedOrder.id}`, {
+        // Antes esta petición no se revisaba: si el servidor la rechazaba
+        // (payload muy grande, conexión mala), el reporte seguía y mostraba
+        // "éxito" aunque las fotos nunca quedaran guardadas en la orden.
+        const fotosRes = await fetch(`${API_URL}/orders/${selectedOrder.id}`, {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ fotos: [...fotosActuales, ...fotosHallazgos] })
         });
+        if (!fotosRes.ok) throw new Error('El servidor rechazó el guardado de las fotos');
       }
       // Un pedido activo tiene un solo reporte "vigente": si el técnico ya había
       // subido uno para esta orden, lo actualizamos en vez de crear otro — antes

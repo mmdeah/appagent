@@ -48,6 +48,15 @@ export default function OrderDetailsModal({ order, onClose, fleetMode = false, i
   // para enviar su texto a "Servicios a Realizar" — se reinicia al cambiar
   // de slot para no arrastrar selección de una tabla distinta.
   const [selectedQuoteIdx, setSelectedQuoteIdx] = useState([]);
+  // Si está activado, el PDF del Reporte Técnico ("Imprimir Reporte") solo
+  // incluye los ítems marcados como "Malo"; desactivado (por defecto) salen
+  // todos los ítems revisados, igual que antes.
+  const [showOnlyBad, setShowOnlyBad] = useState(() => localStorage.getItem('report_only_bad') === 'true');
+  const toggleOnlyBad = () => {
+    const next = !showOnlyBad;
+    setShowOnlyBad(next);
+    localStorage.setItem('report_only_bad', String(next));
+  };
   // Ambos toggles son mutuamente excluyentes (organizar el PDF por
   // prioridad o por categoría, nunca las dos a la vez) — si por alguna
   // sesión vieja quedaron ambos en 'true' en localStorage, categoría gana
@@ -323,6 +332,7 @@ export default function OrderDetailsModal({ order, onClose, fleetMode = false, i
         return it;
       })
       .filter(it => it.state)
+      .filter(it => !showOnlyBad || it.state === 'Malo')
       .map((it, i) => `
       <tr>
         <td class="col-num">${i + 1}</td>
@@ -1147,6 +1157,25 @@ export default function OrderDetailsModal({ order, onClose, fleetMode = false, i
                       </div>
                     </>
                   )}
+
+                  {!fleetMode && <div className="hide-on-print" style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', marginTop: '1rem', marginBottom: '0.75rem', padding: '0.65rem 1rem', background: 'rgba(255,255,255,0.03)', border: '1px solid var(--border)', borderRadius: 10 }}>
+                    <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)', fontWeight: 600 }}>Solo ítems malos en el PDF del reporte:</span>
+                    <button
+                      onClick={toggleOnlyBad}
+                      style={{
+                        display: 'flex', alignItems: 'center', gap: '0.4rem',
+                        padding: '0.35rem 0.9rem', borderRadius: 20, fontWeight: 700, fontSize: '0.82rem', cursor: 'pointer', transition: 'all 0.2s',
+                        background: showOnlyBad ? 'rgba(99,102,241,0.15)' : 'rgba(107,114,128,0.1)',
+                        color: showOnlyBad ? 'var(--primary)' : 'var(--text-muted)',
+                        border: showOnlyBad ? '1.5px solid var(--primary)' : '1.5px solid var(--border)',
+                      }}
+                    >
+                      <span style={{ width: 28, height: 16, borderRadius: 99, background: showOnlyBad ? 'var(--primary)' : '#6b7280', display: 'inline-flex', alignItems: 'center', padding: '0 2px', transition: 'all 0.2s' }}>
+                        <span style={{ width: 12, height: 12, borderRadius: '50%', background: 'white', marginLeft: showOnlyBad ? 'auto' : 0, transition: 'margin 0.2s' }} />
+                      </span>
+                      {showOnlyBad ? 'Activado' : 'Desactivado'}
+                    </button>
+                  </div>}
 
                   <div className="hide-on-print" style={{ display: 'flex', gap: '0.75rem', marginTop: '1rem' }}>
                     {!fleetMode && <button onClick={saveReport} className="btn-primary">Guardar Precios</button>}

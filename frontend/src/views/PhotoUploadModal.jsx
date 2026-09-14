@@ -27,15 +27,48 @@ export default function PhotoUploadModal({ onClose, onSuccess }) {
       .catch(() => {});
   }, []);
 
-  const handleFile = (e) => {
+  // La foto de cámara viene sin comprimir (varios MB) — se reduce antes de
+  // guardarla para no arriesgar que la petición supere el límite del
+  // servidor (eso pasaba en silencio: la petición fallaba y la foto nunca
+  // quedaba guardada, pero no había forma de saberlo).
+  const compressImage = (file, maxDim = 1280, quality = 0.72) => new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      const img = new Image();
+      img.onload = () => {
+        let { width, height } = img;
+        if (width > maxDim || height > maxDim) {
+          if (width >= height) { height = Math.round(height * maxDim / width); width = maxDim; }
+          else { width = Math.round(width * maxDim / height); height = maxDim; }
+        }
+        const canvas = document.createElement('canvas');
+        canvas.width = width;
+        canvas.height = height;
+        canvas.getContext('2d').drawImage(img, 0, 0, width, height);
+        resolve(canvas.toDataURL('image/jpeg', quality));
+      };
+      img.onerror = reject;
+      img.src = ev.target.result;
+    };
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+
+  const handleFile = async (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    const reader = new FileReader();
-    reader.onload = ev => {
-      setPhotoPreview(ev.target.result);
-      setPhotoB64(ev.target.result);
-    };
-    reader.readAsDataURL(file);
+    try {
+      const dataUrl = await compressImage(file);
+      setPhotoPreview(dataUrl);
+      setPhotoB64(dataUrl);
+    } catch {
+      const reader = new FileReader();
+      reader.onload = ev => {
+        setPhotoPreview(ev.target.result);
+        setPhotoB64(ev.target.result);
+      };
+      reader.readAsDataURL(file);
+    }
   };
 
   const handleUpload = async () => {
@@ -47,14 +80,16 @@ export default function PhotoUploadModal({ onClose, onSuccess }) {
     try {
       // Obtener la orden actual
       const res = await fetch(`${API_URL}/orders/${selectedOrderId}`);
+      if (!res.ok) throw new Error('No se pudo leer la orden');
       const order = await res.json();
       const fotosActuales = order.fotos || [];
 
-      await fetch(`${API_URL}/orders/${selectedOrderId}`, {
+      const uploadRes = await fetch(`${API_URL}/orders/${selectedOrderId}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ fotos: [...fotosActuales, photoB64] })
       });
+      if (!uploadRes.ok) throw new Error('El servidor rechazó la foto');
 
       setStatus({ text: '✓ Foto agregada exitosamente', type: 'success' });
       setTimeout(() => {
@@ -62,7 +97,7 @@ export default function PhotoUploadModal({ onClose, onSuccess }) {
         onClose();
       }, 1500);
     } catch {
-      setStatus({ text: 'Error al subir la foto', type: 'error' });
+      setStatus({ text: 'Error al subir la foto. Intenta de nuevo.', type: 'error' });
     } finally {
       setUploading(false);
     }
