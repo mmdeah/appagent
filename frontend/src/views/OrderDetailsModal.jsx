@@ -44,7 +44,27 @@ export default function OrderDetailsModal({ order, onClose, fleetMode = false, i
   const [metodoPago, setMetodoPago] = useState('Efectivo');
   const [notasEntrega, setNotasEntrega] = useState(order.notasEntrega || '');
   const [isEditingInfo, setIsEditingInfo] = useState(false);
-  const [showPriority, setShowPriority] = useState(() => localStorage.getItem('quote_show_priority') !== 'false');
+  // Ambos toggles son mutuamente excluyentes (organizar el PDF por
+  // prioridad o por categoría, nunca las dos a la vez) — si por alguna
+  // sesión vieja quedaron ambos en 'true' en localStorage, categoría gana
+  // y prioridad se apaga al iniciar.
+  const [showCategoria, setShowCategoria] = useState(() => localStorage.getItem('quote_show_categoria') === 'true');
+  const [showPriority, setShowPriority] = useState(() => {
+    if (localStorage.getItem('quote_show_categoria') === 'true') return false;
+    return localStorage.getItem('quote_show_priority') !== 'false';
+  });
+  const togglePriority = () => {
+    const next = !showPriority;
+    setShowPriority(next);
+    localStorage.setItem('quote_show_priority', String(next));
+    if (next && showCategoria) { setShowCategoria(false); localStorage.setItem('quote_show_categoria', 'false'); }
+  };
+  const toggleCategoria = () => {
+    const next = !showCategoria;
+    setShowCategoria(next);
+    localStorage.setItem('quote_show_categoria', String(next));
+    if (next && showPriority) { setShowPriority(false); localStorage.setItem('quote_show_priority', 'false'); }
+  };
   const [editedOrder, setEditedOrder] = useState({ ...order });
   const [showAddItem, setShowAddItem] = useState(false);
   const [newItem, setNewItem] = useState({ category: '', item: '', state: 'Malo', manoObra: '', requiereRepuesto: false, cantidadRepuesto: 1, valorRepuesto: '', recibeReparacion: false, valorReparacion: '' });
@@ -357,19 +377,37 @@ export default function OrderDetailsModal({ order, onClose, fleetMode = false, i
   const printQuote = (forcedTitle = null) => {
     const sub = totals.sub, iva = totals.iva, total = totals.total;
     const mainTitle = forcedTitle || ((order.estado === 'Entregado' || order.estado === 'Ingresos Rápidos') ? 'CUENTA DE COBRO' : 'COTIZACIÓN');
-    const isCuentaCobro = mainTitle === 'CUENTA DE COBRO' || !showPriority;
+    // Los dos modos de agrupación (prioridad / categoría) son mutuamente
+    // excluyentes — si ninguno está activo, o es una cuenta de cobro, se
+    // imprime como lista plana sin agrupar.
+    const groupMode = mainTitle === 'CUENTA DE COBRO' ? null : (showPriority ? 'prioridad' : (showCategoria ? 'categoria' : null));
+    const isCuentaCobro = !groupMode;
     const prioOrder = ['urgente', 'plazo_medio', 'plazo_largo'];
     const prioMap = {
       urgente:     { label: 'Urgente',     color: '#ef4444', bg: '#fef2f2', headerBg: '#fee2e2' },
       plazo_medio: { label: 'Plazo Medio', color: '#d97706', bg: '#fffbeb', headerBg: '#fef3c7' },
       plazo_largo: { label: 'Plazo Largo', color: '#059669', bg: '#f0fdf4', headerBg: '#dcfce7' },
     };
+    // La categoría es un texto libre (viene del reporte técnico: "Frenos",
+    // "Suspensión", etc.), no un set fijo de 3 valores como la prioridad —
+    // así que el color de cada grupo se asigna por orden de aparición en
+    // vez de un mapa fijo.
+    const catPalette = [
+      { color: '#6366f1', bg: '#eef2ff', headerBg: '#e0e7ff' },
+      { color: '#0ea5e9', bg: '#f0f9ff', headerBg: '#e0f2fe' },
+      { color: '#10b981', bg: '#f0fdf4', headerBg: '#dcfce7' },
+      { color: '#f59e0b', bg: '#fffbeb', headerBg: '#fef3c7' },
+      { color: '#ef4444', bg: '#fef2f2', headerBg: '#fee2e2' },
+      { color: '#8b5cf6', bg: '#f5f3ff', headerBg: '#ede9fe' },
+      { color: '#ec4899', bg: '#fdf2f8', headerBg: '#fce7f3' },
+      { color: '#14b8a6', bg: '#f0fdfa', headerBg: '#ccfbf1' },
+    ];
 
     let rows = '';
     let globalNum = 1;
 
     if (isCuentaCobro) {
-      // Cuenta de cobro: simple list, no priority grouping
+      // Cuenta de cobro (o ningún agrupamiento activo): lista plana
       rows = quoteItems.map((it, i) => {
         const lineTotal = it.precio * it.cantidad;
         const lineIva = it.aplicaIva ? lineTotal * 0.19 : 0;
@@ -383,8 +421,8 @@ export default function OrderDetailsModal({ order, onClose, fleetMode = false, i
             <td class="col-total">$${fmt(lineTotal + lineIva)} COP</td>
           </tr>`;
       }).join('');
-    } else {
-      // Cotización: sorted by priority with group headers and subtotals
+    } else if (groupMode === 'prioridad') {
+      // Cotización: agrupada por prioridad, con encabezados y subtotales
       const sortedItems = [...quoteItems].sort((a, b) =>
         prioOrder.indexOf(a.prioridad || 'urgente') - prioOrder.indexOf(b.prioridad || 'urgente')
       );
@@ -412,6 +450,38 @@ export default function OrderDetailsModal({ order, onClose, fleetMode = false, i
             </tr>`;
         });
         rows += `<tr style="background:${p.headerBg}"><td colspan="6" style="text-align:right;font-weight:700;font-size:0.85rem;color:${p.color};padding:5px 10px">Subtotal ${p.label}:</td><td class="col-total" style="font-weight:800;color:${p.color}">$${fmt(groupTotal)} COP</td></tr>`;
+      });
+    } else {
+      // Cotización: agrupada por categoría (Frenos, Suspensión, etc.)
+      const categorias = [];
+      quoteItems.forEach(it => {
+        const c = it.categoria || 'Sin categoría';
+        if (!categorias.includes(c)) categorias.push(c);
+      });
+      categorias.forEach((catName, ci) => {
+        const group = quoteItems.filter(it => (it.categoria || 'Sin categoría') === catName);
+        if (group.length === 0) return;
+        const p = catPalette[ci % catPalette.length];
+        const groupTotal = group.reduce((acc, it) => {
+          const lt = it.precio * it.cantidad;
+          return acc + (it.aplicaIva ? lt * 1.19 : lt);
+        }, 0);
+        rows += `<tr><td colspan="7" style="background:${p.headerBg};color:${p.color};font-weight:800;font-size:0.85rem;padding:6px 10px;letter-spacing:0.03em">${catName}</td></tr>`;
+        group.forEach(it => {
+          const lineTotal = it.precio * it.cantidad;
+          const lineIva = it.aplicaIva ? lineTotal * 0.19 : 0;
+          rows += `
+            <tr>
+              <td class="col-num">${globalNum++}</td>
+              <td class="col-desc">${it.descripcion}</td>
+              <td style="text-align:center"><span style="font-size:0.78rem;font-weight:700;padding:2px 8px;border-radius:6px;background:${p.bg};color:${p.color}">${catName}</span></td>
+              <td style="text-align:center">${it.cantidad}</td>
+              <td class="col-price">$${fmt(it.precio)} COP</td>
+              <td class="col-iva">${lineIva > 0 ? '$' + fmt(lineIva) + ' COP' : '—'}</td>
+              <td class="col-total">$${fmt(lineTotal + lineIva)} COP</td>
+            </tr>`;
+        });
+        rows += `<tr style="background:${p.headerBg}"><td colspan="6" style="text-align:right;font-weight:700;font-size:0.85rem;color:${p.color};padding:5px 10px">Subtotal ${catName}:</td><td class="col-total" style="font-weight:800;color:${p.color}">$${fmt(groupTotal)} COP</td></tr>`;
       });
     }
     printWindow(`${mainTitle} ${order.placa}`, `
@@ -444,7 +514,7 @@ export default function OrderDetailsModal({ order, onClose, fleetMode = false, i
       <table>
         <thead>
           <tr>
-            <th>#</th><th>Descripción</th>${!isCuentaCobro ? '<th style="text-align:center">Prioridad</th>' : ''}<th style="text-align:center">Cant.</th><th style="text-align:right">Precio Unit.</th><th style="text-align:right">IVA</th><th style="text-align:right">Total</th>
+            <th>#</th><th>Descripción</th>${groupMode ? `<th style="text-align:center">${groupMode === 'prioridad' ? 'Prioridad' : 'Categoría'}</th>` : ''}<th style="text-align:center">Cant.</th><th style="text-align:right">Precio Unit.</th><th style="text-align:right">IVA</th><th style="text-align:right">Total</th>
           </tr>
         </thead>
         <tbody>${rows}</tbody>
@@ -600,15 +670,16 @@ export default function OrderDetailsModal({ order, onClose, fleetMode = false, i
       const cRepuesto = parseInt(it.cantidadRepuesto) || 1;
 
       const prio = it.prioridad || 'urgente';
+      const cat = it.category || 'Otros';
       if (it.category === 'Insumos' && (it.state === 'Necesario' || !it.state)) {
-        newItems.push({ descripcion: `Insumo: ${it.item}`, cantidad: parseInt(it.cantidad) || 1, precio: 0, aplicaIva: false, prioridad: prio });
+        newItems.push({ descripcion: `Insumo: ${it.item}`, cantidad: parseInt(it.cantidad) || 1, precio: 0, aplicaIva: false, prioridad: prio, categoria: cat });
       } else if (it.category === 'Servicios Especializados' && (it.state === 'Realizar' || !it.state)) {
         const desc = it.item === 'Diagnostico Profundo en' ? `Diagnóstico Profundo (${it.area || 'General'})` : it.item;
-        newItems.push({ descripcion: desc, cantidad: 1, precio: mO, aplicaIva: false, prioridad: prio });
+        newItems.push({ descripcion: desc, cantidad: 1, precio: mO, aplicaIva: false, prioridad: prio, categoria: cat });
       } else {
-        if (mO > 0) newItems.push({ descripcion: `Mano de obra: ${it.item}`, cantidad: 1, precio: mO, aplicaIva: false, prioridad: prio });
-        if (vRep > 0) newItems.push({ descripcion: `Reparación: ${it.item}`, cantidad: 1, precio: vRep, aplicaIva: false, prioridad: prio });
-        if (vRepuesto > 0) newItems.push({ descripcion: `Repuesto: ${it.item}`, cantidad: cRepuesto, precio: vRepuesto, aplicaIva: false, prioridad: prio });
+        if (mO > 0) newItems.push({ descripcion: `Mano de obra: ${it.item}`, cantidad: 1, precio: mO, aplicaIva: false, prioridad: prio, categoria: cat });
+        if (vRep > 0) newItems.push({ descripcion: `Reparación: ${it.item}`, cantidad: 1, precio: vRep, aplicaIva: false, prioridad: prio, categoria: cat });
+        if (vRepuesto > 0) newItems.push({ descripcion: `Repuesto: ${it.item}`, cantidad: cRepuesto, precio: vRepuesto, aplicaIva: false, prioridad: prio, categoria: cat });
       }
     });
 
@@ -1262,27 +1333,43 @@ export default function OrderDetailsModal({ order, onClose, fleetMode = false, i
                 </div>
               </div>
 
-              {!fleetMode && <div className="hide-on-print" style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', marginBottom: '1rem', padding: '0.65rem 1rem', background: 'rgba(255,255,255,0.03)', border: '1px solid var(--border)', borderRadius: 10 }}>
-                <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)', fontWeight: 600 }}>Mostrar prioridades en PDF de cotización:</span>
-                <button
-                  onClick={() => {
-                    const next = !showPriority;
-                    setShowPriority(next);
-                    localStorage.setItem('quote_show_priority', String(next));
-                  }}
-                  style={{
-                    display: 'flex', alignItems: 'center', gap: '0.4rem',
-                    padding: '0.35rem 0.9rem', borderRadius: 20, fontWeight: 700, fontSize: '0.82rem', cursor: 'pointer', transition: 'all 0.2s',
-                    background: showPriority ? 'rgba(99,102,241,0.15)' : 'rgba(107,114,128,0.1)',
-                    color: showPriority ? 'var(--primary)' : 'var(--text-muted)',
-                    border: showPriority ? '1.5px solid var(--primary)' : '1.5px solid var(--border)',
-                  }}
-                >
-                  <span style={{ width: 28, height: 16, borderRadius: 99, background: showPriority ? 'var(--primary)' : '#6b7280', display: 'inline-flex', alignItems: 'center', padding: '0 2px', transition: 'all 0.2s' }}>
-                    <span style={{ width: 12, height: 12, borderRadius: '50%', background: 'white', marginLeft: showPriority ? 'auto' : 0, transition: 'margin 0.2s' }} />
-                  </span>
-                  {showPriority ? 'Activado' : 'Desactivado'}
-                </button>
+              {!fleetMode && <div className="hide-on-print" style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem', marginBottom: '1rem', padding: '0.65rem 1rem', background: 'rgba(255,255,255,0.03)', border: '1px solid var(--border)', borderRadius: 10 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+                  <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)', fontWeight: 600 }}>Mostrar prioridades en PDF de cotización:</span>
+                  <button
+                    onClick={togglePriority}
+                    style={{
+                      display: 'flex', alignItems: 'center', gap: '0.4rem',
+                      padding: '0.35rem 0.9rem', borderRadius: 20, fontWeight: 700, fontSize: '0.82rem', cursor: 'pointer', transition: 'all 0.2s',
+                      background: showPriority ? 'rgba(99,102,241,0.15)' : 'rgba(107,114,128,0.1)',
+                      color: showPriority ? 'var(--primary)' : 'var(--text-muted)',
+                      border: showPriority ? '1.5px solid var(--primary)' : '1.5px solid var(--border)',
+                    }}
+                  >
+                    <span style={{ width: 28, height: 16, borderRadius: 99, background: showPriority ? 'var(--primary)' : '#6b7280', display: 'inline-flex', alignItems: 'center', padding: '0 2px', transition: 'all 0.2s' }}>
+                      <span style={{ width: 12, height: 12, borderRadius: '50%', background: 'white', marginLeft: showPriority ? 'auto' : 0, transition: 'margin 0.2s' }} />
+                    </span>
+                    {showPriority ? 'Activado' : 'Desactivado'}
+                  </button>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+                  <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)', fontWeight: 600 }}>Mostrar categorías en PDF de cotización:</span>
+                  <button
+                    onClick={toggleCategoria}
+                    style={{
+                      display: 'flex', alignItems: 'center', gap: '0.4rem',
+                      padding: '0.35rem 0.9rem', borderRadius: 20, fontWeight: 700, fontSize: '0.82rem', cursor: 'pointer', transition: 'all 0.2s',
+                      background: showCategoria ? 'rgba(99,102,241,0.15)' : 'rgba(107,114,128,0.1)',
+                      color: showCategoria ? 'var(--primary)' : 'var(--text-muted)',
+                      border: showCategoria ? '1.5px solid var(--primary)' : '1.5px solid var(--border)',
+                    }}
+                  >
+                    <span style={{ width: 28, height: 16, borderRadius: 99, background: showCategoria ? 'var(--primary)' : '#6b7280', display: 'inline-flex', alignItems: 'center', padding: '0 2px', transition: 'all 0.2s' }}>
+                      <span style={{ width: 12, height: 12, borderRadius: '50%', background: 'white', marginLeft: showCategoria ? 'auto' : 0, transition: 'margin 0.2s' }} />
+                    </span>
+                    {showCategoria ? 'Activado' : 'Desactivado'}
+                  </button>
+                </div>
               </div>}
 
               <div className="hide-on-print" style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap', alignItems: 'center' }}>
