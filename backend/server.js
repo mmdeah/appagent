@@ -420,7 +420,7 @@ server.post('/api/analyze-expense-image', async (req, res) => {
         'X-Title': 'AppAgent'
       },
       body: JSON.stringify({
-        model: 'google/gemini-2.5-flash-preview-05-20',
+        model: 'openai/gpt-4o-mini',
         messages: [
           {
             role: 'user',
