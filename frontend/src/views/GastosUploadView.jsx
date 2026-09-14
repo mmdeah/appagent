@@ -1,8 +1,8 @@
-import React, { useState, useRef, useContext } from 'react';
+import React, { useState, useRef, useContext, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { API_URL, BACKEND_URL } from '../api';
 import { ThemeContext } from '../App';
-import { Camera, CheckCircle, ArrowLeft, RefreshCw, Image as ImageIcon, ChevronDown, ChevronUp, HelpCircle } from 'lucide-react';
+import { Camera, CheckCircle, ArrowLeft, RefreshCw, Image as ImageIcon, HelpCircle } from 'lucide-react';
 
 // Mismas listas que en el panel Admin (frontend/src/views/AdminView.jsx) — se
 // duplican aquí a propósito, siguiendo la convención ya usada en el resto del
@@ -13,7 +13,7 @@ const PAYMENT_METHODS = ['Efectivo', 'Nequi', 'Bancolombia', 'Banco de Bogota', 
 
 const emptyForm = () => ({
   fecha: new Date().toISOString().split('T')[0],
-  concepto: '', monto: '', metodoPago: 'Efectivo', categoria: 'Repuestos', vendedor: '', facturaIva: 'No',
+  concepto: '', monto: '', metodoPago: 'Efectivo', categoria: 'Repuestos', vendedor: '', facturaIva: 'No', ordenId: '',
 });
 
 const fmtMiles = (digitsOnly) => digitsOnly ? parseInt(digitsOnly, 10).toLocaleString('es-CO') : '';
@@ -40,9 +40,19 @@ export default function GastosUploadView() {
   const [analyzeError, setAnalyzeError] = useState(false);
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState(false);
-  const [showDetails, setShowDetails] = useState(true);
+  const [showOrderPicker, setShowOrderPicker] = useState(false);
+  const [orders, setOrders] = useState([]);
 
   const stepNum = step === 'foto' ? 1 : step === 'listo' ? 3 : 2;
+
+  // Órdenes activas (vehículos que siguen en el taller), para poder relacionar
+  // el gasto con una placa y así sea fácil de encontrar en el historial.
+  useEffect(() => {
+    fetch(`${API_URL}/orders`)
+      .then(r => r.json())
+      .then(data => setOrders((data || []).filter(o => o.estado !== 'Entregado')))
+      .catch(() => setOrders([]));
+  }, []);
 
   const analyzePhoto = async (base64, mimeType, attempt = 0) => {
     try {
@@ -99,6 +109,7 @@ export default function GastosUploadView() {
     setPhotoPreview(null);
     setForm(emptyForm());
     setAnalyzeError(false);
+    setShowOrderPicker(false);
     setStep('foto');
   };
 
@@ -107,10 +118,18 @@ export default function GastosUploadView() {
     setSaving(true);
     setSaveError(false);
     try {
+      const ordenSeleccionada = orders.find(o => String(o.id) === String(form.ordenId));
+      const concepto = ordenSeleccionada ? `[${ordenSeleccionada.placa}] ${form.concepto}` : form.concepto;
       const res = await fetch(`${API_URL}/expenses`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ...form, monto: parseInt(form.monto) || 0 }),
+        body: JSON.stringify({
+          ...form,
+          concepto,
+          monto: parseInt(form.monto) || 0,
+          ordenId: ordenSeleccionada ? ordenSeleccionada.id : null,
+          placa: ordenSeleccionada ? ordenSeleccionada.placa : '',
+        }),
       });
       if (!res.ok) throw new Error('respuesta no OK');
       setStep('listo');
@@ -126,6 +145,7 @@ export default function GastosUploadView() {
     setForm(emptyForm());
     setAnalyzeError(false);
     setSaveError(false);
+    setShowOrderPicker(false);
     setStep('foto');
   };
 
@@ -250,40 +270,69 @@ export default function GastosUploadView() {
                     </button>
                   </div>
                 </div>
+
+                <div>
+                  <label style={label}>🚗 ¿Es para una orden de servicio?</label>
+                  <p style={{ color: 'var(--text-muted)', fontSize: '0.88rem', marginBottom: '0.6rem', lineHeight: 1.4 }}>
+                    Si es un repuesto o servicio para un vehículo del taller, relaciónalo con su placa.
+                  </p>
+                  <div style={{ display: 'flex', gap: '0.75rem' }}>
+                    <button type="button" onClick={() => setShowOrderPicker(true)}
+                      style={{
+                        flex: 1, padding: '1rem', borderRadius: 14, cursor: 'pointer', fontWeight: 800, fontSize: '1.1rem',
+                        border: showOrderPicker ? '2px solid var(--primary)' : '1.5px solid var(--border)',
+                        background: showOrderPicker ? 'rgba(99,102,241,0.12)' : 'var(--bg)',
+                        color: showOrderPicker ? 'var(--primary)' : 'var(--text)',
+                      }}>
+                      Sí
+                    </button>
+                    <button type="button" onClick={() => { setShowOrderPicker(false); setForm(f => ({ ...f, ordenId: '' })); }}
+                      style={{
+                        flex: 1, padding: '1rem', borderRadius: 14, cursor: 'pointer', fontWeight: 800, fontSize: '1.1rem',
+                        border: !showOrderPicker ? '2px solid var(--text-muted)' : '1.5px solid var(--border)',
+                        background: !showOrderPicker ? 'rgba(148,163,184,0.12)' : 'var(--bg)',
+                        color: !showOrderPicker ? 'var(--text)' : 'var(--text)',
+                      }}>
+                      No
+                    </button>
+                  </div>
+                  {showOrderPicker && (
+                    <select style={{ marginTop: '0.75rem' }} value={form.ordenId} onChange={e => setForm({ ...form, ordenId: e.target.value })}>
+                      <option value="">Selecciona la placa del vehículo...</option>
+                      {orders.map(o => (
+                        <option key={o.id} value={o.id}>{o.placa} — {o.marca} {o.modelo} ({o.cliente})</option>
+                      ))}
+                    </select>
+                  )}
+                  {showOrderPicker && orders.length === 0 && (
+                    <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem', marginTop: '0.5rem' }}>No hay vehículos activos en el taller ahora mismo.</p>
+                  )}
+                </div>
               </div>
 
-              {/* ── Todo lo demás, escondido para no marear ─────────────── */}
-              <button type="button" onClick={() => setShowDetails(v => !v)}
-                style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.4rem', background: 'none', border: 'none', color: 'var(--text-muted)', fontSize: '0.92rem', fontWeight: 700, cursor: 'pointer', padding: '0.6rem 0', marginBottom: showDetails ? '1.25rem' : '1.5rem' }}>
-                {showDetails ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
-                {showDetails ? 'Ocultar otros datos' : 'Ver otros datos (opcional)'}
-              </button>
-
-              {showDetails && (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', marginBottom: '1.5rem', padding: '1rem', background: 'var(--bg)', borderRadius: 14, border: '1px solid var(--border)' }}>
-                  <div>
-                    <label style={detailLabel}>🏪 Vendedor</label>
-                    <input type="text" placeholder="Ej. Repuestos del Valle" value={form.vendedor}
-                      onChange={e => setForm({ ...form, vendedor: e.target.value })} />
-                  </div>
-                  <div>
-                    <label style={detailLabel}>📅 Fecha</label>
-                    <input type="date" required value={form.fecha} onChange={e => setForm({ ...form, fecha: e.target.value })} />
-                  </div>
-                  <div>
-                    <label style={detailLabel}>🏷️ Categoría</label>
-                    <select value={form.categoria} onChange={e => setForm({ ...form, categoria: e.target.value })}>
-                      {EXPENSE_CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
-                    </select>
-                  </div>
-                  <div>
-                    <label style={detailLabel}>💳 Método de Pago</label>
-                    <select value={form.metodoPago} onChange={e => setForm({ ...form, metodoPago: e.target.value })}>
-                      {PAYMENT_METHODS.map(m => <option key={m} value={m}>{m}</option>)}
-                    </select>
-                  </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', marginBottom: '1.5rem', padding: '1rem', background: 'var(--bg)', borderRadius: 14, border: '1px solid var(--border)' }}>
+                <div>
+                  <label style={detailLabel}>🏪 Vendedor</label>
+                  <input type="text" placeholder="Ej. Repuestos del Valle" value={form.vendedor}
+                    onChange={e => setForm({ ...form, vendedor: e.target.value })} />
                 </div>
-              )}
+                <div>
+                  <label style={detailLabel}>📅 Fecha</label>
+                  <input type="date" required value={form.fecha} onChange={e => setForm({ ...form, fecha: e.target.value })} />
+                </div>
+                <div>
+                  <label style={detailLabel}>🏷️ Categoría</label>
+                  <select value={form.categoria} onChange={e => setForm({ ...form, categoria: e.target.value })}>
+                    {EXPENSE_CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label style={detailLabel}>💳 Método de Pago</label>
+                  <select value={form.metodoPago} onChange={e => setForm({ ...form, metodoPago: e.target.value })}>
+                    {PAYMENT_METHODS.map(m => <option key={m} value={m}>{m}</option>)}
+                  </select>
+                </div>
+              </div>
 
               {saveError && <div className="toast toast-error" style={{ marginBottom: '1rem' }}>No se pudo guardar. Revisa tu conexión e intenta de nuevo.</div>}
 
