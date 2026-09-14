@@ -12,7 +12,6 @@ import {
   Camera,
   AlertTriangle,
   Info,
-  CheckCircle,
   X,
   RefreshCw,
   WifiOff
@@ -335,12 +334,12 @@ export default function TechnicianView() {
   };
 
   // Los técnicos deben ver TODOS los vehículos activos (Recepción, Ingresos
-  // Rápidos, Proceso, Calidad, etc.) — solo los ya Entregados quedan afuera
-  // (eso ya se filtra en fetchOrders). La división entre las dos columnas es
-  // simplemente "¿ya tiene una cotización autorizada?", no el estado del
-  // Kanban — así ningún vehículo activo queda sin aparecer en ninguna lista.
-  const authorizedOrders = orders.filter(o => o.quotes?.some(q => q.autorizada));
-  const pendingOrders = orders.filter(o => !o.quotes?.some(q => q.autorizada));
+  // Rápidos, Proceso, Calidad, etc.) en una sola lista — solo los ya
+  // Entregados quedan afuera (eso ya se filtra en fetchOrders). Ya no se
+  // separan por "cotización autorizada": ese paso de autorización se quitó,
+  // ahora "Servicios a Realizar" (llenado a mano por el admin) es lo que le
+  // dice al técnico qué hacer.
+  const activeOrders = orders;
 
   return (
     <div style={{ minHeight: '100vh', background: 'var(--bg)', color: 'var(--text)' }}>
@@ -568,48 +567,29 @@ export default function TechnicianView() {
             )}
 
             {!loading && !loadError && (
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 350px), 1fr))', gap: '1.5rem' }}>
-                <div>
-                  <h2 style={{ fontSize: '0.9rem', fontWeight: 800, textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}><AlertTriangle size={14} color="var(--warning)" /> Revision Pendiente ({pendingOrders.length})</h2>
-                  <div style={{ display: 'grid', gap: '1rem' }}>
-                    {pendingOrders.map(o => (
-                      <div key={o.id} className="card card-hover" style={{ cursor: 'pointer', padding: '1.25rem', borderLeft: '4px solid var(--primary)' }} onClick={() => setSelectedOrder(o)}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
-                          <div>
-                            <div style={{ fontSize: '1.45rem', fontWeight: 900, lineHeight: 1 }}>{o.placa}</div>
-                            <div style={{ fontSize: '0.95rem', color: 'var(--text-muted)', fontWeight: 600 }}>{o.marca} {o.modelo}</div>
-                            {getPicoYPlaca(o.placa) && <div style={{ fontSize: '0.85rem', color: '#f59e0b', fontWeight: 800, marginTop: '0.2rem' }}>⚠️ {getPicoYPlaca(o.placa)}</div>}
-                          </div>
-                          <div style={{ background: 'var(--primary)', color: 'white', padding: '0.3rem 0.6rem', borderRadius: 6, fontWeight: 900 }}>{o.kilometraje ? `${fmt(o.kilometraje)} KM` : 'S/K'}</div>
+              <div>
+                <h2 style={{ fontSize: '0.9rem', fontWeight: 800, textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}><AlertTriangle size={14} color="var(--warning)" /> Vehículos Activos ({activeOrders.length})</h2>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 350px), 1fr))', gap: '1rem' }}>
+                  {activeOrders.map(o => (
+                    <div key={o.id} className="card" style={{ padding: '1.25rem', borderLeft: '4px solid var(--primary)' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '0.75rem' }}>
+                        <div style={{ cursor: 'pointer' }} onClick={() => setSelectedOrder(o)}>
+                          <div style={{ fontSize: '1.45rem', fontWeight: 900, lineHeight: 1 }}>{o.placa}</div>
+                          <div style={{ fontSize: '0.95rem', color: 'var(--text-muted)', fontWeight: 600 }}>{o.marca} {o.modelo}</div>
+                          {getPicoYPlaca(o.placa) && <div style={{ fontSize: '0.85rem', color: '#f59e0b', fontWeight: 800, marginTop: '0.2rem' }}>⚠️ {getPicoYPlaca(o.placa)}</div>}
                         </div>
-                        {o.servicios && <div style={{ padding: '0.6rem', background: 'rgba(99,102,241,0.1)', borderRadius: 6, fontSize: '1rem', fontWeight: 600 }}>{o.servicios}</div>}
-                      </div>
-                    ))}
-                    {pendingOrders.length === 0 && <div className="card" style={{ textAlign: 'center', padding: '2rem', opacity: 0.5, borderStyle: 'dashed' }}>Vacio</div>}
-                  </div>
-                </div>
-                <div>
-                  <h2 style={{ fontSize: '0.9rem', fontWeight: 800, textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}><CheckCircle size={14} color="var(--success)" /> En Trabajo ({authorizedOrders.length})</h2>
-                  <div style={{ display: 'grid', gap: '1rem' }}>
-                    {authorizedOrders.map(o => (
-                      <div key={o.id} className="card" style={{ padding: '1.25rem', borderLeft: '4px solid var(--success)' }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1rem' }}>
-                          <div>
-                            <div style={{ fontSize: '1.45rem', fontWeight: 900, lineHeight: 1 }}>{o.placa}</div>
-                            <div style={{ fontSize: '0.95rem', color: 'var(--text-muted)', fontWeight: 600 }}>{o.marca} {o.modelo}</div>
-                          </div>
+                        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '0.4rem' }}>
+                          <div style={{ background: 'var(--primary)', color: 'white', padding: '0.3rem 0.6rem', borderRadius: 6, fontWeight: 900, fontSize: '0.85rem' }}>{o.kilometraje ? `${fmt(o.kilometraje)} KM` : 'S/K'}</div>
                           <div style={{ display: 'flex', gap: '0.4rem' }}>
                             <button className="btn-secondary" onClick={() => setSelectedOrder(o)} style={{ padding: '0.3rem 0.6rem', fontSize: '0.85rem', fontWeight: 800 }}>Reportar</button>
                             <button className="btn-success" onClick={() => setShowChecklist(o.id)} style={{ padding: '0.3rem 0.6rem', fontSize: '0.85rem', fontWeight: 800 }}>Terminar</button>
                           </div>
                         </div>
-                        <div style={{ background: 'var(--surface2)', borderRadius: 8, padding: '0.75rem', fontSize: '0.9rem', fontWeight: 600 }}>
-                          {o.quotes?.find(q => q.autorizada)?.items?.map(i => i.descripcion).join(', ')}
-                        </div>
                       </div>
-                    ))}
-                    {authorizedOrders.length === 0 && <div className="card" style={{ textAlign: 'center', padding: '2rem', opacity: 0.5, borderStyle: 'dashed' }}>Vacio</div>}
-                  </div>
+                      {o.servicios && <div style={{ padding: '0.6rem', background: 'rgba(99,102,241,0.1)', borderRadius: 6, fontSize: '1rem', fontWeight: 600 }}>{o.servicios}</div>}
+                    </div>
+                  ))}
+                  {activeOrders.length === 0 && <div className="card" style={{ textAlign: 'center', padding: '2rem', opacity: 0.5, borderStyle: 'dashed' }}>Vacio</div>}
                 </div>
               </div>
             )}

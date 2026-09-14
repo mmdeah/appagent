@@ -44,6 +44,10 @@ export default function OrderDetailsModal({ order, onClose, fleetMode = false, i
   const [metodoPago, setMetodoPago] = useState('Efectivo');
   const [notasEntrega, setNotasEntrega] = useState(order.notasEntrega || '');
   const [isEditingInfo, setIsEditingInfo] = useState(false);
+  // Índices (dentro de quoteItems del slot activo) de los ítems marcados
+  // para enviar su texto a "Servicios a Realizar" — se reinicia al cambiar
+  // de slot para no arrastrar selección de una tabla distinta.
+  const [selectedQuoteIdx, setSelectedQuoteIdx] = useState([]);
   // Ambos toggles son mutuamente excluyentes (organizar el PDF por
   // prioridad o por categoría, nunca las dos a la vez) — si por alguna
   // sesión vieja quedaron ambos en 'true' en localStorage, categoría gana
@@ -168,6 +172,32 @@ export default function OrderDetailsModal({ order, onClose, fleetMode = false, i
       }
     } catch (err) {
       showStatus('Error al actualizar la información', 'error');
+    }
+  };
+
+  // Toma el texto (solo la descripción, sin precios) de los ítems de la
+  // cotización que el admin seleccionó y lo agrega al campo "Servicios a
+  // Realizar" de la orden, para que el técnico sepa qué hacer sin necesidad
+  // de entrar a ver la cotización.
+  const sendSelectedToServicios = async () => {
+    const textos = selectedQuoteIdx.map(i => quoteItems[i]?.descripcion?.trim()).filter(Boolean);
+    if (textos.length === 0) return;
+    const nuevoTexto = textos.join(', ');
+    const servicios = order.servicios ? `${order.servicios}, ${nuevoTexto}` : nuevoTexto;
+    try {
+      const res = await fetch(`${API_URL}/orders/${order.id}`, {
+        method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ servicios })
+      });
+      if (!res.ok) throw new Error('El servidor rechazó la actualización');
+      Object.assign(order, { servicios });
+      setEditedOrder(prev => ({ ...prev, servicios }));
+      setSelectedQuoteIdx([]);
+      showStatus('Enviado a "Servicios a Realizar"');
+      onUpdate && onUpdate();
+    } catch (e) {
+      console.error(e);
+      showStatus('Error al enviar a Servicios a Realizar. Intenta de nuevo.', 'error');
     }
   };
 
@@ -610,28 +640,6 @@ export default function OrderDetailsModal({ order, onClose, fleetMode = false, i
     }
   };
 
-  const authorizeQuote = async () => {
-    setSavingQuote(true);
-    try {
-      await persistQuote(activeSlot, { autorizada: true });
-
-      const res = await fetch(`${API_URL}/orders/${order.id}`, {
-        method: 'PATCH', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ estado: 'Proceso' })
-      });
-      if (!res.ok) throw new Error('El servidor rechazó la actualización de la orden');
-
-      onUpdate && onUpdate();
-      showStatus('¡Cotización Autorizada! El técnico ya tiene el ticket.', 'success');
-      setTimeout(() => onClose(), 1500);
-    } catch (e) {
-      console.error(e);
-      showStatus('Error al autorizar la cotización. Intenta de nuevo.', 'error');
-    } finally {
-      setSavingQuote(false);
-    }
-  };
-
   const doDeliver = async () => {
     try {
       // Primero guardamos las cotizaciones (las 2, si existen) para asegurar
@@ -677,9 +685,12 @@ export default function OrderDetailsModal({ order, onClose, fleetMode = false, i
         const desc = it.item === 'Diagnostico Profundo en' ? `Diagnóstico Profundo (${it.area || 'General'})` : it.item;
         newItems.push({ descripcion: desc, cantidad: 1, precio: mO, aplicaIva: false, prioridad: prio, categoria: cat });
       } else {
-        if (mO > 0) newItems.push({ descripcion: `Mano de obra: ${it.item}`, cantidad: 1, precio: mO, aplicaIva: false, prioridad: prio, categoria: cat });
-        if (vRep > 0) newItems.push({ descripcion: `Reparación: ${it.item}`, cantidad: 1, precio: vRep, aplicaIva: false, prioridad: prio, categoria: cat });
-        if (vRepuesto > 0) newItems.push({ descripcion: `Repuesto: ${it.item}`, cantidad: cRepuesto, precio: vRepuesto, aplicaIva: false, prioridad: prio, categoria: cat });
+        // Se transfiere la línea aunque el técnico no le haya puesto precio
+        // todavía (queda en $0 en la cotización) — así ningún ítem marcado
+        // como necesario desaparece silenciosamente solo por no tener valor.
+        if (it.state && it.state !== 'Bueno') newItems.push({ descripcion: `Mano de obra: ${it.item}`, cantidad: 1, precio: mO, aplicaIva: false, prioridad: prio, categoria: cat });
+        if (it.recibeReparacion) newItems.push({ descripcion: `Reparación: ${it.item}`, cantidad: 1, precio: vRep, aplicaIva: false, prioridad: prio, categoria: cat });
+        if (it.requiereRepuesto) newItems.push({ descripcion: `Repuesto: ${it.item}`, cantidad: cRepuesto, precio: vRepuesto, aplicaIva: false, prioridad: prio, categoria: cat });
       }
     });
 
@@ -1169,22 +1180,23 @@ export default function OrderDetailsModal({ order, onClose, fleetMode = false, i
                 <button
                   className={`tab-btn ${activeSlot === 1 ? 'active' : ''}`}
                   style={{ flex: 'none', padding: '0.5rem 1rem' }}
-                  onClick={() => setActiveSlot(1)}>
-                  Cotización{quotes[1]?.autorizada ? ' ✓' : ''}
+                  onClick={() => { setActiveSlot(1); setSelectedQuoteIdx([]); }}>
+                  Cotización
                 </button>
                 {quotes[2] && (
                   <button
                     className={`tab-btn ${activeSlot === 2 ? 'active' : ''}`}
                     style={{ flex: 'none', padding: '0.5rem 1rem' }}
-                    onClick={() => setActiveSlot(2)}>
+                    onClick={() => { setActiveSlot(2); setSelectedQuoteIdx([]); }}>
                     Borrador (solo yo)
                   </button>
                 )}
                 {!quotes[2] && !fleetMode && (
                   <button className="btn-secondary" style={{ fontSize: '0.8rem' }}
                     onClick={() => {
-                      setQuotes(prev => ({ ...prev, 2: { id: null, items: [{ descripcion: '', cantidad: 1, precio: 0, aplicaIva: false, prioridad: 'urgente' }], autorizada: false } }));
+                      setQuotes(prev => ({ ...prev, 2: { id: null, items: [{ descripcion: '', cantidad: 1, precio: 0, aplicaIva: false, prioridad: 'urgente' }] } }));
                       setActiveSlot(2);
+                      setSelectedQuoteIdx([]);
                     }}>
                     <Plus size={14} /> Agregar borrador
                   </button>
@@ -1194,6 +1206,7 @@ export default function OrderDetailsModal({ order, onClose, fleetMode = false, i
               <table className="data-table">
                 <thead>
                   <tr>
+                    {!fleetMode && <th className="hide-on-print" style={{ width: 30 }}></th>}
                     <th style={{ width: '35%' }}>Descripción</th>
                     <th style={{ textAlign: 'center' }}>Prioridad</th>
                     <th style={{ textAlign: 'center' }}>Cant.</th>
@@ -1209,6 +1222,11 @@ export default function OrderDetailsModal({ order, onClose, fleetMode = false, i
                     const total = it.aplicaIva ? lt * 1.19 : lt;
                     return (
                       <tr key={idx}>
+                        {!fleetMode && <td className="hide-on-print" style={{ textAlign: 'center' }}>
+                          <input type="checkbox" checked={selectedQuoteIdx.includes(idx)}
+                            onChange={e => setSelectedQuoteIdx(prev => e.target.checked ? [...prev, idx] : prev.filter(i => i !== idx))}
+                            title="Seleccionar para enviar a Servicios a Realizar" />
+                        </td>}
                         <td>
                           {!fleetMode && <input className="hide-on-print" type="text" placeholder="Descripción" value={it.descripcion}
                             onChange={e => { const q=[...quoteItems]; q[idx].descripcion=e.target.value; setQuoteItems(q); }}
@@ -1310,9 +1328,13 @@ export default function OrderDetailsModal({ order, onClose, fleetMode = false, i
                 </tbody>
               </table>
 
-              {!fleetMode && <div className="hide-on-print" style={{ marginTop: '0.75rem', marginBottom: '1.5rem' }}>
+              {!fleetMode && <div className="hide-on-print" style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap', alignItems: 'center', marginTop: '0.75rem', marginBottom: '1.5rem' }}>
                 <button className="btn-secondary" style={{ fontSize: '0.82rem' }} onClick={() => setQuoteItems([...quoteItems, { descripcion: '', cantidad: 1, precio: 0, aplicaIva: false, prioridad: 'urgente' }])}>
                   <Plus size={14} /> Añadir ítem
+                </button>
+                <button className="btn-secondary" style={{ fontSize: '0.82rem' }} disabled={selectedQuoteIdx.length === 0} onClick={sendSelectedToServicios}
+                  title="Copia solo el texto (sin precios) de los ítems marcados al campo Servicios a Realizar de la orden">
+                  <MoveRight size={14} /> Enviar a "Servicios a Realizar" {selectedQuoteIdx.length > 0 ? `(${selectedQuoteIdx.length})` : ''}
                 </button>
               </div>}
 
@@ -1374,12 +1396,6 @@ export default function OrderDetailsModal({ order, onClose, fleetMode = false, i
 
               <div className="hide-on-print" style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap', alignItems: 'center' }}>
                 {!fleetMode && <button onClick={saveQuote} disabled={savingQuote} className="btn-secondary">{savingQuote ? 'Guardando...' : 'Guardar Borrador'}</button>}
-                {/* Autorizar solo tiene sentido en la cotización real (slot 1) — el
-                    slot 2 es un borrador privado que nunca se autoriza ni cambia el
-                    estado de la orden. */}
-                {!fleetMode && activeSlot === 1 && <button onClick={authorizeQuote} disabled={savingQuote} className="btn-primary" style={{ background: 'var(--success)', borderColor: 'var(--success)' }}>
-                  <CheckCircle size={16} /> {savingQuote ? 'Guardando...' : 'Autorizar y Empezar Trabajo'}
-                </button>}
                 {fleetMode && (
                   <button onClick={handleSaveApprovals} disabled={savingApprovals} className="btn-primary">
                     {savingApprovals ? 'Guardando...' : '✓ Guardar aprobaciones'}
