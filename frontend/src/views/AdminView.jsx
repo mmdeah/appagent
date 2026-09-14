@@ -41,7 +41,7 @@ export default function AdminView() {
   const [openMenu, setOpenMenu] = useState(null);
   const navRef = useRef(null);
   const [expenses, setExpenses] = useState([]);
-  const [expenseForm, setExpenseForm] = useState({ fecha: new Date().toISOString().split('T')[0], concepto: '', monto: '', metodoPago: 'Efectivo', categoria: 'Repuestos' });
+  const [expenseForm, setExpenseForm] = useState({ fecha: new Date().toISOString().split('T')[0], concepto: '', monto: '', metodoPago: 'Efectivo', categoria: 'Repuestos', vendedor: '', facturaIva: 'No' });
   const [quickOrderForm, setQuickOrderForm] = useState({ placa: '', cliente: '', marca: '', modelo: '', anio: '', servicios: '' });
   const [formStatus, setFormStatus] = useState({ text: '', type: '' });
   const [orderToDelete, setOrderToDelete] = useState(null);
@@ -467,6 +467,8 @@ export default function AdminView() {
         ...(data.monto ? { monto: String(data.monto) } : {}),
         ...(data.metodoPago ? { metodoPago: data.metodoPago } : {}),
         ...(data.categoria && EXPENSE_CATEGORIES.includes(data.categoria) ? { categoria: data.categoria } : {}),
+        ...(data.vendedor ? { vendedor: data.vendedor } : {}),
+        ...(typeof data.facturaConIva === 'boolean' ? { facturaIva: data.facturaConIva ? 'Sí' : 'No' } : {}),
       }));
     } catch (err) {
       alert('No se pudo analizar la imagen: ' + err.message);
@@ -484,7 +486,7 @@ export default function AdminView() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ ...expenseForm, monto: parseInt(expenseForm.monto) })
       });
-      setExpenseForm({ fecha: new Date().toISOString().split('T')[0], concepto: '', monto: '', metodoPago: 'Efectivo', categoria: 'Repuestos' });
+      setExpenseForm({ fecha: new Date().toISOString().split('T')[0], concepto: '', monto: '', metodoPago: 'Efectivo', categoria: 'Repuestos', vendedor: '', facturaIva: 'No' });
       fetchExpenses();
     } catch (e) { console.error(e); }
   };
@@ -1610,13 +1612,15 @@ ${PAYMENT_METHODS.map(m => `<tr><td>${m}</td><td style="text-align:right;font-we
 
               const exportGastosCsv = () => {
                 const rows = [
-                  ['Fecha', 'Concepto', 'Categoría', 'Método de Pago', 'Monto'],
+                  ['Fecha', 'Concepto', 'Categoría', 'Método de Pago', 'Monto', 'Vendedor', 'Factura con IVA'],
                   ...filteredExpenses.map(g => [
                     g.fecha ? new Date(g.fecha).toLocaleDateString('es-CO') : '',
                     (g.concepto || '').replace(/"/g, '""'),
                     g.categoria || 'Sin categoría',
                     g.metodoPago || '',
                     parseFloat(g.monto) || 0,
+                    (g.vendedor || '').replace(/"/g, '""'),
+                    g.facturaIva || 'No',
                   ]),
                 ];
                 const csv = '﻿' + rows.map(r => r.map(c => `"${c}"`).join(';')).join('\n');
@@ -1680,6 +1684,17 @@ ${PAYMENT_METHODS.map(m => `<tr><td>${m}</td><td style="text-align:right;font-we
                           <label className="gasto-label">Método de Pago</label>
                           <select value={expenseForm.metodoPago} onChange={e => setExpenseForm({...expenseForm, metodoPago: e.target.value})} style={{ width:'100%' }}>
                             {PAYMENT_METHODS.map(m => <option key={m} value={m}>{m}</option>)}
+                          </select>
+                        </div>
+                        <div>
+                          <label className="gasto-label">Vendedor</label>
+                          <input type="text" placeholder="Ej. Repuestos del Valle" value={expenseForm.vendedor} onChange={e => setExpenseForm({...expenseForm, vendedor: e.target.value})} style={{ width:'100%' }} />
+                        </div>
+                        <div>
+                          <label className="gasto-label">¿Factura con IVA?</label>
+                          <select value={expenseForm.facturaIva} onChange={e => setExpenseForm({...expenseForm, facturaIva: e.target.value})} style={{ width:'100%' }}>
+                            <option value="No">No</option>
+                            <option value="Sí">Sí</option>
                           </select>
                         </div>
                       </div>
@@ -1948,7 +1963,15 @@ ${PAYMENT_METHODS.map(m => `<tr><td>${m}</td><td style="text-align:right;font-we
                         {filteredExpenses.map(g => (
                           <tr key={g.id}>
                             <td style={{ whiteSpace:'nowrap', color:'var(--text-muted)', fontSize:'0.85rem' }}>{g.fecha ? new Date(g.fecha).toLocaleDateString('es-CO') : '—'}</td>
-                            <td style={{ fontWeight:600 }}>{g.concepto}</td>
+                            <td style={{ fontWeight:600 }}>
+                              {g.concepto}
+                              {(g.vendedor || g.facturaIva === 'Sí') && (
+                                <div style={{ fontSize:'0.76rem', fontWeight:500, color:'var(--text-muted)', marginTop:'0.15rem', display:'flex', alignItems:'center', gap:'0.4rem' }}>
+                                  {g.vendedor && <span>{g.vendedor}</span>}
+                                  {g.facturaIva === 'Sí' && <span className="badge badge-blue" style={{ fontSize:'0.68rem', padding:'0.05rem 0.4rem' }}>+IVA</span>}
+                                </div>
+                              )}
+                            </td>
                             <td>
                               <select value={g.categoria || ''} onChange={e => updateExpenseCategoria(g.id, e.target.value)}
                                 title="Cambiar categoría"

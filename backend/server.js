@@ -437,7 +437,9 @@ server.post('/api/analyze-expense-image', async (req, res) => {
   "concepto": "lista detallada de TODOS los ítems/productos o servicios que aparecen en el recibo, uno por uno, separados por coma. Para cada ítem usa su nombre tal como aparece en el recibo y, si tiene cantidad mayor a 1, agrégala como 'xN' al final (ej: 'Filtro de aceite, Pastillas de freno delanteras, Bujía de encendido x4'). No resumas ni agrupes los ítems en una sola frase genérica — lista cada línea del recibo por separado. Si el recibo no detalla ítems individuales (ej. un recibo de servicios), describe brevemente el gasto general en su lugar.",
   "monto": número entero sin símbolos ni puntos ni comas (ej: 45000),
   "metodoPago": "Efectivo" o "Nequi" o "Bancolombia" o "Banco de Bogota" o "Tarjeta" (infiere si puedes, sino "Efectivo"),
-  "categoria": "Repuestos" o "Insumos" o "Nómina" o "Arriendo" o "Servicios Públicos" o "Herramientas" o "Impuestos" o "Otros" (clasifica según el contenido del recibo)
+  "categoria": "Repuestos" o "Insumos" o "Nómina" o "Arriendo" o "Servicios Públicos" o "Herramientas" o "Impuestos" o "Otros" (clasifica según el contenido del recibo),
+  "vendedor": "nombre del negocio, tienda o persona que vendió/emitió el recibo, tal como aparece en el encabezado o firma. null si no se ve.",
+  "facturaConIva": true o false — true SOLO si el recibo muestra explícitamente el IVA discriminado (ej. una línea "IVA" o "IVA (19%)" con su valor); false si no aparece IVA discriminado o no es claro
 }
 No incluyas texto adicional, solo el JSON.`
               }

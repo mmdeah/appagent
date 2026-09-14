@@ -1,6 +1,6 @@
 import React, { useState, useContext } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Shield, Wrench, Car, ArrowLeft, Lock, Building2, Users } from 'lucide-react';
+import { Shield, Wrench, Car, ArrowLeft, Lock, Building2, Users, Receipt } from 'lucide-react';
 import { ThemeContext } from '../App';
 import { BACKEND_URL } from '../api';
 
@@ -49,6 +49,15 @@ const roles = [
     iconBg: 'rgba(16,185,129,0.15)',
     pass: null,
     path: '/flota'
+  },
+  {
+    id: 'gastos',
+    label: 'Gastos',
+    desc: 'Sube la foto de un recibo para registrar un gasto',
+    icon: <Receipt size={22} color="#fbbf24" />,
+    iconBg: 'rgba(245,158,11,0.15)',
+    pass: 'gastos123',
+    path: '/gastos'
   }
 ];
 
