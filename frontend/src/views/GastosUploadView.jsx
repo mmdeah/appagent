@@ -40,7 +40,7 @@ export default function GastosUploadView() {
   const [analyzeError, setAnalyzeError] = useState(false);
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState(false);
-  const [showDetails, setShowDetails] = useState(false);
+  const [showDetails, setShowDetails] = useState(true);
 
   const stepNum = step === 'foto' ? 1 : step === 'listo' ? 3 : 2;
 
