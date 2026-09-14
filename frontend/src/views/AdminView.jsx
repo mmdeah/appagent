@@ -5,7 +5,7 @@ import PhotoUploadModal from './PhotoUploadModal';
 import CitaModal, { SERVICIOS } from './CitaModal';
 import RecordatoriosModal from './RecordatoriosModal';
 import { ThemeContext } from '../App';
-import { PlusCircle, BarChart3, Camera, X, Car, Trash2, Zap, LayoutDashboard, History, Receipt, CheckCircle, AlertTriangle, ClipboardList, Save, Settings, FileText, Plus, Sparkles, CreditCard, Clock, BadgeCheck, Ban, Search, ChevronDown, Calendar, MessageCircle } from 'lucide-react';
+import { PlusCircle, BarChart3, Camera, X, Car, Trash2, Zap, LayoutDashboard, History, Receipt, CheckCircle, AlertTriangle, ClipboardList, Save, Settings, FileText, Plus, Sparkles, CreditCard, Clock, BadgeCheck, Ban, Search, ChevronDown, Calendar, MessageCircle, Pencil } from 'lucide-react';
 import BillingCycleTab from './BillingCycleTab';
 import { getQuoteSlot, getRealQuoteTotal, getRealQuoteIva } from '../quoteUtils';
 
@@ -42,6 +42,10 @@ export default function AdminView() {
   const navRef = useRef(null);
   const [expenses, setExpenses] = useState([]);
   const [expenseForm, setExpenseForm] = useState({ fecha: new Date().toISOString().split('T')[0], concepto: '', monto: '', metodoPago: 'Efectivo', categoria: 'Repuestos', vendedor: '', facturaIva: 'No' });
+  // null = formulario en modo "Registrar un Gasto" nuevo; con un id, el mismo
+  // formulario pasa a modo edición de ese gasto (ver handleExpenseSubmit).
+  const [editingExpenseId, setEditingExpenseId] = useState(null);
+  const gastoFormRef = useRef(null);
   const [quickOrderForm, setQuickOrderForm] = useState({ placa: '', cliente: '', marca: '', modelo: '', anio: '', servicios: '' });
   const [formStatus, setFormStatus] = useState({ text: '', type: '' });
   const [orderToDelete, setOrderToDelete] = useState(null);
@@ -481,20 +485,49 @@ export default function AdminView() {
     e.preventDefault();
     if(!expenseForm.monto || !expenseForm.concepto) return;
     try {
-      await fetch(`${API_URL}/expenses`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ...expenseForm, monto: parseInt(expenseForm.monto) })
-      });
+      if (editingExpenseId) {
+        await fetch(`${API_URL}/expenses/${editingExpenseId}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ ...expenseForm, monto: parseInt(expenseForm.monto) })
+        });
+        setEditingExpenseId(null);
+      } else {
+        await fetch(`${API_URL}/expenses`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ ...expenseForm, monto: parseInt(expenseForm.monto) })
+        });
+      }
       setExpenseForm({ fecha: new Date().toISOString().split('T')[0], concepto: '', monto: '', metodoPago: 'Efectivo', categoria: 'Repuestos', vendedor: '', facturaIva: 'No' });
       fetchExpenses();
     } catch (e) { console.error(e); }
+  };
+
+  const startEditExpense = (g) => {
+    setEditingExpenseId(g.id);
+    setExpenseForm({
+      fecha: g.fecha || new Date().toISOString().split('T')[0],
+      concepto: g.concepto || '',
+      monto: g.monto ? String(g.monto) : '',
+      metodoPago: g.metodoPago || 'Efectivo',
+      categoria: g.categoria || 'Repuestos',
+      vendedor: g.vendedor || '',
+      facturaIva: g.facturaIva || 'No',
+    });
+    gastoFormRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  };
+
+  const cancelEditExpense = () => {
+    setEditingExpenseId(null);
+    setExpenseForm({ fecha: new Date().toISOString().split('T')[0], concepto: '', monto: '', metodoPago: 'Efectivo', categoria: 'Repuestos', vendedor: '', facturaIva: 'No' });
   };
 
   const handleDeleteExpense = async (id) => {
     try {
       await fetch(`${API_URL}/expenses/${id}`, { method: 'DELETE' });
       setDeleteExpenseId(null);
+      if (editingExpenseId === id) cancelEditExpense();
       fetchExpenses();
     } catch (e) { console.error(e); }
   };
@@ -1637,19 +1670,21 @@ ${PAYMENT_METHODS.map(m => `<tr><td>${m}</td><td style="text-align:right;font-we
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '1.75rem' }}>
 
                   {/* ── ROW 1: Quick entry + AI scan ─────────────────── */}
-                  <div className="card" style={{ padding: '1.5rem' }}>
+                  <div className="card" style={{ padding: '1.5rem', border: editingExpenseId ? '1.5px solid var(--primary)' : undefined }} ref={gastoFormRef}>
                     <div className="gasto-header-row" style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'1.5rem', gap:'0.75rem' }}>
                       <div style={{ display:'flex', alignItems:'center', gap:'0.65rem' }}>
                         <div style={{ width:38, height:38, borderRadius:10, background:'rgba(99,102,241,0.12)', color:'var(--primary)', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>
                           <Receipt size={19} />
                         </div>
-                        <h2 style={{ fontSize: '1.15rem', fontWeight: 800, margin: 0 }}>Registrar un Gasto</h2>
+                        <h2 style={{ fontSize: '1.15rem', fontWeight: 800, margin: 0 }}>{editingExpenseId ? 'Editar Gasto' : 'Registrar un Gasto'}</h2>
                       </div>
-                      <input type="file" accept="image/*" ref={expenseImageInputRef} style={{ display:'none' }} onChange={e => { analyzeExpenseImage(e.target.files[0]); e.target.value=''; }} />
-                      <button type="button" className="gasto-ai-btn" onClick={() => expenseImageInputRef.current?.click()} disabled={analyzingExpense}
-                        style={{ padding:'0.55rem 1.1rem', background: analyzingExpense ? 'var(--bg)' : 'rgba(99,102,241,0.1)', color:'var(--primary)', border:'1.5px dashed var(--primary)', borderRadius:'var(--radius-sm)', cursor: analyzingExpense ? 'not-allowed' : 'pointer', fontWeight:700, fontSize:'0.88rem', opacity: analyzingExpense ? 0.7 : 1, whiteSpace:'nowrap' }}>
-                        <Sparkles size={15} />{analyzingExpense ? 'Analizando...' : 'Tomar Foto del Recibo'}
-                      </button>
+                      {!editingExpenseId && <>
+                        <input type="file" accept="image/*" ref={expenseImageInputRef} style={{ display:'none' }} onChange={e => { analyzeExpenseImage(e.target.files[0]); e.target.value=''; }} />
+                        <button type="button" className="gasto-ai-btn" onClick={() => expenseImageInputRef.current?.click()} disabled={analyzingExpense}
+                          style={{ padding:'0.55rem 1.1rem', background: analyzingExpense ? 'var(--bg)' : 'rgba(99,102,241,0.1)', color:'var(--primary)', border:'1.5px dashed var(--primary)', borderRadius:'var(--radius-sm)', cursor: analyzingExpense ? 'not-allowed' : 'pointer', fontWeight:700, fontSize:'0.88rem', opacity: analyzingExpense ? 0.7 : 1, whiteSpace:'nowrap' }}>
+                          <Sparkles size={15} />{analyzingExpense ? 'Analizando...' : 'Tomar Foto del Recibo'}
+                        </button>
+                      </>}
                     </div>
                     <form onSubmit={handleExpenseSubmit}>
                       <div className="gasto-main-row">
@@ -1699,9 +1734,14 @@ ${PAYMENT_METHODS.map(m => `<tr><td>${m}</td><td style="text-align:right;font-we
                         </div>
                       </div>
 
-                      <button type="submit" className="btn-primary gasto-submit-btn-v2">
-                        <PlusCircle size={20} /> Guardar Gasto
-                      </button>
+                      <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center' }}>
+                        <button type="submit" className="btn-primary gasto-submit-btn-v2">
+                          {editingExpenseId ? <><Save size={20} /> Guardar Cambios</> : <><PlusCircle size={20} /> Guardar Gasto</>}
+                        </button>
+                        {editingExpenseId && (
+                          <button type="button" className="btn-secondary" onClick={cancelEditExpense}>Cancelar</button>
+                        )}
+                      </div>
                     </form>
                   </div>
 
@@ -1992,9 +2032,14 @@ ${PAYMENT_METHODS.map(m => `<tr><td>${m}</td><td style="text-align:right;font-we
                                   <button onClick={() => setDeleteExpenseId(null)} style={{ fontSize:'0.75rem', padding:'0.2rem 0.5rem', background:'var(--bg)', color:'var(--text-muted)', border:'1px solid var(--border)', borderRadius:6, cursor:'pointer' }}>Cancelar</button>
                                 </div>
                               ) : (
-                                <button onClick={() => setDeleteExpenseId(g.id)} style={{ background:'none', border:'none', cursor:'pointer', color:'var(--text-muted)', padding:'0.2rem', display:'flex', alignItems:'center' }} title="Eliminar">
-                                  <Trash2 size={14} />
-                                </button>
+                                <div style={{ display:'flex', gap:'0.5rem', justifyContent:'center' }}>
+                                  <button onClick={() => startEditExpense(g)} style={{ background:'none', border:'none', cursor:'pointer', color:'var(--text-muted)', padding:'0.2rem', display:'flex', alignItems:'center' }} title="Editar">
+                                    <Pencil size={14} />
+                                  </button>
+                                  <button onClick={() => setDeleteExpenseId(g.id)} style={{ background:'none', border:'none', cursor:'pointer', color:'var(--text-muted)', padding:'0.2rem', display:'flex', alignItems:'center' }} title="Eliminar">
+                                    <Trash2 size={14} />
+                                  </button>
+                                </div>
                               )}
                             </td>
                           </tr>
