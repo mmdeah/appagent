@@ -148,6 +148,17 @@ body {
 }
 .card-hover:hover { border-color: var(--primary); transform: translateY(-2px); box-shadow: var(--shadow-lg); }
 
+/* ── Bento grid ────────────────────────── */
+/* 12-column grid; tiles pick their width via inline `gridColumn: 'span N'`.
+   Below the breakpoint every tile forces full width (stacked), overriding
+   whatever span it was given — inline styles need `!important` here since a
+   plain class rule can't otherwise beat them. */
+.bento-grid { display: grid; grid-template-columns: repeat(12, 1fr); gap: 1rem; }
+@media (max-width: 900px) {
+  .bento-grid { grid-template-columns: 1fr; }
+  .bento-grid > * { grid-column: 1 / -1 !important; }
+}
+
 /* ── Inputs ────────────────────────── */
 input, textarea, select {
   background: var(--bg);

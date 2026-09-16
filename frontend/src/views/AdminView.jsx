@@ -19,6 +19,21 @@ const fmtCompact = (n) => {
 // Muestra "1.234.567" mientras se escribe; el valor guardado en el estado sigue siendo solo dígitos.
 const fmtMiles = (digitsOnly) => digitsOnly ? parseInt(digitsOnly, 10).toLocaleString('es-CO') : '';
 
+// Genera valores de eje "redondos" (0 / 500K / 1M, nunca $683.417) con un
+// paso de 1/2/5 × 10^n, en vez de cortar el rango en fracciones parejas.
+const niceTicks = (min, max, count = 4) => {
+  const range = max - min || 1;
+  const rawStep = range / count;
+  const mag = Math.pow(10, Math.floor(Math.log10(rawStep)));
+  const norm = rawStep / mag;
+  const step = (norm <= 1 ? 1 : norm <= 2 ? 2 : norm <= 5 ? 5 : 10) * mag;
+  const niceMin = Math.floor(min / step) * step;
+  const niceMax = Math.ceil(max / step) * step;
+  const ticks = [];
+  for (let v = niceMin; v <= niceMax + step * 0.001; v += step) ticks.push(Math.round(v));
+  return ticks;
+};
+
 const COLUMNS = ['Recepción', 'Proceso', 'Calidad', 'Ingresos Rápidos'];
 const PAYMENT_METHODS = ['Efectivo', 'Nequi', 'Bancolombia', 'Banco de Bogota', 'Tarjeta'];
 const EXPENSE_CATEGORIES = ['Repuestos', 'Insumos', 'Nómina', 'Arriendo', 'Servicios Públicos', 'Herramientas', 'Impuestos', 'Otros'];
@@ -89,6 +104,9 @@ export default function AdminView() {
   const [gastosStatsDesde, setGastosStatsDesde] = useState('');
   const [gastosStatsHasta, setGastosStatsHasta] = useState('');
   const [deleteExpenseId, setDeleteExpenseId] = useState(null);
+  // Índice del bucket bajo el cursor en el gráfico de Tendencia (null = nada
+  // resaltado); alimenta el crosshair + tooltip.
+  const [trendHoverIdx, setTrendHoverIdx] = useState(null);
   const [chatMessages, setChatMessages] = useState([]);
   const [chatInput, setChatInput] = useState('');
   const [chatLoading, setChatLoading] = useState(false);
@@ -588,6 +606,20 @@ export default function AdminView() {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ categoria }),
+      });
+      fetchExpenses();
+    } catch (e) { console.error(e); }
+  };
+
+  const toggleExpenseVerificado = async (id, verificado) => {
+    // Optimista: se refleja de inmediato en la tabla sin esperar la
+    // respuesta, y se re-sincroniza con fetchExpenses() al terminar.
+    setExpenses(prev => prev.map(g => g.id === id ? { ...g, verificado } : g));
+    try {
+      await fetch(`${API_URL}/expenses/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ verificado }),
       });
       fetchExpenses();
     } catch (e) { console.error(e); }
@@ -1504,7 +1536,9 @@ export default function AdminView() {
                   servTotals[k].total += (Number(it.precio) || 0) * (Number(it.cantidad) || 1);
                 });
               });
-              const topServicios = Object.values(servTotals).sort((a, b) => b.total - a.total).slice(0, 5).map(s => [s.name, s]);
+              // Ordenado por frecuencia (cuántas veces se vendió), no por valor —
+              // "más vendido" es lo que más se repite, no lo que más factura.
+              const topServicios = Object.values(servTotals).sort((a, b) => b.count - a.count).slice(0, 5).map(s => [s.name, s]);
 
               const deltaPct = (cur, prev) => (prev && prev !== 0) ? ((cur - prev) / Math.abs(prev)) * 100 : null;
 
@@ -1772,31 +1806,67 @@ ${PAYMENT_METHODS.map(m => `<tr><td>${m}</td><td style="text-align:right;font-we
                       )}
                     </div>
 
-                    {/* KPI cards */}
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(175px, 1fr))', gap: '1rem' }}>
+                    {/* KPI cards — bento: Ganancia Neta lleva la voz cantante (tile
+                        grande, es la cifra que de verdad importa), el resto se
+                        reparte en dos filas de anchos distintos en vez de la
+                        cuadrícula uniforme de antes. */}
+                    <div className="bento-grid">
+                      {(() => {
+                        const heroGood = ganancia >= 0;
+                        const heroD = deltaPct(ganancia, gananciaPrev);
+                        return (
+                          <div className="card" style={{ gridColumn: 'span 5', padding: '1.25rem 1.5rem', display: 'flex', flexDirection: 'column', justifyContent: 'center', minWidth: 0,
+                            background: heroGood ? 'linear-gradient(135deg, rgba(16,185,129,0.12), rgba(16,185,129,0.02))' : 'linear-gradient(135deg, rgba(239,68,68,0.12), rgba(239,68,68,0.02))',
+                            border: `1px solid ${heroGood ? 'rgba(16,185,129,0.3)' : 'rgba(239,68,68,0.3)'}` }}>
+                            <div style={{ fontSize: '0.78rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '0.5rem' }}>Ganancia Neta del período</div>
+                            <div style={{ fontSize: '2.4rem', fontWeight: 900, color: heroGood ? '#10b981' : '#ef4444', lineHeight: 1, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>${fmt(ganancia)}</div>
+                            {heroD != null && (
+                              <div style={{ fontSize: '0.82rem', fontWeight: 700, marginTop: '0.6rem', color: heroD >= 0 ? '#10b981' : '#ef4444' }}>
+                                {heroD >= 0 ? '▲' : '▼'} {Math.abs(heroD).toFixed(0)}% vs período anterior
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })()}
                       {[
-                        { label: 'Vehículos atendidos', value: ordenesPeriodo.length, prev: ordenesPrev.length, color: 'var(--primary)', display: n => n },
-                        { label: 'Ingresos', value: ingresosPeriodo, prev: ingresosPrev, color: '#10b981', display: n => `$${fmt(n)}` },
-                        { label: 'Gastos', value: gastosTotalPeriodo, prev: gastosPrev, invert: true, color: '#ef4444', display: n => `$${fmt(n)}` },
-                        { label: 'Ganancia neta', value: ganancia, prev: gananciaPrev, color: ganancia >= 0 ? '#10b981' : '#ef4444', display: n => `$${fmt(n)}` },
-                        { label: 'Margen', value: margenPct, color: (margenPct ?? 0) >= 0 ? '#10b981' : '#ef4444', display: n => n == null ? '—' : `${n.toFixed(0)}%` },
-                        { label: 'Ticket promedio', value: ticketProm, prev: ticketPrev, color: '#f59e0b', display: n => `$${fmt(n)}` },
-                        { label: 'IVA generado', value: ivaPeriodo, color: '#818cf8', display: n => `$${fmt(n)}`, sub: 'Para declaración DIAN' },
+                        { label: 'Ingresos', value: ingresosPeriodo, prev: ingresosPrev, color: '#10b981', display: n => `$${fmt(n)}`, span: 4 },
+                        { label: 'Gastos', value: gastosTotalPeriodo, prev: gastosPrev, invert: true, color: '#ef4444', display: n => `$${fmt(n)}`, span: 3 },
+                      ].map(s => {
+                        const d = s.prev !== undefined ? deltaPct(s.value, s.prev) : null;
+                        const good = d != null ? (s.invert ? d < 0 : d >= 0) : null;
+                        return (
+                          <div key={s.label} className="card" style={{ gridColumn: `span ${s.span}`, padding: '1.1rem 1.25rem', minWidth: 0 }}>
+                            <div style={{ fontSize: '0.72rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing:'0.05em', marginBottom: '0.4rem' }}>{s.label}</div>
+                            <div style={{ fontSize: '1.45rem', fontWeight: 900, color: s.color, whiteSpace: 'nowrap' }}>{s.display(s.value)}</div>
+                            {d != null && (
+                              <div style={{ fontSize: '0.72rem', fontWeight: 700, marginTop: '0.3rem', color: good ? '#10b981' : '#ef4444' }}>
+                                {d >= 0 ? '▲' : '▼'} {Math.abs(d).toFixed(0)}% vs período anterior
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
+                      {[
+                        { label: 'Vehículos atendidos', value: ordenesPeriodo.length, prev: ordenesPrev.length, color: 'var(--primary)', display: n => n, span: 3 },
+                        { label: 'Margen', value: margenPct, color: (margenPct ?? 0) >= 0 ? '#10b981' : '#ef4444', display: n => n == null ? '—' : `${n.toFixed(0)}%`, span: 3 },
+                        { label: 'Ticket promedio', value: ticketProm, prev: ticketPrev, color: '#f59e0b', display: n => `$${fmt(n)}`, span: 3 },
+                        { label: 'IVA generado', value: ivaPeriodo, color: '#818cf8', display: n => `$${fmt(n)}`, span: 3,
+                          sub: 'IVA cobrado en las cotizaciones de vehículos entregados en este período — lo que hay que declarar a la DIAN (no incluye el IVA de los gastos/compras).' },
                       ].map(s => {
                         const d = s.prev !== undefined ? deltaPct(s.value, s.prev) : null;
                         const good = d != null ? (s.invert ? d < 0 : d >= 0) : null;
                         const displayVal = String(s.display(s.value));
                         return (
-                          <div key={s.label} className="card" style={{ padding: '1rem 1.25rem', minWidth: 0 }}>
+                          <div key={s.label} className="card" style={{ gridColumn: `span ${s.span}`, padding: '1rem 1.25rem', minWidth: 0 }} title={s.sub || undefined}>
                             <div style={{ fontSize: '0.72rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing:'0.05em', marginBottom: '0.4rem' }}>{s.label}</div>
-                            <div style={{ fontSize: displayVal.length > 13 ? '0.98rem' : displayVal.length > 10 ? '1.18rem' : '1.45rem', fontWeight: 900, color: s.color, whiteSpace: 'nowrap' }} title={displayVal}>{displayVal}</div>
+                            <div style={{ fontSize: displayVal.length > 10 ? '1.18rem' : '1.45rem', fontWeight: 900, color: s.color, whiteSpace: 'nowrap' }}>{displayVal}</div>
                             {d != null && (
                               <div style={{ fontSize: '0.72rem', fontWeight: 700, marginTop: '0.3rem', color: good ? '#10b981' : '#ef4444' }}>
                                 {d >= 0 ? '▲' : '▼'} {Math.abs(d).toFixed(0)}% vs período anterior
                               </div>
                             )}
                             {d == null && s.sub && (
-                              <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginTop: '0.3rem' }}>{s.sub}</div>
+                              <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)', marginTop: '0.35rem', lineHeight: 1.35 }}>Para declaración DIAN</div>
                             )}
                           </div>
                         );
@@ -1804,8 +1874,8 @@ ${PAYMENT_METHODS.map(m => `<tr><td>${m}</td><td style="text-align:right;font-we
                     </div>
 
                     {/* Category breakdown + balances by payment method */}
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '1rem' }}>
-                      <div className="card" style={{ padding: '1.5rem' }}>
+                    <div className="bento-grid">
+                      <div className="card" style={{ gridColumn: 'span 7', padding: '1.5rem', minWidth: 0 }}>
                         <h3 style={{ fontSize: '0.95rem', fontWeight: 700, marginBottom: '1rem' }}>¿En qué se va la plata? <span style={{ fontWeight: 500, color: 'var(--text-muted)', fontSize: '0.8rem' }}>(gastos del período)</span></h3>
                         {catList.length === 0 && <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>Sin gastos en este período.</p>}
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
@@ -1822,7 +1892,7 @@ ${PAYMENT_METHODS.map(m => `<tr><td>${m}</td><td style="text-align:right;font-we
                           ))}
                         </div>
                       </div>
-                      <div className="card" style={{ padding: '1.5rem' }}>
+                      <div className="card" style={{ gridColumn: 'span 5', padding: '1.5rem', minWidth: 0 }}>
                         <h3 style={{ fontSize: '0.95rem', fontWeight: 700, marginBottom: '1rem' }}>Saldos por método de pago <span style={{ fontWeight: 500, color: 'var(--text-muted)', fontSize: '0.8rem' }}>(del período)</span></h3>
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
                           {PAYMENT_METHODS.map(m => {
@@ -1840,8 +1910,8 @@ ${PAYMENT_METHODS.map(m => `<tr><td>${m}</td><td style="text-align:right;font-we
                     </div>
 
                     {/* Top clients + top services */}
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '1rem' }}>
-                      <div className="card" style={{ padding: '1.5rem' }}>
+                    <div className="bento-grid">
+                      <div className="card" style={{ gridColumn: 'span 6', padding: '1.5rem', minWidth: 0 }}>
                         <h3 style={{ fontSize: '0.95rem', fontWeight: 700, marginBottom: '1rem' }}>Top clientes <span style={{ fontWeight: 500, color: 'var(--text-muted)', fontSize: '0.8rem' }}>(ingresos del período)</span></h3>
                         {topClientes.length === 0 && <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>Sin órdenes entregadas en este período.</p>}
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
@@ -1856,14 +1926,14 @@ ${PAYMENT_METHODS.map(m => `<tr><td>${m}</td><td style="text-align:right;font-we
                           ))}
                         </div>
                       </div>
-                      <div className="card" style={{ padding: '1.5rem' }}>
-                        <h3 style={{ fontSize: '0.95rem', fontWeight: 700, marginBottom: '1rem' }}>Servicios más vendidos <span style={{ fontWeight: 500, color: 'var(--text-muted)', fontSize: '0.8rem' }}>(del período)</span></h3>
+                      <div className="card" style={{ gridColumn: 'span 6', padding: '1.5rem', minWidth: 0 }}>
+                        <h3 style={{ fontSize: '0.95rem', fontWeight: 700, marginBottom: '1rem' }}>Servicios más vendidos <span style={{ fontWeight: 500, color: 'var(--text-muted)', fontSize: '0.8rem' }}>(los que más se repiten, no los de mayor valor)</span></h3>
                         {topServicios.length === 0 && <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>Sin datos en este período.</p>}
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
                           {topServicios.map(([serv, data]) => (
                             <div key={serv} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.75rem', padding: '0.55rem 0.8rem', background: 'var(--bg)', borderRadius: 8, border: '1px solid var(--border)' }}>
                               <span style={{ fontSize: '0.82rem', fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{serv}</span>
-                              <span style={{ fontSize: '0.85rem', fontWeight: 800, color: '#10b981', whiteSpace: 'nowrap' }}>${fmt(data.total)} <span style={{ color: 'var(--text-muted)', fontWeight: 500, fontSize: '0.72rem' }}>×{data.count}</span></span>
+                              <span style={{ fontSize: '0.85rem', fontWeight: 800, color: '#10b981', whiteSpace: 'nowrap' }}>×{data.count} <span style={{ color: 'var(--text-muted)', fontWeight: 500, fontSize: '0.72rem' }}>${fmt(data.total)}</span></span>
                             </div>
                           ))}
                         </div>
@@ -1886,42 +1956,84 @@ ${PAYMENT_METHODS.map(m => `<tr><td>${m}</td><td style="text-align:right;font-we
                       {!trendHasData ? (
                         <p style={{ color:'var(--text-muted)', fontSize:'0.85rem', textAlign:'center', padding:'2rem 0' }}>Sin movimientos en este período.</p>
                       ) : (() => {
-                        const W = 800, H = 240, pL = 48, pR = 12, pT = 12, pB = 26;
-                        const maxY = Math.max(...trendBuckets.map(b => Math.max(b.ingresos, b.gastos, b.utilidad)), 1);
-                        const minY = Math.min(0, ...trendBuckets.map(b => b.utilidad));
+                        const W = 800, H = 260, pL = 52, pR = 12, pT = 16, pB = 28;
+                        const rawMax = Math.max(...trendBuckets.map(b => Math.max(b.ingresos, b.gastos, b.utilidad)), 1);
+                        const rawMin = Math.min(0, ...trendBuckets.map(b => b.utilidad));
+                        const ticks = niceTicks(rawMin, rawMax, 4);
+                        const minY = ticks[0], maxY = ticks[ticks.length - 1];
                         const xAt = i => pL + (trendBuckets.length === 1 ? (W-pL-pR)/2 : i * (W-pL-pR) / (trendBuckets.length-1));
                         const yAt = v => pT + (H-pT-pB) * (1 - (v - minY) / ((maxY - minY) || 1));
                         const pts = key => trendBuckets.map((b,i) => `${xAt(i)},${yAt(b[key])}`).join(' ');
-                        const gridVals = [0.25, 0.5, 0.75, 1].map(f => minY + f * (maxY - minY));
+                        const areaPath = `M ${xAt(0)},${yAt(0)} ` + trendBuckets.map((b,i) => `L ${xAt(i)},${yAt(b.utilidad)}`).join(' ') + ` L ${xAt(trendBuckets.length-1)},${yAt(0)} Z`;
                         const labStep = Math.max(1, Math.ceil(trendBuckets.length / 8));
+                        const lastIdx = trendBuckets.length - 1;
+
+                        const handleMove = (e) => {
+                          const rect = e.currentTarget.getBoundingClientRect();
+                          const relX = ((e.clientX - rect.left) / rect.width) * W;
+                          let nearest = 0, best = Infinity;
+                          trendBuckets.forEach((b, i) => { const d = Math.abs(xAt(i) - relX); if (d < best) { best = d; nearest = i; } });
+                          setTrendHoverIdx(nearest);
+                        };
+                        const hb = trendHoverIdx != null ? trendBuckets[trendHoverIdx] : null;
+                        const tooltipLeftPct = trendHoverIdx != null ? Math.min(Math.max((xAt(trendHoverIdx) / W) * 100, 14), 86) : 0;
+
                         return (
                           <>
-                            <svg viewBox={`0 0 ${W} ${H}`} style={{ width:'100%', height:'auto' }}>
-                              {gridVals.map((v, i) => (
-                                <g key={i}>
-                                  <line x1={pL} x2={W-pR} y1={yAt(v)} y2={yAt(v)} stroke="var(--border)" strokeWidth="1" strokeDasharray="3 4" />
-                                  <text x={pL-6} y={yAt(v)+3} textAnchor="end" fontSize="10" fill="var(--text-muted)">{fmtCompact(v)}</text>
-                                </g>
-                              ))}
-                              {minY < 0 && <line x1={pL} x2={W-pR} y1={yAt(0)} y2={yAt(0)} stroke="var(--text-muted)" strokeWidth="1" />}
-                              <polyline points={pts('ingresos')} fill="none" stroke="#10b981" strokeWidth="2" />
-                              <polyline points={pts('gastos')} fill="none" stroke="#ef4444" strokeWidth="2" strokeDasharray="5 4" />
-                              <polyline points={pts('utilidad')} fill="none" stroke="#818cf8" strokeWidth="2.5" />
-                              {trendBuckets.length <= 31 && trendBuckets.map((b, i) => (
-                                <g key={'d'+i}>
-                                  <circle cx={xAt(i)} cy={yAt(b.ingresos)} r="3" fill="#10b981"><title>{`${b.label} — Ingresos: $${fmt(b.ingresos)}`}</title></circle>
-                                  <circle cx={xAt(i)} cy={yAt(b.gastos)} r="3" fill="#ef4444"><title>{`${b.label} — Gastos: $${fmt(b.gastos)}`}</title></circle>
-                                  <circle cx={xAt(i)} cy={yAt(b.utilidad)} r="3" fill="#818cf8"><title>{`${b.label} — Utilidad: $${fmt(b.utilidad)}`}</title></circle>
-                                </g>
-                              ))}
-                              {trendBuckets.map((b, i) => (i % labStep === 0) ? (
-                                <text key={'x'+i} x={xAt(i)} y={H-8} textAnchor="middle" fontSize="10" fill="var(--text-muted)">{b.label}</text>
-                              ) : null)}
-                            </svg>
-                            <div style={{ display:'flex', gap:'1.25rem', marginTop:'0.5rem', fontSize:'0.78rem', flexWrap:'wrap' }}>
+                            <div style={{ position: 'relative' }}>
+                              <svg viewBox={`0 0 ${W} ${H}`} style={{ width:'100%', height:'auto', display: 'block', cursor: 'crosshair' }}
+                                onMouseMove={handleMove} onMouseLeave={() => setTrendHoverIdx(null)}>
+                                {ticks.map((v, i) => (
+                                  <g key={i}>
+                                    <line x1={pL} x2={W-pR} y1={yAt(v)} y2={yAt(v)} stroke="var(--border)" strokeWidth="1" />
+                                    <text x={pL-8} y={yAt(v)+3} textAnchor="end" fontSize="10" fill="var(--text-muted)">{fmtCompact(v)}</text>
+                                  </g>
+                                ))}
+                                {/* Área de utilidad: wash de 10% bajo la línea, ancla el "¿vamos ganando o perdiendo?" de un vistazo */}
+                                <path d={areaPath} fill="#818cf8" fillOpacity="0.1" stroke="none" />
+                                {minY < 0 && maxY > 0 && <line x1={pL} x2={W-pR} y1={yAt(0)} y2={yAt(0)} stroke="var(--text-muted)" strokeWidth="1" />}
+                                <polyline points={pts('ingresos')} fill="none" stroke="#10b981" strokeWidth="2" strokeLinejoin="round" strokeLinecap="round" />
+                                <polyline points={pts('gastos')} fill="none" stroke="#ef4444" strokeWidth="2" strokeDasharray="5 4" strokeLinejoin="round" strokeLinecap="round" />
+                                <polyline points={pts('utilidad')} fill="none" stroke="#818cf8" strokeWidth="2.5" strokeLinejoin="round" strokeLinecap="round" />
+
+                                {/* Punto final de cada serie — marca el valor "actual" sin saturar el gráfico de puntos */}
+                                {[['ingresos','#10b981'],['gastos','#ef4444'],['utilidad','#818cf8']].map(([key,color]) => (
+                                  <circle key={key} cx={xAt(lastIdx)} cy={yAt(trendBuckets[lastIdx][key])} r="4" fill={color} stroke="var(--bg-card)" strokeWidth="2" />
+                                ))}
+
+                                {/* Crosshair + puntos resaltados al pasar el mouse */}
+                                {hb && (
+                                  <g>
+                                    <line x1={xAt(trendHoverIdx)} x2={xAt(trendHoverIdx)} y1={pT} y2={H-pB} stroke="var(--text-muted)" strokeWidth="1" strokeDasharray="3 3" />
+                                    {[['ingresos','#10b981'],['gastos','#ef4444'],['utilidad','#818cf8']].map(([key,color]) => (
+                                      <circle key={key} cx={xAt(trendHoverIdx)} cy={yAt(hb[key])} r="4.5" fill={color} stroke="var(--bg-card)" strokeWidth="2" />
+                                    ))}
+                                  </g>
+                                )}
+
+                                {trendBuckets.map((b, i) => (i % labStep === 0) ? (
+                                  <text key={'x'+i} x={xAt(i)} y={H-8} textAnchor="middle" fontSize="10" fill="var(--text-muted)">{b.label}</text>
+                                ) : null)}
+                              </svg>
+
+                              {/* Tooltip HTML (valores en negrita, nombre de serie en texto secundario, clave de línea de color) */}
+                              {hb && (
+                                <div style={{ position: 'absolute', top: 8, left: `${tooltipLeftPct}%`, transform: 'translateX(-50%)', background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: 8, padding: '0.5rem 0.7rem', fontSize: '0.75rem', boxShadow: 'var(--shadow-lg)', pointerEvents: 'none', whiteSpace: 'nowrap', zIndex: 2 }}>
+                                  <div style={{ fontWeight: 700, marginBottom: '0.3rem', color: 'var(--text)' }}>{hb.label}</div>
+                                  {[['Ingresos','#10b981','ingresos'],['Gastos','#ef4444','gastos'],['Utilidad','#818cf8','utilidad']].map(([lab,color,key]) => (
+                                    <div key={key} style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', marginTop: '0.15rem' }}>
+                                      <span style={{ width: 10, height: 2, background: color, display: 'inline-block', borderRadius: 2 }} />
+                                      <span style={{ color: 'var(--text-muted)' }}>{lab}:</span>
+                                      <span style={{ fontWeight: 800, color: 'var(--text)' }}>${fmt(hb[key])}</span>
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+                            <div style={{ display:'flex', gap:'1.25rem', marginTop:'0.75rem', fontSize:'0.78rem', flexWrap:'wrap' }}>
                               <span style={{ display:'flex', alignItems:'center', gap:'0.3rem' }}><span style={{ width:14, height:3, background:'#10b981', display:'inline-block', borderRadius:2 }}/> Ingresos</span>
                               <span style={{ display:'flex', alignItems:'center', gap:'0.3rem' }}><span style={{ width:14, height:3, background:'#ef4444', display:'inline-block', borderRadius:2 }}/> Gastos</span>
-                              <span style={{ display:'flex', alignItems:'center', gap:'0.3rem' }}><span style={{ width:14, height:3, background:'#818cf8', display:'inline-block', borderRadius:2 }}/> Utilidad</span>
+                              <span style={{ display:'flex', alignItems:'center', gap:'0.3rem' }}><span style={{ width:14, height:3, background:'#818cf8', display:'inline-block', borderRadius:2 }}/> Utilidad <span style={{ color:'var(--text-muted)', fontWeight: 500 }}>(ingresos − gastos)</span></span>
                             </div>
                           </>
                         );
@@ -1936,6 +2048,7 @@ ${PAYMENT_METHODS.map(m => `<tr><td>${m}</td><td style="text-align:right;font-we
                         <h2 style={{ fontSize:'1rem', fontWeight:700, margin:0 }}>Historial de Gastos</h2>
                         <span style={{ fontSize:'0.82rem', color:'var(--text-muted)', fontWeight:600 }}>
                           {filteredExpenses.length} registro{filteredExpenses.length!==1?'s':''} · <span style={{ color:'var(--error)', fontWeight:700 }}>${fmt(filteredTotal)}</span>
+                          {' · '}{filteredExpenses.filter(g => g.verificado).length}/{filteredExpenses.length} verificados
                         </span>
                         {hasGastoFilters && (
                           <button onClick={() => { setGastosSearch(''); setGastosDesde(''); setGastosHasta(''); setGastosMetodo('Todos'); setGastosCategoria('Todas'); }}
@@ -1988,6 +2101,7 @@ ${PAYMENT_METHODS.map(m => `<tr><td>${m}</td><td style="text-align:right;font-we
                     <table className="data-table">
                       <thead>
                         <tr>
+                          <th style={{ textAlign:'center', width: 40 }} title="Verificado">✓</th>
                           <th>Fecha</th>
                           <th>Concepto</th>
                           <th>Categoría</th>
@@ -1998,10 +2112,15 @@ ${PAYMENT_METHODS.map(m => `<tr><td>${m}</td><td style="text-align:right;font-we
                       </thead>
                       <tbody>
                         {filteredExpenses.length === 0 && (
-                          <tr><td colSpan="6" style={{ textAlign:'center', color:'var(--text-muted)', padding:'2rem 0' }}>Sin gastos para este filtro.</td></tr>
+                          <tr><td colSpan="7" style={{ textAlign:'center', color:'var(--text-muted)', padding:'2rem 0' }}>Sin gastos para este filtro.</td></tr>
                         )}
                         {filteredExpenses.map(g => (
-                          <tr key={g.id}>
+                          <tr key={g.id} style={{ opacity: g.verificado ? 0.72 : 1 }}>
+                            <td style={{ textAlign:'center' }}>
+                              <input type="checkbox" checked={!!g.verificado} onChange={e => toggleExpenseVerificado(g.id, e.target.checked)}
+                                title={g.verificado ? 'Verificado' : 'Marcar como verificado'}
+                                style={{ width: 16, height: 16, cursor: 'pointer', accentColor: 'var(--success)' }} />
+                            </td>
                             <td style={{ whiteSpace:'nowrap', color:'var(--text-muted)', fontSize:'0.85rem' }}>{g.fecha ? new Date(g.fecha).toLocaleDateString('es-CO') : '—'}</td>
                             <td style={{ fontWeight:600 }}>
                               {g.concepto}
