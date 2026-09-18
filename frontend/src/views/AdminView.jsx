@@ -94,6 +94,10 @@ export default function AdminView() {
   const [fleetUsers, setFleetUsers] = useState([]);
   const [fleetUserForm, setFleetUserForm] = useState({ nombre: '', empresa: 'ald', usuario: '', password: '' });
   const [fleetUserStatus, setFleetUserStatus] = useState('');
+  const [ivaPeriod, setIvaPeriod] = useState('mes');
+  const [ivaDesde, setIvaDesde] = useState('');
+  const [ivaHasta, setIvaHasta] = useState('');
+  const [ivaExpandedId, setIvaExpandedId] = useState(null);
   const [gastosSearch, setGastosSearch] = useState('');
   const [gastosDesde, setGastosDesde] = useState('');
   const [gastosHasta, setGastosHasta] = useState('');
@@ -874,6 +878,7 @@ export default function AdminView() {
                     { id: 'ConsultNetworks',  icon: <CreditCard size={14} />, label: 'Consult Networks' },
                     { id: 'LaAscension',      icon: <CreditCard size={14} />, label: 'La Ascensión' },
                     { id: 'AsistenteIA',      icon: <Sparkles size={14} />,   label: 'Asistente IA' },
+                    { id: 'IVA',              icon: <BadgeCheck size={14} />, label: 'IVA' },
                   ]
                 },
                 {
@@ -2167,6 +2172,232 @@ ${PAYMENT_METHODS.map(m => `<tr><td>${m}</td><td style="text-align:right;font-we
                     </table>
                   </div>
 
+                </div>
+              );
+            })()}
+
+            {activeTab === 'IVA' && (() => {
+              // ── Date range (mismo patrón de presets que la pestaña Gastos) ──
+              const getIvaRange = () => {
+                const now = new Date();
+                if (ivaPeriod === 'hoy') {
+                  const d = new Date(); d.setHours(0,0,0,0);
+                  const h = new Date(); h.setHours(23,59,59,999);
+                  return { desde: d, hasta: h };
+                }
+                if (['7d','30d','90d'].includes(ivaPeriod)) {
+                  const days = parseInt(ivaPeriod);
+                  const d = new Date(); d.setDate(d.getDate()-days+1); d.setHours(0,0,0,0);
+                  const h = new Date(); h.setHours(23,59,59,999);
+                  return { desde: d, hasta: h };
+                }
+                if (ivaPeriod === 'mes') return { desde: new Date(now.getFullYear(), now.getMonth(), 1), hasta: new Date(now.getFullYear(), now.getMonth()+1, 0, 23,59,59,999) };
+                if (ivaPeriod === 'año') return { desde: new Date(now.getFullYear(), 0, 1), hasta: new Date(now.getFullYear(), 11, 31, 23,59,59,999) };
+                return { desde: ivaDesde ? new Date(ivaDesde) : null, hasta: ivaHasta ? new Date(ivaHasta+'T23:59:59') : null };
+              };
+              const { desde: ivDesde, hasta: ivHasta } = getIvaRange();
+              const inIvaRange = f => { if (!f) return false; const d = new Date(f); return (!ivDesde || d >= ivDesde) && (!ivHasta || d <= ivHasta); };
+
+              // ── Órdenes entregadas en el rango con al menos un ítem con IVA
+              //     en su cotización real (slot 1) — la misma fuente que ya usa
+              //     el KPI "IVA Generado" de la pestaña Gastos, para que ambas
+              //     cifras siempre coincidan. ──
+              const ordenesConIva = orders
+                .filter(o => o.estado === 'Entregado' && inIvaRange(o.fechaEntrega || o.fecha))
+                .map(o => {
+                  const items = (getQuoteSlot(o, 1)?.items || []).filter(it => it.aplicaIva);
+                  const base = items.reduce((s, it) => s + (Number(it.precio) || 0) * (Number(it.cantidad) || 1), 0);
+                  return { order: o, items, base, iva: base * 0.19, total: base * 1.19 };
+                })
+                .filter(x => x.items.length > 0)
+                .sort((a, b) => new Date(b.order.fechaEntrega || b.order.fecha) - new Date(a.order.fechaEntrega || a.order.fecha));
+
+              const totalBase = ordenesConIva.reduce((s, x) => s + x.base, 0);
+              const totalIva  = ordenesConIva.reduce((s, x) => s + x.iva, 0);
+              const totalFact = ordenesConIva.reduce((s, x) => s + x.total, 0);
+
+              const generarReporteIva = () => {
+                const fmtDate = d => d ? d.toLocaleDateString('es-CO') : '—';
+                const periodo = `${fmtDate(ivDesde)} — ${fmtDate(ivHasta)}`;
+                const filasOrdenes = ordenesConIva.map(({ order: o, items, base, iva, total }) => `
+                  <tr style="background:#f7fafc"><td colspan="5" style="font-weight:800;padding:8px 10px">
+                    ${o.placa} — ${o.marca} ${o.modelo} ${o.anio || ''} · ${o.cliente} · Entregado ${fmtDate(new Date(o.fechaEntrega || o.fecha))}
+                  </td></tr>
+                  ${items.map(it => `
+                    <tr>
+                      <td style="padding-left:20px">${it.descripcion}</td>
+                      <td style="text-align:center">${it.cantidad}</td>
+                      <td style="text-align:right">$${fmt(it.precio)}</td>
+                      <td style="text-align:right">$${fmt((Number(it.precio)||0)*(Number(it.cantidad)||1)*0.19)}</td>
+                      <td style="text-align:right">$${fmt((Number(it.precio)||0)*(Number(it.cantidad)||1)*1.19)}</td>
+                    </tr>`).join('')}
+                  <tr style="border-top:1px solid #e2e8f0"><td colspan="2"></td>
+                    <td style="text-align:right;font-weight:700">$${fmt(base)}</td>
+                    <td style="text-align:right;font-weight:700">$${fmt(iva)}</td>
+                    <td style="text-align:right;font-weight:800">$${fmt(total)}</td>
+                  </tr>`).join('');
+                const html = `<!DOCTYPE html><html lang="es"><head><meta charset="utf-8"><title>Reporte de IVA — Taller Automotriz</title>
+<style>
+  body { font-family: 'Segoe UI', Arial, sans-serif; color: #1a202c; margin: 2rem auto; max-width: 900px; padding: 0 1.5rem; }
+  h1 { font-size: 1.4rem; margin-bottom: 0.2rem; }
+  .muted { color: #718096; font-size: 0.85rem; }
+  h2 { font-size: 1rem; margin: 1.8rem 0 0.6rem; border-bottom: 2px solid #e2e8f0; padding-bottom: 0.3rem; }
+  table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+  td, th { padding: 0.45rem 0.6rem; border-bottom: 1px solid #edf2f7; }
+  th { text-align: left; background: #f7fafc; font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.04em; color: #4a5568; }
+  .kpi-grid { display:flex; gap:1rem; margin: 1rem 0; }
+  .kpi { flex:1; border:1px solid #e2e8f0; border-radius:10px; padding:0.9rem 1.1rem; }
+  .kpi .l { font-size:0.72rem; text-transform:uppercase; letter-spacing:0.04em; color:#718096; margin-bottom:0.3rem; }
+  .kpi .v { font-size:1.25rem; font-weight:800; }
+  .print-btn { position: fixed; top: 1rem; right: 1rem; padding: 0.6rem 1.2rem; background: #1a202c; color: #fff; border: none; border-radius: 8px; font-weight: 700; cursor: pointer; }
+  @media print { .print-btn { display: none; } body { margin: 0.5rem; } }
+</style></head><body>
+<button class="print-btn" onclick="window.print()">🖨 Imprimir / PDF</button>
+<h1>Reporte de IVA</h1>
+<div class="muted">Período: ${periodo} &nbsp;·&nbsp; Generado: ${new Date().toLocaleString('es-CO')}</div>
+
+<div class="kpi-grid">
+  <div class="kpi"><div class="l">Órdenes con IVA</div><div class="v">${ordenesConIva.length}</div></div>
+  <div class="kpi"><div class="l">Base gravable</div><div class="v">$${fmt(totalBase)}</div></div>
+  <div class="kpi"><div class="l">IVA generado (19%)</div><div class="v">$${fmt(totalIva)}</div></div>
+  <div class="kpi"><div class="l">Total facturado</div><div class="v">$${fmt(totalFact)}</div></div>
+</div>
+
+<h2>Detalle por orden de servicio</h2>
+<table>
+  <thead><tr><th>Ítem</th><th style="text-align:center">Cant.</th><th style="text-align:right">Vr. Unitario</th><th style="text-align:right">IVA</th><th style="text-align:right">Total</th></tr></thead>
+  <tbody>${filasOrdenes || '<tr><td class="muted" colspan="5">Sin órdenes con IVA en este período.</td></tr>'}</tbody>
+</table>
+</body></html>`;
+                const w = window.open('', '_blank');
+                if (!w) { alert('Permite las ventanas emergentes para generar el reporte.'); return; }
+                w.document.write(html);
+                w.document.close();
+              };
+
+              return (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '1.75rem' }}>
+                  <div className="card" style={{ padding: '1.5rem' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '0.75rem', marginBottom: '0.5rem' }}>
+                      <div>
+                        <h2 style={{ fontSize: '1.15rem', fontWeight: 800, margin: 0, display: 'flex', alignItems: 'center', gap: '0.5rem' }}><BadgeCheck size={20} color="#818cf8" /> IVA</h2>
+                        <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem', marginTop: '0.3rem', maxWidth: 560 }}>
+                          Órdenes de servicio entregadas cuya cotización tiene ítems con IVA discriminado — lo que hay que declarar a la DIAN por ventas en el período seleccionado.
+                        </p>
+                      </div>
+                      <button onClick={generarReporteIva}
+                        style={{ display:'flex', alignItems:'center', gap:'0.4rem', padding:'0.5rem 1.1rem', borderRadius:'var(--radius-sm)', border:'none', background:'var(--text)', color:'var(--bg-card)', fontWeight:700, fontSize:'0.85rem', cursor:'pointer', whiteSpace:'nowrap' }}>
+                        <FileText size={14} /> Generar Reporte PDF
+                      </button>
+                    </div>
+
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', flexWrap: 'wrap', marginTop: '1rem' }}>
+                      {[{k:'hoy',l:'Hoy'},{k:'7d',l:'7 días'},{k:'30d',l:'30 días'},{k:'90d',l:'90 días'},{k:'mes',l:'Este mes'},{k:'año',l:'Este año'},{k:'personalizado',l:'Personalizado'}].map(p => (
+                        <button key={p.k} onClick={() => setIvaPeriod(p.k)}
+                          style={{ padding:'0.28rem 0.8rem', borderRadius:20, border:'1px solid var(--border)', background: ivaPeriod===p.k ? 'var(--primary)' : 'transparent', color: ivaPeriod===p.k ? 'white' : 'var(--text-muted)', fontWeight:600, fontSize:'0.82rem', cursor:'pointer' }}>
+                          {p.l}
+                        </button>
+                      ))}
+                      {ivaPeriod === 'personalizado' && (
+                        <>
+                          <input type="date" value={ivaDesde} onChange={e => setIvaDesde(e.target.value)} style={{ fontSize:'0.82rem', padding:'0.28rem 0.5rem', width:140 }} />
+                          <span style={{ color:'var(--text-muted)' }}>—</span>
+                          <input type="date" value={ivaHasta} onChange={e => setIvaHasta(e.target.value)} style={{ fontSize:'0.82rem', padding:'0.28rem 0.5rem', width:140 }} />
+                        </>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* KPI cards */}
+                  <div className="bento-grid">
+                    {[
+                      { label: 'Órdenes con IVA', value: ordenesConIva.length, color: 'var(--primary)', span: 3 },
+                      { label: 'Base gravable', value: `$${fmt(totalBase)}`, color: 'var(--text)', span: 3 },
+                      { label: 'IVA generado (19%)', value: `$${fmt(totalIva)}`, color: '#818cf8', span: 3, sub: 'Para declaración DIAN' },
+                      { label: 'Total facturado con IVA', value: `$${fmt(totalFact)}`, color: '#10b981', span: 3 },
+                    ].map(s => (
+                      <div key={s.label} className="card" style={{ gridColumn: `span ${s.span}`, padding: '1.1rem 1.25rem', minWidth: 0 }}>
+                        <div style={{ fontSize: '0.72rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing:'0.05em', marginBottom: '0.4rem' }}>{s.label}</div>
+                        <div style={{ fontSize: '1.4rem', fontWeight: 900, color: s.color, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{s.value}</div>
+                        {s.sub && <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)', marginTop: '0.3rem' }}>{s.sub}</div>}
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Orders table */}
+                  <div className="card" style={{ padding: '1.5rem' }}>
+                    <h3 style={{ fontSize: '0.95rem', fontWeight: 700, marginBottom: '1rem' }}>
+                      Órdenes con IVA <span style={{ fontWeight: 500, color: 'var(--text-muted)', fontSize: '0.8rem' }}>({ordenesConIva.length} en el período)</span>
+                    </h3>
+                    {ordenesConIva.length === 0 ? (
+                      <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem', textAlign: 'center', padding: '1.5rem 0' }}>Sin órdenes facturadas con IVA en este período.</p>
+                    ) : (
+                      <table className="data-table">
+                        <thead>
+                          <tr>
+                            <th style={{ width: 30 }}></th>
+                            <th>Entrega</th>
+                            <th>Placa / Vehículo</th>
+                            <th>Cliente</th>
+                            <th style={{ textAlign: 'right' }}>Base gravable</th>
+                            <th style={{ textAlign: 'right' }}>IVA</th>
+                            <th style={{ textAlign: 'right' }}>Total</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {ordenesConIva.map(({ order: o, items, base, iva, total }) => {
+                            const isOpen = ivaExpandedId === o.id;
+                            return (
+                              <React.Fragment key={o.id}>
+                                <tr style={{ cursor: 'pointer' }} onClick={() => setIvaExpandedId(isOpen ? null : o.id)}>
+                                  <td style={{ textAlign: 'center', color: 'var(--text-muted)' }}>
+                                    <ChevronDown size={14} style={{ transform: isOpen ? 'rotate(180deg)' : 'none', transition: 'transform 0.15s' }} />
+                                  </td>
+                                  <td style={{ whiteSpace: 'nowrap', color: 'var(--text-muted)', fontSize: '0.85rem' }}>{o.fechaEntrega || o.fecha ? new Date(o.fechaEntrega || o.fecha).toLocaleDateString('es-CO') : '—'}</td>
+                                  <td style={{ fontWeight: 700 }}>{o.placa} <span style={{ fontWeight: 500, color: 'var(--text-muted)', fontSize: '0.82rem' }}>{o.marca} {o.modelo} {o.anio ? `(${o.anio})` : ''}</span></td>
+                                  <td style={{ fontSize: '0.88rem' }}>{o.cliente}</td>
+                                  <td style={{ textAlign: 'right' }}>${fmt(base)}</td>
+                                  <td style={{ textAlign: 'right', fontWeight: 700, color: '#818cf8' }}>${fmt(iva)}</td>
+                                  <td style={{ textAlign: 'right', fontWeight: 800, color: '#10b981' }}>${fmt(total)}</td>
+                                </tr>
+                                {isOpen && (
+                                  <tr>
+                                    <td colSpan="7" style={{ padding: 0, background: 'var(--bg)' }}>
+                                      <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                                        <thead>
+                                          <tr>
+                                            <th style={{ padding: '0.5rem 0.5rem 0.5rem 3rem', fontSize: '0.72rem', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Ítem</th>
+                                            <th style={{ padding: '0.5rem', fontSize: '0.72rem', color: 'var(--text-muted)', textTransform: 'uppercase', textAlign: 'center' }}>Cant.</th>
+                                            <th style={{ padding: '0.5rem', fontSize: '0.72rem', color: 'var(--text-muted)', textTransform: 'uppercase', textAlign: 'right' }}>Vr. Unitario</th>
+                                            <th style={{ padding: '0.5rem', fontSize: '0.72rem', color: 'var(--text-muted)', textTransform: 'uppercase', textAlign: 'right' }}>IVA</th>
+                                            <th style={{ padding: '0.5rem 1.25rem 0.5rem 0.5rem', fontSize: '0.72rem', color: 'var(--text-muted)', textTransform: 'uppercase', textAlign: 'right' }}>Total</th>
+                                          </tr>
+                                        </thead>
+                                        <tbody>
+                                          {items.map((it, i) => {
+                                            const lt = (Number(it.precio) || 0) * (Number(it.cantidad) || 1);
+                                            return (
+                                              <tr key={i}>
+                                                <td style={{ padding: '0.4rem 0.5rem 0.4rem 3rem', fontSize: '0.85rem' }}>{it.descripcion}</td>
+                                                <td style={{ padding: '0.4rem 0.5rem', fontSize: '0.85rem', textAlign: 'center' }}>{it.cantidad}</td>
+                                                <td style={{ padding: '0.4rem 0.5rem', fontSize: '0.85rem', textAlign: 'right' }}>${fmt(it.precio)}</td>
+                                                <td style={{ padding: '0.4rem 0.5rem', fontSize: '0.85rem', textAlign: 'right', color: '#818cf8' }}>${fmt(lt * 0.19)}</td>
+                                                <td style={{ padding: '0.4rem 1.25rem 0.4rem 0.5rem', fontSize: '0.85rem', textAlign: 'right', fontWeight: 700 }}>${fmt(lt * 1.19)}</td>
+                                              </tr>
+                                            );
+                                          })}
+                                        </tbody>
+                                      </table>
+                                    </td>
+                                  </tr>
+                                )}
+                              </React.Fragment>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    )}
+                  </div>
                 </div>
               );
             })()}
