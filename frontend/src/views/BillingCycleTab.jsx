@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { API_URL } from '../api';
-import { BadgeCheck, Ban, Clock, X, MoveRight, Plus, Trash2, EyeOff } from 'lucide-react';
+import { BadgeCheck, Ban, Clock, X, MoveRight, Plus, Trash2, EyeOff, FileText } from 'lucide-react';
 import { getRealQuoteTotal } from '../quoteUtils';
 
 const fmt = n => (parseFloat(n) || 0).toLocaleString('es-CO', { minimumFractionDigits: 0 });
@@ -246,6 +246,83 @@ export default function BillingCycleTab({
   // Total helpers including manual entries
   const getManualTotal = (entry) => entry.total || 0;
 
+  // Informe PDF de un corte específico — el usuario elige cuál generar
+  // haciendo clic en el botón de esa tarjeta (cada tarjeta ya es "un período
+  // de corte" seleccionable).
+  const generarInformePDF = (cycle) => {
+    const { period, cutDate } = getCyclePeriodLabel(cycle.year, cycle.month, noCutDate);
+    const approvedIds = new Set((cycle.billing?.approvedOrderIds || []).map(String));
+    const manualEntries = cycle.billing?.manualEntries || [];
+
+    const rows = [
+      ...cycle.ordersList.map(o => ({
+        placa: o.placa, cliente: o.cliente, vehiculo: `${o.marca || ''} ${o.modelo || ''}`.trim(),
+        fecha: o.fecha, total: calcOrderTotal(o), ok: approvedIds.has(String(o.id)), manual: false,
+      })),
+      ...manualEntries.map(e => ({
+        placa: e.placa, cliente: e.cliente || '—', vehiculo: e.vehiculo || e.descripcion || '—',
+        fecha: e.fecha, total: getManualTotal(e), ok: approvedIds.has(`m_${e.id}`), manual: true,
+      })),
+    ].sort((a, b) => new Date(a.fecha || 0) - new Date(b.fecha || 0));
+
+    const totalAll = rows.reduce((s, r) => s + r.total, 0);
+    const totalOK = rows.filter(r => r.ok).reduce((s, r) => s + r.total, 0);
+    const fechaFmt = f => f ? new Date(f).toLocaleDateString('es-CO') : '—';
+
+    const filas = rows.map(r => `
+      <tr>
+        <td style="font-weight:700">${r.placa}${r.manual ? ' <span style="font-size:10px;color:#b45309;font-weight:800">(Manual)</span>' : ''}</td>
+        <td>${r.cliente || '—'}</td>
+        <td>${r.vehiculo}</td>
+        <td>${fechaFmt(r.fecha)}</td>
+        <td style="text-align:right;font-weight:700">$${fmt(r.total)}</td>
+        <td style="text-align:center">${r.ok ? '<span style="color:#059669;font-weight:700">OK</span>' : '<span style="color:#94a3b8">Pendiente</span>'}</td>
+      </tr>`).join('');
+
+    const html = `<!DOCTYPE html><html lang="es"><head><meta charset="utf-8"><title>Informe de Facturación — ${title}</title>
+<style>
+  body { font-family: 'Segoe UI', Arial, sans-serif; color: #1a202c; margin: 2rem auto; max-width: 900px; padding: 0 1.5rem; }
+  h1 { font-size: 1.4rem; margin-bottom: 0.2rem; }
+  .muted { color: #718096; font-size: 0.85rem; }
+  table { width: 100%; border-collapse: collapse; font-size: 0.85rem; margin-top: 1rem; }
+  td, th { padding: 0.5rem 0.6rem; border-bottom: 1px solid #edf2f7; }
+  th { text-align: left; background: #f7fafc; font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.04em; color: #4a5568; }
+  .kpi-grid { display:flex; gap:1rem; margin: 1.25rem 0; }
+  .kpi { flex:1; border:1px solid #e2e8f0; border-radius:10px; padding:0.9rem 1.1rem; }
+  .kpi .l { font-size:0.72rem; text-transform:uppercase; letter-spacing:0.04em; color:#718096; margin-bottom:0.3rem; }
+  .kpi .v { font-size:1.25rem; font-weight:800; }
+  .status-line { margin-top: 1.25rem; padding: 0.75rem 1rem; background: #f7fafc; border-radius: 8px; font-size: 0.88rem; }
+  .print-btn { position: fixed; top: 1rem; right: 1rem; padding: 0.6rem 1.2rem; background: #1a202c; color: #fff; border: none; border-radius: 8px; font-weight: 700; cursor: pointer; }
+  @media print { .print-btn { display: none; } body { margin: 0.5rem; } }
+</style></head><body>
+<button class="print-btn" onclick="window.print()">🖨 Imprimir / PDF</button>
+<h1>Informe de Facturación — ${title}</h1>
+<div class="muted">${noCutDate ? cutDate : `Corte ${cutDate} · Período: ${period}`} &nbsp;·&nbsp; Generado: ${new Date().toLocaleString('es-CO')}</div>
+
+<div class="kpi-grid">
+  <div class="kpi"><div class="l">Vehículos</div><div class="v">${rows.length}</div></div>
+  <div class="kpi"><div class="l">Total del corte</div><div class="v">$${fmt(totalAll)}</div></div>
+  <div class="kpi"><div class="l">Aprobado (OK)</div><div class="v" style="color:#059669">$${fmt(totalOK)}</div></div>
+  <div class="kpi"><div class="l">Pendiente</div><div class="v" style="color:#dc2626">$${fmt(totalAll - totalOK)}</div></div>
+</div>
+
+<table>
+  <thead><tr><th>Placa</th><th>Cliente</th><th>Vehículo</th><th>Fecha entrega</th><th style="text-align:right">Total</th><th style="text-align:center">Estado</th></tr></thead>
+  <tbody>${filas || '<tr><td class="muted" colspan="6">Sin vehículos en este corte.</td></tr>'}</tbody>
+</table>
+
+${(cycle.billing?.fechaEnvio || cycle.billing?.pagado) ? `
+<div class="status-line">
+  ${cycle.billing?.fechaEnvio ? `Factura enviada el <strong>${fechaFmt(cycle.billing.fechaEnvio)}</strong>${cycle.billing.fechaVencimiento ? ` · Vence <strong>${fechaFmt(cycle.billing.fechaVencimiento)}</strong>` : ''}<br/>` : ''}
+  ${cycle.billing?.pagado ? `<span style="color:#059669;font-weight:700">Pagada el ${fechaFmt(cycle.billing.fechaPago)}</span>` : ''}
+</div>` : ''}
+</body></html>`;
+    const w = window.open('', '_blank');
+    if (!w) { alert('Permite las ventanas emergentes para generar el informe.'); return; }
+    w.document.write(html);
+    w.document.close();
+  };
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
 
@@ -465,6 +542,10 @@ export default function BillingCycleTab({
               <button className="btn-secondary" style={{ fontSize: '0.88rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}
                 onClick={() => openManualModal(cycle)}>
                 <Plus size={14}/> Agregar factura manual
+              </button>
+              <button className="btn-secondary" style={{ fontSize: '0.88rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}
+                onClick={() => generarInformePDF(cycle)}>
+                <FileText size={14}/> Generar Informe PDF
               </button>
               {!cycle.billing?.fechaEnvio && (
                 <button className="btn-primary" style={{ fontSize: '0.9rem' }}
