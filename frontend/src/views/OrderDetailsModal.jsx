@@ -389,18 +389,20 @@ export default function OrderDetailsModal({ order, onClose, fleetMode = false, i
       ` : ''}
 
       ${(() => {
-        // Solo se imprimen las fotos con descripción: esas son las que el técnico tomó
-        // al marcar un ítem como Malo. Las fotos sin descripción (recepción, u otras
-        // subidas sueltas) no demuestran un hallazgo puntual y no van en este reporte.
-        const fotosHallazgo = (order.fotos || []).filter(f => fotoDesc(f));
-        if (fotosHallazgo.length === 0) return '';
+        // Todas las fotos adjuntas a la orden van en el reporte — no solo las
+        // de "hallazgo" (las que el técnico toma al marcar un ítem como
+        // Malo). Antes se filtraban las que no tenían descripción (fotos de
+        // recepción u otras subidas sueltas), y esas simplemente no
+        // aparecían nunca en el PDF descargado.
+        const todasLasFotos = order.fotos || [];
+        if (todasLasFotos.length === 0) return '';
         return `
-        <div class="section-header">Fotos de la Revisión</div>
+        <div class="section-header">Fotos de la Orden</div>
         <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 12px; margin-bottom: 16px;">
-          ${fotosHallazgo.map(f => `
+          ${todasLasFotos.map(f => `
             <div>
               <img src="${fotoSrc(f)}" style="width: 100%; height: 130px; object-fit: cover; border-radius: 6px; border: 1px solid #e2e8f0;" />
-              <div style="font-size: 10px; color: #64748b; text-align: center; margin-top: 4px;">${fotoDesc(f)}</div>
+              ${fotoDesc(f) ? `<div style="font-size: 10px; color: #64748b; text-align: center; margin-top: 4px;">${fotoDesc(f)}</div>` : ''}
             </div>
           `).join('')}
         </div>
