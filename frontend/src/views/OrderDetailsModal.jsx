@@ -38,11 +38,12 @@ export default function OrderDetailsModal({ order, onClose, fleetMode = false, i
   const quoteId = quotes[activeSlot]?.id ?? null;
   const setQuoteItems = (items) => setQuotes(prev => ({ ...prev, [activeSlot]: { ...(prev[activeSlot] || { id: null }), items } }));
   // Interruptor por orden: si está activado y la cotización tiene más de 5
-  // ítems, se reparten $30.000 entre todos ellos — se suma como un extra por
-  // ítem en los cálculos y en el PDF, sin tocar el precio base que el admin
-  // edita (así prender/apagar el interruptor es reversible y no corrompe
-  // los precios guardados).
+  // ítems, se reparte el monto de insumosMonto entre todos ellos — se suma
+  // como un extra por ítem en los cálculos y en el PDF, sin tocar el precio
+  // base que el admin edita (así prender/apagar el interruptor es
+  // reversible y no corrompe los precios guardados).
   const [distribuirInsumos, setDistribuirInsumos] = useState(!!order.distribuirInsumos);
+  const [insumosMonto, setInsumosMonto] = useState(order.insumosMonto ?? 30000);
   const toggleDistribuirInsumos = async () => {
     const next = !distribuirInsumos;
     setDistribuirInsumos(next);
@@ -55,7 +56,18 @@ export default function OrderDetailsModal({ order, onClose, fleetMode = false, i
       onUpdate && onUpdate();
     } catch (e) { console.error(e); }
   };
-  const insumosExtraPorItem = (distribuirInsumos && quoteItems.length > 5) ? 30000 / quoteItems.length : 0;
+  const updateInsumosMonto = async (monto) => {
+    setInsumosMonto(monto);
+    Object.assign(order, { insumosMonto: monto });
+    try {
+      await fetch(`${API_URL}/orders/${order.id}`, {
+        method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ insumosMonto: monto })
+      });
+      onUpdate && onUpdate();
+    } catch (e) { console.error(e); }
+  };
+  const insumosExtraPorItem = (distribuirInsumos && quoteItems.length > 5) ? insumosMonto / quoteItems.length : 0;
   // El extra es por ítem (por línea), no por unidad — si se sumara directo
   // al precio unitario, una línea con cantidad > 1 recibiría el extra varias
   // veces (precio+extra multiplicado por cantidad) y el total repartido ya
@@ -1260,6 +1272,43 @@ export default function OrderDetailsModal({ order, onClose, fleetMode = false, i
                 )}
               </div>
 
+              {!fleetMode && (
+                <div className="hide-on-print" style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', flexWrap: 'wrap', marginBottom: '1rem', padding: '0.6rem 0.9rem', background: 'rgba(255,255,255,0.03)', border: '1px solid var(--border)', borderRadius: 10 }}>
+                  <span style={{ fontSize: '0.82rem', color: 'var(--text-muted)', fontWeight: 600 }}>Distribuir insumos en cotizaciones de +5 ítems:</span>
+                  <button
+                    onClick={toggleDistribuirInsumos}
+                    style={{
+                      display: 'flex', alignItems: 'center', gap: '0.4rem',
+                      padding: '0.3rem 0.8rem', borderRadius: 20, fontWeight: 700, fontSize: '0.8rem', cursor: 'pointer', transition: 'all 0.2s',
+                      background: distribuirInsumos ? 'rgba(99,102,241,0.15)' : 'rgba(107,114,128,0.1)',
+                      color: distribuirInsumos ? 'var(--primary)' : 'var(--text-muted)',
+                      border: distribuirInsumos ? '1.5px solid var(--primary)' : '1.5px solid var(--border)',
+                    }}
+                  >
+                    <span style={{ width: 26, height: 15, borderRadius: 99, background: distribuirInsumos ? 'var(--primary)' : '#6b7280', display: 'inline-flex', alignItems: 'center', padding: '0 2px', transition: 'all 0.2s' }}>
+                      <span style={{ width: 11, height: 11, borderRadius: '50%', background: 'white', marginLeft: distribuirInsumos ? 'auto' : 0, transition: 'margin 0.2s' }} />
+                    </span>
+                    {distribuirInsumos ? 'Activado' : 'Desactivado'}
+                  </button>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                    <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Valor a repartir:</span>
+                    <div style={{ position: 'relative' }}>
+                      <span style={{ position: 'absolute', left: 8, top: '50%', transform: 'translateY(-50%)', fontSize: '0.85rem', color: 'var(--text-muted)', pointerEvents: 'none' }}>$</span>
+                      <input type="text" className="price-input" value={insumosMonto ? fmt(insumosMonto) : ''}
+                        onChange={e => updateInsumosMonto(parseInt(e.target.value.replace(/\D/g, '')) || 0)}
+                        style={{ width: 100, paddingLeft: '1.1rem', fontSize: '0.8rem', padding: '0.25rem 0.4rem 0.25rem 1.1rem' }} />
+                    </div>
+                  </div>
+                  {distribuirInsumos && (
+                    <span style={{ fontSize: '0.76rem', color: 'var(--text-muted)' }}>
+                      {quoteItems.length > 5
+                        ? `Repartiendo $${fmt(insumosMonto)} entre ${quoteItems.length} ítems ($${fmt(insumosExtraPorItem)} c/u)`
+                        : `Esta cotización tiene ${quoteItems.length} ítem${quoteItems.length !== 1 ? 's' : ''} — se necesitan más de 5 para repartir`}
+                    </span>
+                  )}
+                </div>
+              )}
+
               <table className="data-table">
                 <thead>
                   <tr>
@@ -1451,33 +1500,6 @@ export default function OrderDetailsModal({ order, onClose, fleetMode = false, i
                     </span>
                     {showCategoria ? 'Activado' : 'Desactivado'}
                   </button>
-                </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
-                  <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)', fontWeight: 600 }}>
-                    Distribuir $30.000 de insumos en cotizaciones de +5 ítems:
-                  </span>
-                  <button
-                    onClick={toggleDistribuirInsumos}
-                    style={{
-                      display: 'flex', alignItems: 'center', gap: '0.4rem',
-                      padding: '0.35rem 0.9rem', borderRadius: 20, fontWeight: 700, fontSize: '0.82rem', cursor: 'pointer', transition: 'all 0.2s',
-                      background: distribuirInsumos ? 'rgba(99,102,241,0.15)' : 'rgba(107,114,128,0.1)',
-                      color: distribuirInsumos ? 'var(--primary)' : 'var(--text-muted)',
-                      border: distribuirInsumos ? '1.5px solid var(--primary)' : '1.5px solid var(--border)',
-                    }}
-                  >
-                    <span style={{ width: 28, height: 16, borderRadius: 99, background: distribuirInsumos ? 'var(--primary)' : '#6b7280', display: 'inline-flex', alignItems: 'center', padding: '0 2px', transition: 'all 0.2s' }}>
-                      <span style={{ width: 12, height: 12, borderRadius: '50%', background: 'white', marginLeft: distribuirInsumos ? 'auto' : 0, transition: 'margin 0.2s' }} />
-                    </span>
-                    {distribuirInsumos ? 'Activado' : 'Desactivado'}
-                  </button>
-                  {distribuirInsumos && (
-                    <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>
-                      {quoteItems.length > 5
-                        ? `Repartiendo $30.000 entre ${quoteItems.length} ítems ($${fmt(insumosExtraPorItem)} c/u)`
-                        : `Esta cotización tiene ${quoteItems.length} ítem${quoteItems.length !== 1 ? 's' : ''} — se necesitan más de 5 para repartir`}
-                    </span>
-                  )}
                 </div>
               </div>}
 
