@@ -37,6 +37,32 @@ export default function OrderDetailsModal({ order, onClose, fleetMode = false, i
   const quoteItems = quotes[activeSlot]?.items || [];
   const quoteId = quotes[activeSlot]?.id ?? null;
   const setQuoteItems = (items) => setQuotes(prev => ({ ...prev, [activeSlot]: { ...(prev[activeSlot] || { id: null }), items } }));
+  // Interruptor por orden: si está activado y la cotización tiene más de 5
+  // ítems, se reparten $30.000 entre todos ellos — se suma como un extra por
+  // ítem en los cálculos y en el PDF, sin tocar el precio base que el admin
+  // edita (así prender/apagar el interruptor es reversible y no corrompe
+  // los precios guardados).
+  const [distribuirInsumos, setDistribuirInsumos] = useState(!!order.distribuirInsumos);
+  const toggleDistribuirInsumos = async () => {
+    const next = !distribuirInsumos;
+    setDistribuirInsumos(next);
+    Object.assign(order, { distribuirInsumos: next });
+    try {
+      await fetch(`${API_URL}/orders/${order.id}`, {
+        method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ distribuirInsumos: next })
+      });
+      onUpdate && onUpdate();
+    } catch (e) { console.error(e); }
+  };
+  const insumosExtraPorItem = (distribuirInsumos && quoteItems.length > 5) ? 30000 / quoteItems.length : 0;
+  // El extra es por ítem (por línea), no por unidad — si se sumara directo
+  // al precio unitario, una línea con cantidad > 1 recibiría el extra varias
+  // veces (precio+extra multiplicado por cantidad) y el total repartido ya
+  // no sumaría $30.000. Se divide entre la cantidad para que, al multiplicar
+  // de nuevo por cantidad al calcular el total de la línea, quede sumado
+  // una sola vez.
+  const precioEfectivo = (it) => (Number(it.precio) || 0) + (insumosExtraPorItem / (Number(it.cantidad) || 1));
   const [savingQuote, setSavingQuote] = useState(false);
   const [statusMsg, setStatusMsg] = useState({ text: '', type: '' });
   const [showConfirm, setShowConfirm] = useState(false);
@@ -451,14 +477,14 @@ export default function OrderDetailsModal({ order, onClose, fleetMode = false, i
     if (isCuentaCobro) {
       // Cuenta de cobro (o ningún agrupamiento activo): lista plana
       rows = quoteItems.map((it, i) => {
-        const lineTotal = it.precio * it.cantidad;
+        const lineTotal = precioEfectivo(it) * it.cantidad;
         const lineIva = it.aplicaIva ? lineTotal * 0.19 : 0;
         return `
           <tr>
             <td class="col-num">${i + 1}</td>
             <td class="col-desc">${it.descripcion}</td>
             <td style="text-align:center">${it.cantidad}</td>
-            <td class="col-price">$${fmt(it.precio)} COP</td>
+            <td class="col-price">$${fmt(precioEfectivo(it))} COP</td>
             <td class="col-iva">${lineIva > 0 ? '$' + fmt(lineIva) + ' COP' : '—'}</td>
             <td class="col-total">$${fmt(lineTotal + lineIva)} COP</td>
           </tr>`;
@@ -473,12 +499,12 @@ export default function OrderDetailsModal({ order, onClose, fleetMode = false, i
         if (group.length === 0) return;
         const p = prioMap[prioKey];
         const groupTotal = group.reduce((acc, it) => {
-          const lt = it.precio * it.cantidad;
+          const lt = precioEfectivo(it) * it.cantidad;
           return acc + (it.aplicaIva ? lt * 1.19 : lt);
         }, 0);
         rows += `<tr><td colspan="7" style="background:${p.headerBg};color:${p.color};font-weight:800;font-size:0.85rem;padding:6px 10px;letter-spacing:0.03em">${p.label}</td></tr>`;
         group.forEach(it => {
-          const lineTotal = it.precio * it.cantidad;
+          const lineTotal = precioEfectivo(it) * it.cantidad;
           const lineIva = it.aplicaIva ? lineTotal * 0.19 : 0;
           rows += `
             <tr>
@@ -486,7 +512,7 @@ export default function OrderDetailsModal({ order, onClose, fleetMode = false, i
               <td class="col-desc">${it.descripcion}</td>
               <td style="text-align:center"><span style="font-size:0.78rem;font-weight:700;padding:2px 8px;border-radius:6px;background:${p.bg};color:${p.color}">${p.label}</span></td>
               <td style="text-align:center">${it.cantidad}</td>
-              <td class="col-price">$${fmt(it.precio)} COP</td>
+              <td class="col-price">$${fmt(precioEfectivo(it))} COP</td>
               <td class="col-iva">${lineIva > 0 ? '$' + fmt(lineIva) + ' COP' : '—'}</td>
               <td class="col-total">$${fmt(lineTotal + lineIva)} COP</td>
             </tr>`;
@@ -505,12 +531,12 @@ export default function OrderDetailsModal({ order, onClose, fleetMode = false, i
         if (group.length === 0) return;
         const p = catPalette[ci % catPalette.length];
         const groupTotal = group.reduce((acc, it) => {
-          const lt = it.precio * it.cantidad;
+          const lt = precioEfectivo(it) * it.cantidad;
           return acc + (it.aplicaIva ? lt * 1.19 : lt);
         }, 0);
         rows += `<tr><td colspan="7" style="background:${p.headerBg};color:${p.color};font-weight:800;font-size:0.85rem;padding:6px 10px;letter-spacing:0.03em">${catName}</td></tr>`;
         group.forEach(it => {
-          const lineTotal = it.precio * it.cantidad;
+          const lineTotal = precioEfectivo(it) * it.cantidad;
           const lineIva = it.aplicaIva ? lineTotal * 0.19 : 0;
           rows += `
             <tr>
@@ -518,7 +544,7 @@ export default function OrderDetailsModal({ order, onClose, fleetMode = false, i
               <td class="col-desc">${it.descripcion}</td>
               <td style="text-align:center"><span style="font-size:0.78rem;font-weight:700;padding:2px 8px;border-radius:6px;background:${p.bg};color:${p.color}">${catName}</span></td>
               <td style="text-align:center">${it.cantidad}</td>
-              <td class="col-price">$${fmt(it.precio)} COP</td>
+              <td class="col-price">$${fmt(precioEfectivo(it))} COP</td>
               <td class="col-iva">${lineIva > 0 ? '$' + fmt(lineIva) + ' COP' : '—'}</td>
               <td class="col-total">$${fmt(lineTotal + lineIva)} COP</td>
             </tr>`;
@@ -719,7 +745,7 @@ export default function OrderDetailsModal({ order, onClose, fleetMode = false, i
   const calcTotals = () => {
     let sub = 0, iva = 0;
     quoteItems.forEach(it => {
-      const lt = it.precio * it.cantidad;
+      const lt = precioEfectivo(it) * it.cantidad;
       sub += lt;
       if (it.aplicaIva) iva += lt * 0.19;
     });
@@ -1249,7 +1275,7 @@ export default function OrderDetailsModal({ order, onClose, fleetMode = false, i
                 </thead>
                 <tbody>
                   {quoteItems.map((it, idx) => {
-                    const lt = it.precio * it.cantidad;
+                    const lt = precioEfectivo(it) * it.cantidad;
                     const total = it.aplicaIva ? lt * 1.19 : lt;
                     return (
                       <tr key={idx}>
@@ -1298,6 +1324,9 @@ export default function OrderDetailsModal({ order, onClose, fleetMode = false, i
                           {!fleetMode && <input className="hide-on-print price-input" type="text" placeholder="0" value={it.precio ? fmt(it.precio) : ''}
                             onChange={e => { const q=[...quoteItems]; q[idx].precio=parseFloat(e.target.value.replace(/\D/g, ''))||0; setQuoteItems(q); }}
                             style={{ width: 140, textAlign: 'right', fontSize: '0.9rem', padding: '0.2rem' }} />}
+                          {!fleetMode && insumosExtraPorItem > 0 && (
+                            <div className="hide-on-print" style={{ fontSize: '0.68rem', color: 'var(--text-muted)', marginTop: '0.15rem' }}>+${fmt(insumosExtraPorItem)} insumos</div>
+                          )}
                           <span className={fleetMode ? undefined : 'show-on-print'}>${fmt(it.precio)}</span>
                         </td>
                         <td style={{ textAlign: 'center' }}>
@@ -1422,6 +1451,33 @@ export default function OrderDetailsModal({ order, onClose, fleetMode = false, i
                     </span>
                     {showCategoria ? 'Activado' : 'Desactivado'}
                   </button>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+                  <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)', fontWeight: 600 }}>
+                    Distribuir $30.000 de insumos en cotizaciones de +5 ítems:
+                  </span>
+                  <button
+                    onClick={toggleDistribuirInsumos}
+                    style={{
+                      display: 'flex', alignItems: 'center', gap: '0.4rem',
+                      padding: '0.35rem 0.9rem', borderRadius: 20, fontWeight: 700, fontSize: '0.82rem', cursor: 'pointer', transition: 'all 0.2s',
+                      background: distribuirInsumos ? 'rgba(99,102,241,0.15)' : 'rgba(107,114,128,0.1)',
+                      color: distribuirInsumos ? 'var(--primary)' : 'var(--text-muted)',
+                      border: distribuirInsumos ? '1.5px solid var(--primary)' : '1.5px solid var(--border)',
+                    }}
+                  >
+                    <span style={{ width: 28, height: 16, borderRadius: 99, background: distribuirInsumos ? 'var(--primary)' : '#6b7280', display: 'inline-flex', alignItems: 'center', padding: '0 2px', transition: 'all 0.2s' }}>
+                      <span style={{ width: 12, height: 12, borderRadius: '50%', background: 'white', marginLeft: distribuirInsumos ? 'auto' : 0, transition: 'margin 0.2s' }} />
+                    </span>
+                    {distribuirInsumos ? 'Activado' : 'Desactivado'}
+                  </button>
+                  {distribuirInsumos && (
+                    <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>
+                      {quoteItems.length > 5
+                        ? `Repartiendo $30.000 entre ${quoteItems.length} ítems ($${fmt(insumosExtraPorItem)} c/u)`
+                        : `Esta cotización tiene ${quoteItems.length} ítem${quoteItems.length !== 1 ? 's' : ''} — se necesitan más de 5 para repartir`}
+                    </span>
+                  )}
                 </div>
               </div>}
 
