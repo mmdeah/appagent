@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { API_URL, BACKEND_URL } from '../api';
 import { MessageCircle, Printer, CheckCircle, X, Plus, Trash2, Camera, Edit2, Save, FileText, Upload, Download, Search, MoveRight } from 'lucide-react';
 import { getQuoteSlot } from '../quoteUtils';
@@ -67,14 +67,57 @@ export default function OrderDetailsModal({ order, onClose, fleetMode = false, i
       onUpdate && onUpdate();
     } catch (e) { console.error(e); }
   };
-  const insumosExtraPorItem = (distribuirInsumos && quoteItems.length > 5) ? insumosMonto / quoteItems.length : 0;
+  // Los ítems que el admin dejó deliberadamente en $0 no entran en el
+  // reparto — ni cuentan para dividir el monto, ni reciben una parte de él
+  // (antes sí, y un ítem en $0 terminaba con un precio inventado).
+  const itemsConValor = quoteItems.filter(it => (Number(it.precio) || 0) > 0);
+  const insumosExtraPorItem = (distribuirInsumos && quoteItems.length > 5 && itemsConValor.length > 0)
+    ? insumosMonto / itemsConValor.length
+    : 0;
   // El extra es por ítem (por línea), no por unidad — si se sumara directo
   // al precio unitario, una línea con cantidad > 1 recibiría el extra varias
   // veces (precio+extra multiplicado por cantidad) y el total repartido ya
-  // no sumaría $30.000. Se divide entre la cantidad para que, al multiplicar
-  // de nuevo por cantidad al calcular el total de la línea, quede sumado
-  // una sola vez.
-  const precioEfectivo = (it) => (Number(it.precio) || 0) + (insumosExtraPorItem / (Number(it.cantidad) || 1));
+  // no sumaría el monto configurado. Se divide entre la cantidad para que,
+  // al multiplicar de nuevo por cantidad al calcular el total de la línea,
+  // quede sumado una sola vez.
+  const precioEfectivo = (it) => {
+    const base = Number(it.precio) || 0;
+    if (base === 0) return 0;
+    return base + (insumosExtraPorItem / (Number(it.cantidad) || 1));
+  };
+
+  // Notas de la pestaña Cotización: un solo bloc compartido, no por orden —
+  // se guarda en /settings (id fijo "cotizacion_notas") para que quede
+  // igual sin importar qué vehículo/orden se esté viendo, y sobreviva a
+  // cerrar y volver a abrir la app.
+  const [cotizacionNotas, setCotizacionNotas] = useState('');
+  const [notasCargadas, setNotasCargadas] = useState(false);
+  const notasSaveTimeout = useRef(null);
+  useEffect(() => {
+    fetch(`${API_URL}/settings/cotizacion_notas`)
+      .then(r => r.ok ? r.json() : null)
+      .then(d => setCotizacionNotas(d?.texto || ''))
+      .catch(() => {})
+      .finally(() => setNotasCargadas(true));
+  }, []);
+  const handleNotasChange = (texto) => {
+    setCotizacionNotas(texto);
+    clearTimeout(notasSaveTimeout.current);
+    notasSaveTimeout.current = setTimeout(async () => {
+      try {
+        const res = await fetch(`${API_URL}/settings/cotizacion_notas`, {
+          method: 'PUT', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ id: 'cotizacion_notas', texto })
+        });
+        if (!res.ok) {
+          await fetch(`${API_URL}/settings`, {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ id: 'cotizacion_notas', texto })
+          });
+        }
+      } catch (e) { console.error(e); }
+    }, 600);
+  };
   const [savingQuote, setSavingQuote] = useState(false);
   const [statusMsg, setStatusMsg] = useState({ text: '', type: '' });
   const [showConfirm, setShowConfirm] = useState(false);
@@ -1302,7 +1345,7 @@ export default function OrderDetailsModal({ order, onClose, fleetMode = false, i
                   {distribuirInsumos && (
                     <span style={{ fontSize: '0.76rem', color: 'var(--text-muted)' }}>
                       {quoteItems.length > 5
-                        ? `Repartiendo $${fmt(insumosMonto)} entre ${quoteItems.length} ítems ($${fmt(insumosExtraPorItem)} c/u)`
+                        ? `Repartiendo $${fmt(insumosMonto)} entre ${itemsConValor.length} ítem${itemsConValor.length !== 1 ? 's' : ''} con valor ($${fmt(insumosExtraPorItem)} c/u) — los ítems en $0 no se tocan`
                         : `Esta cotización tiene ${quoteItems.length} ítem${quoteItems.length !== 1 ? 's' : ''} — se necesitan más de 5 para repartir`}
                     </span>
                   )}
@@ -1373,7 +1416,7 @@ export default function OrderDetailsModal({ order, onClose, fleetMode = false, i
                           {!fleetMode && <input className="hide-on-print price-input" type="text" placeholder="0" value={it.precio ? fmt(it.precio) : ''}
                             onChange={e => { const q=[...quoteItems]; q[idx].precio=parseFloat(e.target.value.replace(/\D/g, ''))||0; setQuoteItems(q); }}
                             style={{ width: 140, textAlign: 'right', fontSize: '0.9rem', padding: '0.2rem' }} />}
-                          {!fleetMode && insumosExtraPorItem > 0 && (
+                          {!fleetMode && insumosExtraPorItem > 0 && (Number(it.precio) || 0) > 0 && (
                             <div className="hide-on-print" style={{ fontSize: '0.68rem', color: 'var(--text-muted)', marginTop: '0.15rem' }}>+${fmt(insumosExtraPorItem)} insumos</div>
                           )}
                           <span className={fleetMode ? undefined : 'show-on-print'}>${fmt(it.precio)}</span>
@@ -1447,8 +1490,22 @@ export default function OrderDetailsModal({ order, onClose, fleetMode = false, i
                 </button>
               </div>}
 
-              {/* Totals box */}
-              <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '1.5rem' }}>
+              {/* Notas (izquierda) + Totals box (derecha) */}
+              <div style={{ display: 'flex', justifyContent: 'space-between', gap: '1.5rem', marginBottom: '1.5rem', flexWrap: 'wrap' }}>
+                {!fleetMode && (
+                  <div className="hide-on-print" style={{ flex: '1 1 300px', minWidth: 260 }}>
+                    <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: '0.4rem' }}>
+                      Notas (compartidas, todas las órdenes)
+                    </label>
+                    <textarea
+                      value={cotizacionNotas}
+                      onChange={e => handleNotasChange(e.target.value)}
+                      placeholder={notasCargadas ? 'Escribe aquí lo que quieras recordar...' : 'Cargando...'}
+                      rows={5}
+                      style={{ width: '100%', resize: 'vertical', background: 'rgba(255,255,255,0.03)', border: '1px solid var(--border)', borderRadius: 10, padding: '0.75rem', fontSize: '0.85rem', color: 'var(--text)' }}
+                    />
+                  </div>
+                )}
                 <div style={{ width: 300, background: 'rgba(255,255,255,0.03)', border: '1px solid var(--border)', borderRadius: 10, padding: '1rem' }}>
                   {[
                     ['Subtotal', `$${fmt(totals.sub)}`],
