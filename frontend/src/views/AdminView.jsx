@@ -615,6 +615,19 @@ export default function AdminView() {
     } catch (e) { console.error(e); }
   };
 
+  const toggleComisionPagada = async (orderId, comisionPagada) => {
+    // Optimista, igual que toggleExpenseVerificado: se refleja de inmediato
+    // en la tabla sin esperar la respuesta del servidor.
+    setOrders(prev => prev.map(o => o.id === orderId ? { ...o, comisionPagada } : o));
+    try {
+      await fetch(`${API_URL}/orders/${orderId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ comisionPagada }),
+      });
+    } catch (e) { console.error(e); }
+  };
+
   const toggleExpenseVerificado = async (id, verificado) => {
     // Optimista: se refleja de inmediato en la tabla sin esperar la
     // respuesta, y se re-sincroniza con fetchExpenses() al terminar.
@@ -1213,12 +1226,13 @@ export default function AdminView() {
                         <th>Ingreso</th>
                         <th>Entrega</th>
                         <th>Método Pago</th>
+                        <th style={{ textAlign: 'center' }} title="Comisión pagada por este vehículo">Comisión</th>
                         <th>Acciones</th>
                       </tr>
                     </thead>
                     <tbody>
                       {filtradas.length === 0 && (
-                        <tr><td colSpan="7" style={{ textAlign: 'center', color: 'var(--text-muted)' }}>
+                        <tr><td colSpan="8" style={{ textAlign: 'center', color: 'var(--text-muted)' }}>
                           {entregadas.length === 0 ? 'No hay órdenes entregadas.' : 'Sin resultados para los filtros aplicados.'}
                         </td></tr>
                       )}
@@ -1237,6 +1251,11 @@ export default function AdminView() {
                               : <span style={{ color: 'var(--text-muted)' }}>—</span>}
                           </td>
                           <td><span className="badge badge-blue" style={{ background: 'rgba(99,102,241,0.1)', color: 'var(--primary)', border: 'none' }}>{o.metodoPago || 'Efectivo'}</span></td>
+                          <td style={{ textAlign: 'center' }}>
+                            <input type="checkbox" checked={!!o.comisionPagada} onChange={e => toggleComisionPagada(o.id, e.target.checked)}
+                              title={o.comisionPagada ? 'Comisión pagada' : 'Marcar comisión como pagada'}
+                              style={{ width: 17, height: 17, cursor: 'pointer', accentColor: 'var(--success)' }} />
+                          </td>
                           <td>
                             <div style={{ display: 'flex', gap: '0.5rem' }}>
                               <button className="btn-secondary" style={{ padding: '0.4rem 0.6rem', fontSize: '0.9rem' }} onClick={() => setSelectedOrder(o)}>Ver Detalle</button>

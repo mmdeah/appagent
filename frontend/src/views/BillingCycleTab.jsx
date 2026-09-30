@@ -187,6 +187,16 @@ export default function BillingCycleTab({
     onRefreshOrders();
   };
 
+  // Marca/desmarca la comisión pagada de un vehículo (solo aplica a órdenes
+  // reales de la app, no a facturas manuales, que no tienen una orden detrás).
+  const toggleComisionPagada = async (orderId, comisionPagada) => {
+    await fetch(`${API_URL}/orders/${orderId}`, {
+      method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ comisionPagada })
+    });
+    onRefreshOrders();
+  };
+
   // Move order
   const doMove = async () => {
     if (!movingOrder || !moveTarget) return;
@@ -428,6 +438,7 @@ ${(cycle.billing?.fechaEnvio || cycle.billing?.pagado) ? `
                     <th>Fecha entrega</th>
                     <th style={{ textAlign: 'right' }}>Total</th>
                     <th style={{ textAlign: 'center' }}>Estado</th>
+                    <th style={{ textAlign: 'center' }} title="Comisión pagada por este vehículo">Comisión</th>
                     <th style={{ textAlign: 'center' }}></th>
                   </tr>
                 </thead>
@@ -466,6 +477,11 @@ ${(cycle.billing?.fechaEnvio || cycle.billing?.pagado) ? `
                               <BadgeCheck size={13}/> OK
                             </span>
                           ) : <span style={{ color: 'var(--text-muted)', fontSize: '0.82rem' }}>—</span>}
+                        </td>
+                        <td style={{ textAlign: 'center' }}>
+                          <input type="checkbox" checked={!!o.comisionPagada} onChange={e => toggleComisionPagada(o.id, e.target.checked)}
+                            title={o.comisionPagada ? 'Comisión pagada' : 'Marcar comisión como pagada'}
+                            style={{ width: 16, height: 16, cursor: 'pointer', accentColor: '#10b981' }} />
                         </td>
                         <td style={{ textAlign: 'center' }}>
                           <div style={{ display: 'flex', gap: '0.3rem', justifyContent: 'center' }}>
@@ -517,6 +533,7 @@ ${(cycle.billing?.fechaEnvio || cycle.billing?.pagado) ? `
                             </span>
                           ) : <span style={{ color: 'var(--text-muted)', fontSize: '0.82rem' }}>—</span>}
                         </td>
+                        <td style={{ textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.82rem' }} title="Las facturas manuales no tienen orden asociada">—</td>
                         <td style={{ textAlign: 'center' }}>
                           <button style={{ background: 'none', border: '1px solid rgba(239,68,68,0.4)', cursor: 'pointer', color: '#ef4444', fontSize: '0.78rem', padding: '0.2rem 0.5rem', borderRadius: 6, display: 'inline-flex', alignItems: 'center', gap: '0.25rem' }}
                             onClick={() => { if (window.confirm(`¿Eliminar factura manual ${e.placa}?`)) deleteManualEntry(cycle.id, e.id, cycle.billing); }}>
