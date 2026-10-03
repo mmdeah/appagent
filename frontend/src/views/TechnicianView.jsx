@@ -44,8 +44,7 @@ export default function TechnicianView() {
   const [orders, setOrders] = useState([]);
   const [selectedOrder, setSelectedOrder] = useState(null);
   const [reportData, setReportData] = useState({});
-  const [scannerCodes, setScannerCodes] = useState([{ prefix: 'P', code: '', description: '' }]);
-  const [precioDiagnostico, setPrecioDiagnostico] = useState('');
+  const [scannerFoto, setScannerFoto] = useState(null); // foto del escáner con los códigos de avería
   const [statusMsg, setStatusMsg] = useState({ text: '', type: '' });
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
@@ -125,14 +124,12 @@ export default function TechnicianView() {
   // sigue ahí. Se borra solo cuando el reporte se envía con éxito.
   const draftKey = (id) => `revision_draft_${id}`;
   const ACTIVE_KEY = 'revision_active_order';
-  const emptyScanner = () => [{ prefix: 'P', code: '', description: '' }];
 
   const openOrder = (o) => {
     let draft = null;
     try { draft = JSON.parse(localStorage.getItem(draftKey(o.id)) || 'null'); } catch { /* borrador dañado: se ignora */ }
     setReportData(draft?.reportData || {});
-    setScannerCodes(draft?.scannerCodes?.length ? draft.scannerCodes : emptyScanner());
-    setPrecioDiagnostico(draft?.precioDiagnostico || '');
+    setScannerFoto(draft?.scannerFoto || null);
     setPendingPriority(null);
     setSelectedOrder(o);
     try { localStorage.setItem(ACTIVE_KEY, String(o.id)); } catch { /* sin espacio/bloqueado */ }
@@ -153,15 +150,14 @@ export default function TechnicianView() {
   useEffect(() => {
     if (!selectedOrder) return;
     const hasData = Object.keys(reportData).length > 0
-      || scannerCodes.some(c => c.code || c.description)
-      || precioDiagnostico;
+      || scannerFoto;
     if (!hasData) return;
     try {
-      localStorage.setItem(draftKey(selectedOrder.id), JSON.stringify({ reportData, scannerCodes, precioDiagnostico, savedAt: Date.now() }));
+      localStorage.setItem(draftKey(selectedOrder.id), JSON.stringify({ reportData, scannerFoto, savedAt: Date.now() }));
     } catch (e) {
       console.warn('No se pudo guardar el borrador de la revisión', e);
     }
-  }, [selectedOrder, reportData, scannerCodes, precioDiagnostico]);
+  }, [selectedOrder, reportData, scannerFoto]);
 
   // Si la app se recargó con una revisión a medias, reabre esa orden sola
   // apenas cargue la lista de vehículos (una sola vez).
@@ -252,7 +248,20 @@ export default function TechnicianView() {
     }
   };
 
-  const buildWhatsAppMessage = (items, validCodes, precioDiag) => {
+  // Foto del escáner: más resolución que las demás fotos, para que los
+  // códigos se lean bien en el informe.
+  const handleScannerPhoto = async (file) => {
+    if (!file) return;
+    try {
+      setScannerFoto(await compressImage(file, 1800, 0.82));
+    } catch {
+      const reader = new FileReader();
+      reader.onload = ev => setScannerFoto(ev.target.result);
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const buildWhatsAppMessage = (items, hasScannerFoto) => {
     const o = selectedOrder;
     const fecha = new Date().toLocaleDateString('es-CO');
     const fmtNum = (n) => Number(n || 0).toLocaleString('es-CO', { minimumFractionDigits: 0 });
@@ -306,16 +315,10 @@ export default function TechnicianView() {
       msg += `\n`;
     }
 
-    if (validCodes.length > 0) {
-      msg += `*CODIGOS ESCANER:*\n`;
-      validCodes.forEach(c => {
-        msg += `- ${c.prefix}${c.code}${c.description ? `: ${c.description}` : ''}\n`;
-      });
-      if (precioDiag > 0) {
-        totalMO += precioDiag;
-        msg += `  Diagnostico: $${fmtNum(precioDiag)}\n`;
-      }
-      msg += `\n`;
+    if (hasScannerFoto) {
+      msg += `*ESCANER:* foto de los codigos de averia adjunta en el informe
+
+`;
     }
 
     const buenas = items.filter(i => i.state === 'Bueno');
@@ -346,34 +349,36 @@ export default function TechnicianView() {
       .filter(it => it.foto)
       .map(it => ({ src: it.foto, descripcion: `${it.item} — ${it.category} (Malo)` }));
     const items = itemsRaw.map(({ foto, ...rest }) => rest);
-    const validCodes = scannerCodes.filter(c => c.code.length > 0);
-    const precioDiag = validCodes.length > 0 ? (parseFloat(precioDiagnostico.replace(/\D/g,'')) || 0) : 0;
+    const fotoEscaner = scannerFoto
+      ? { src: scannerFoto, descripcion: 'Escáner — códigos de avería', tipo: 'escaner' }
+      : null;
 
     // Abrir WhatsApp ANTES del await para evitar bloqueo de popup del navegador
-    const mensaje = buildWhatsAppMessage(items, validCodes, precioDiag);
+    const mensaje = buildWhatsAppMessage(items, !!fotoEscaner);
     const waUrl = `https://wa.me/573014697942?text=${encodeURIComponent(mensaje)}`;
     window.open(waUrl, '_blank');
 
     const payload = {
       orderId: selectedOrder.id,
       items,
-      scannerCodes: validCodes,
-      precioDiagnostico: precioDiag,
+      scannerCodes: [],
+      precioDiagnostico: 0,
       fecha: new Date().toISOString()
     };
     try {
-      if (fotosHallazgos.length > 0) {
+      if (fotosHallazgos.length > 0 || fotoEscaner) {
         const orderRes = await fetch(`${API_URL}/orders/${selectedOrder.id}`);
         if (!orderRes.ok) throw new Error('No se pudo leer la orden para guardar las fotos');
         const orderActual = await orderRes.json();
-        const fotosActuales = orderActual.fotos || [];
+        // La foto del escáner es única: la nueva reemplaza a la anterior en vez de acumularse.
+        const fotosActuales = (orderActual.fotos || []).filter(f => !(fotoEscaner && f?.tipo === 'escaner'));
         // Antes esta petición no se revisaba: si el servidor la rechazaba
         // (payload muy grande, conexión mala), el reporte seguía y mostraba
         // "éxito" aunque las fotos nunca quedaran guardadas en la orden.
         const fotosRes = await fetch(`${API_URL}/orders/${selectedOrder.id}`, {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ fotos: [...fotosActuales, ...fotosHallazgos] })
+          body: JSON.stringify({ fotos: [...fotosActuales, ...(fotoEscaner ? [fotoEscaner] : []), ...fotosHallazgos] })
         });
         if (!fotosRes.ok) throw new Error('El servidor rechazó el guardado de las fotos');
       }
@@ -404,8 +409,7 @@ export default function TechnicianView() {
       setTimeout(() => {
         setSelectedOrder(null);
         setReportData({});
-        setScannerCodes([{ prefix: 'P', code: '', description: '' }]);
-        setPrecioDiagnostico('');
+        setScannerFoto(null);
         setStatusMsg({ text: '', type: '' });
         fetchOrders();
       }, 2000);
@@ -608,15 +612,24 @@ export default function TechnicianView() {
             ))}
 
             <div className="card" style={{ padding: '1rem' }}>
-              <h3 className="section-title" style={{ fontSize: '0.8rem' }}>Escáner DTC</h3>
-              {scannerCodes.map((code, index) => (
-                <div key={index} style={{ display: 'flex', gap: '0.4rem', marginBottom: '0.6rem' }}>
-                  <select value={code.prefix} style={{ width: 50, padding: '0.3rem' }} onChange={e => { const n = [...scannerCodes]; n[index].prefix = e.target.value; setScannerCodes(n); }}>{['P','B','C','U'].map(l => <option key={l} value={l}>{l}</option>)}</select>
-                  <input type="text" maxLength={4} placeholder="0000" style={{ width: 70, fontWeight: 800, textAlign: 'center', padding: '0.3rem' }} value={code.code} onChange={e => { const v = e.target.value.replace(/\D/g,''); const n=[...scannerCodes]; n[index].code=v; setScannerCodes(n); }} />
-                  <input type="text" placeholder="Falla" style={{ flex: 1, padding: '0.3rem' }} value={code.description} onChange={e => { const n=[...scannerCodes]; n[index].description=e.target.value; setScannerCodes(n); }} />
+              <h3 className="section-title" style={{ fontSize: '0.8rem' }}>Escáner — códigos de avería</h3>
+              <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: '0.75rem' }}>
+                Toma una foto clara de la pantalla del escáner donde se vean los códigos.
+              </p>
+              {scannerFoto ? (
+                <div style={{ position: 'relative' }}>
+                  <img src={scannerFoto} alt="foto del escáner" style={{ width: '100%', maxHeight: 320, objectFit: 'contain', borderRadius: 10, border: '1px solid var(--border)', background: '#000', display: 'block' }} />
+                  <button type="button" onClick={() => setScannerFoto(null)}
+                    style={{ position: 'absolute', top: 8, right: 8, background: 'var(--error)', border: 'none', borderRadius: '50%', width: 28, height: 28, color: 'white', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <X size={16} />
+                  </button>
                 </div>
-              ))}
-              <button className="btn-secondary" style={{ fontSize: '0.85rem', padding: '0.4rem' }} onClick={() => setScannerCodes([...scannerCodes, { prefix: 'P', code: '', description: '' }])}>+ DTC</button>
+              ) : (
+                <label style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem', padding: '1rem', border: '1.5px dashed var(--primary)', borderRadius: 10, color: 'var(--primary)', fontWeight: 700, cursor: 'pointer' }}>
+                  <Camera size={18} /> Tomar foto del escáner
+                  <input type="file" accept="image/*" capture="environment" style={{ display: 'none' }} onChange={e => { handleScannerPhoto(e.target.files?.[0]); e.target.value = ''; }} />
+                </label>
+              )}
             </div>
 
             <button className="btn-success" style={{ width: '100%', padding: '1rem', fontSize: '1.1rem', fontWeight: 900, marginTop: '1.5rem', borderRadius: 12, display: 'block' }} onClick={submitReport}>SUBIR REVISIÓN</button>

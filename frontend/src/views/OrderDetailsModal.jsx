@@ -477,16 +477,28 @@ export default function OrderDetailsModal({ order, onClose, fleetMode = false, i
         // aparecían nunca en el PDF descargado.
         const todasLasFotos = order.fotos || [];
         if (todasLasFotos.length === 0) return '';
+        // La foto del escáner (códigos de avería) va aparte y a ancho completo
+        // para que los códigos se lean bien; el resto, en la cuadrícula chica.
+        const fotosEscaner = todasLasFotos.filter(f => f?.tipo === 'escaner');
+        const fotosGenerales = todasLasFotos.filter(f => f?.tipo !== 'escaner');
         return `
+        ${fotosEscaner.length > 0 ? `
+        <div class="section-header">Escáner — Códigos de Avería</div>
+        ${fotosEscaner.map(f => `
+          <div style="margin-bottom: 16px; page-break-inside: avoid;">
+            <img src="${fotoSrc(f)}" style="width: 100%; max-height: 620px; object-fit: contain; border-radius: 6px; border: 1px solid #e2e8f0; background: #f8fafc;" />
+          </div>
+        `).join('')}` : ''}
+        ${fotosGenerales.length > 0 ? `
         <div class="section-header">Fotos de la Orden</div>
         <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 12px; margin-bottom: 16px;">
-          ${todasLasFotos.map(f => `
+          ${fotosGenerales.map(f => `
             <div>
               <img src="${fotoSrc(f)}" style="width: 100%; height: 130px; object-fit: cover; border-radius: 6px; border: 1px solid #e2e8f0;" />
               ${fotoDesc(f) ? `<div style="font-size: 10px; color: #64748b; text-align: center; margin-top: 4px;">${fotoDesc(f)}</div>` : ''}
             </div>
           `).join('')}
-        </div>
+        </div>` : ''}
         `;
       })()}
 
