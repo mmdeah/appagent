@@ -44,7 +44,7 @@ export default function TechnicianView() {
   const [orders, setOrders] = useState([]);
   const [selectedOrder, setSelectedOrder] = useState(null);
   const [reportData, setReportData] = useState({});
-  const [scannerFoto, setScannerFoto] = useState(null); // foto del escáner con los códigos de avería
+  const [scannerFotos, setScannerFotos] = useState([]); // fotos del escáner con los códigos de avería (una o varias)
   const [statusMsg, setStatusMsg] = useState({ text: '', type: '' });
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
@@ -129,7 +129,7 @@ export default function TechnicianView() {
     let draft = null;
     try { draft = JSON.parse(localStorage.getItem(draftKey(o.id)) || 'null'); } catch { /* borrador dañado: se ignora */ }
     setReportData(draft?.reportData || {});
-    setScannerFoto(draft?.scannerFoto || null);
+    setScannerFotos(draft?.scannerFotos || (draft?.scannerFoto ? [draft.scannerFoto] : []));
     setPendingPriority(null);
     setSelectedOrder(o);
     try { localStorage.setItem(ACTIVE_KEY, String(o.id)); } catch { /* sin espacio/bloqueado */ }
@@ -150,14 +150,14 @@ export default function TechnicianView() {
   useEffect(() => {
     if (!selectedOrder) return;
     const hasData = Object.keys(reportData).length > 0
-      || scannerFoto;
+      || scannerFotos.length > 0;
     if (!hasData) return;
     try {
-      localStorage.setItem(draftKey(selectedOrder.id), JSON.stringify({ reportData, scannerFoto, savedAt: Date.now() }));
+      localStorage.setItem(draftKey(selectedOrder.id), JSON.stringify({ reportData, scannerFotos, savedAt: Date.now() }));
     } catch (e) {
       console.warn('No se pudo guardar el borrador de la revisión', e);
     }
-  }, [selectedOrder, reportData, scannerFoto]);
+  }, [selectedOrder, reportData, scannerFotos]);
 
   // Si la app se recargó con una revisión a medias, reabre esa orden sola
   // apenas cargue la lista de vehículos (una sola vez).
@@ -250,18 +250,23 @@ export default function TechnicianView() {
 
   // Foto del escáner: más resolución que las demás fotos, para que los
   // códigos se lean bien en el informe.
-  const handleScannerPhoto = async (file) => {
-    if (!file) return;
-    try {
-      setScannerFoto(await compressImage(file, 1800, 0.82));
-    } catch {
-      const reader = new FileReader();
-      reader.onload = ev => setScannerFoto(ev.target.result);
-      reader.readAsDataURL(file);
+  const handleScannerPhoto = async (files) => {
+    for (const file of Array.from(files || [])) {
+      let src;
+      try {
+        src = await compressImage(file, 1800, 0.82);
+      } catch {
+        src = await new Promise(resolve => {
+          const reader = new FileReader();
+          reader.onload = ev => resolve(ev.target.result);
+          reader.readAsDataURL(file);
+        });
+      }
+      setScannerFotos(prev => [...prev, src]);
     }
   };
 
-  const buildWhatsAppMessage = (items, hasScannerFoto) => {
+  const buildWhatsAppMessage = (items, nScannerFotos) => {
     const o = selectedOrder;
     const fecha = new Date().toLocaleDateString('es-CO');
     const fmtNum = (n) => Number(n || 0).toLocaleString('es-CO', { minimumFractionDigits: 0 });
@@ -315,8 +320,8 @@ export default function TechnicianView() {
       msg += `\n`;
     }
 
-    if (hasScannerFoto) {
-      msg += `*ESCANER:* foto de los codigos de averia adjunta en el informe
+    if (nScannerFotos > 0) {
+      msg += `*ESCANER:* ${nScannerFotos} foto${nScannerFotos > 1 ? 's' : ''} de los codigos de averia adjunta${nScannerFotos > 1 ? 's' : ''} en el informe
 
 `;
     }
@@ -349,12 +354,12 @@ export default function TechnicianView() {
       .filter(it => it.foto)
       .map(it => ({ src: it.foto, descripcion: `${it.item} — ${it.category} (Malo)` }));
     const items = itemsRaw.map(({ foto, ...rest }) => rest);
-    const fotoEscaner = scannerFoto
-      ? { src: scannerFoto, descripcion: 'Escáner — códigos de avería', tipo: 'escaner' }
-      : null;
+    const fotosEscaner = scannerFotos.map((src, i) => ({
+      src, descripcion: `Escáner — códigos de avería${scannerFotos.length > 1 ? ` (${i + 1} de ${scannerFotos.length})` : ''}`, tipo: 'escaner'
+    }));
 
     // Abrir WhatsApp ANTES del await para evitar bloqueo de popup del navegador
-    const mensaje = buildWhatsAppMessage(items, !!fotoEscaner);
+    const mensaje = buildWhatsAppMessage(items, fotosEscaner.length);
     const waUrl = `https://wa.me/573014697942?text=${encodeURIComponent(mensaje)}`;
     window.open(waUrl, '_blank');
 
@@ -366,19 +371,19 @@ export default function TechnicianView() {
       fecha: new Date().toISOString()
     };
     try {
-      if (fotosHallazgos.length > 0 || fotoEscaner) {
+      if (fotosHallazgos.length > 0 || fotosEscaner.length > 0) {
         const orderRes = await fetch(`${API_URL}/orders/${selectedOrder.id}`);
         if (!orderRes.ok) throw new Error('No se pudo leer la orden para guardar las fotos');
         const orderActual = await orderRes.json();
-        // La foto del escáner es única: la nueva reemplaza a la anterior en vez de acumularse.
-        const fotosActuales = (orderActual.fotos || []).filter(f => !(fotoEscaner && f?.tipo === 'escaner'));
+        // Las fotos del escáner de este envío reemplazan a las del envío anterior (el formulario trae el juego completo), en vez de acumularse.
+        const fotosActuales = (orderActual.fotos || []).filter(f => !(fotosEscaner.length > 0 && f?.tipo === 'escaner'));
         // Antes esta petición no se revisaba: si el servidor la rechazaba
         // (payload muy grande, conexión mala), el reporte seguía y mostraba
         // "éxito" aunque las fotos nunca quedaran guardadas en la orden.
         const fotosRes = await fetch(`${API_URL}/orders/${selectedOrder.id}`, {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ fotos: [...fotosActuales, ...(fotoEscaner ? [fotoEscaner] : []), ...fotosHallazgos] })
+          body: JSON.stringify({ fotos: [...fotosActuales, ...fotosEscaner, ...fotosHallazgos] })
         });
         if (!fotosRes.ok) throw new Error('El servidor rechazó el guardado de las fotos');
       }
@@ -409,7 +414,7 @@ export default function TechnicianView() {
       setTimeout(() => {
         setSelectedOrder(null);
         setReportData({});
-        setScannerFoto(null);
+        setScannerFotos([]);
         setStatusMsg({ text: '', type: '' });
         fetchOrders();
       }, 2000);
@@ -614,22 +619,25 @@ export default function TechnicianView() {
             <div className="card" style={{ padding: '1rem' }}>
               <h3 className="section-title" style={{ fontSize: '0.8rem' }}>Escáner — códigos de avería</h3>
               <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: '0.75rem' }}>
-                Toma una foto clara de la pantalla del escáner donde se vean los códigos.
+                Toma las fotos que necesites de la pantalla del escáner donde se vean los códigos.
               </p>
-              {scannerFoto ? (
-                <div style={{ position: 'relative' }}>
-                  <img src={scannerFoto} alt="foto del escáner" style={{ width: '100%', maxHeight: 320, objectFit: 'contain', borderRadius: 10, border: '1px solid var(--border)', background: '#000', display: 'block' }} />
-                  <button type="button" onClick={() => setScannerFoto(null)}
-                    style={{ position: 'absolute', top: 8, right: 8, background: 'var(--error)', border: 'none', borderRadius: '50%', width: 28, height: 28, color: 'white', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                    <X size={16} />
-                  </button>
+              {scannerFotos.length > 0 && (
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: '0.6rem', marginBottom: '0.75rem' }}>
+                  {scannerFotos.map((src, i) => (
+                    <div key={i} style={{ position: 'relative' }}>
+                      <img src={src} alt={`foto del escáner ${i + 1}`} style={{ width: '100%', height: 120, objectFit: 'contain', borderRadius: 10, border: '1px solid var(--border)', background: '#000', display: 'block' }} />
+                      <button type="button" onClick={() => setScannerFotos(prev => prev.filter((_, j) => j !== i))}
+                        style={{ position: 'absolute', top: 4, right: 4, background: 'var(--error)', border: 'none', borderRadius: '50%', width: 24, height: 24, color: 'white', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                        <X size={14} />
+                      </button>
+                    </div>
+                  ))}
                 </div>
-              ) : (
-                <label style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem', padding: '1rem', border: '1.5px dashed var(--primary)', borderRadius: 10, color: 'var(--primary)', fontWeight: 700, cursor: 'pointer' }}>
-                  <Camera size={18} /> Tomar foto del escáner
-                  <input type="file" accept="image/*" capture="environment" style={{ display: 'none' }} onChange={e => { handleScannerPhoto(e.target.files?.[0]); e.target.value = ''; }} />
-                </label>
               )}
+              <label style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem', padding: '1rem', border: '1.5px dashed var(--primary)', borderRadius: 10, color: 'var(--primary)', fontWeight: 700, cursor: 'pointer' }}>
+                <Camera size={18} /> {scannerFotos.length > 0 ? 'Agregar otra foto del escáner' : 'Tomar foto del escáner'}
+                <input type="file" accept="image/*" capture="environment" multiple style={{ display: 'none' }} onChange={e => { handleScannerPhoto(e.target.files); e.target.value = ''; }} />
+              </label>
             </div>
 
             <button className="btn-success" style={{ width: '100%', padding: '1rem', fontSize: '1.1rem', fontWeight: 900, marginTop: '1.5rem', borderRadius: 12, display: 'block' }} onClick={submitReport}>SUBIR REVISIÓN</button>
