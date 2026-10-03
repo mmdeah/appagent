@@ -44,6 +44,7 @@ export default function TechnicianView() {
   const [orders, setOrders] = useState([]);
   const [selectedOrder, setSelectedOrder] = useState(null);
   const [reportData, setReportData] = useState({});
+  const [showScannerAlert, setShowScannerAlert] = useState(false);
   const [scannerFotos, setScannerFotos] = useState([]); // fotos del escáner con los códigos de avería (una o varias)
   const [statusMsg, setStatusMsg] = useState({ text: '', type: '' });
   const [loading, setLoading] = useState(true);
@@ -339,6 +340,14 @@ export default function TechnicianView() {
   };
 
   const submitReport = async () => {
+    // El reporte no se puede subir sin foto del escáner — ni en esta
+    // revisión ni ya guardada en la orden de un envío anterior. Se valida
+    // antes de abrir WhatsApp o tocar el servidor.
+    const yaTieneEscaner = (selectedOrder?.fotos || []).some(f => f?.tipo === 'escaner');
+    if (scannerFotos.length === 0 && !yaTieneEscaner) {
+      setShowScannerAlert(true);
+      return;
+    }
     // Cualquier ítem de Insumos/Servicios Especializados solo llega a reportData
     // marcado por el técnico (el checkbox); nunca debe subirse con estado vacío —
     // si así queda, se ve como "NULL" en el reporte y además transferToQuote() en
@@ -717,6 +726,20 @@ export default function TechnicianView() {
       )}
 
       {showPhotoUpload && <PhotoUploadModal onClose={() => setShowPhotoUpload(false)} onSuccess={() => {}} />}
+      {showScannerAlert && (
+        <div className="modal-overlay" style={{ zIndex: 1200 }}>
+          <div className="modal-box" style={{ maxWidth: 420, textAlign: 'center' }}>
+            <div style={{ width: 64, height: 64, borderRadius: '50%', background: 'rgba(245,158,11,0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 1rem' }}>
+              <AlertTriangle size={32} color="var(--warning)" />
+            </div>
+            <h2 style={{ fontSize: '1.4rem', fontWeight: 900, marginBottom: '0.6rem' }}>Falta la foto del escáner</h2>
+            <p style={{ color: 'var(--text-muted)', fontSize: '1rem', lineHeight: 1.5, marginBottom: '1.5rem' }}>
+              No puedes subir el reporte sin adjuntar al menos una foto del escáner con los códigos de avería. Tómala en la sección <strong>"Escáner — códigos de avería"</strong> al final del formulario y vuelve a intentar.
+            </p>
+            <button className="btn-primary" style={{ width: '100%', justifyContent: 'center', padding: '0.9rem', fontWeight: 800 }} onClick={() => setShowScannerAlert(false)}>Entendido</button>
+          </div>
+        </div>
+      )}
       {showChecklist && (
         <div className="modal-overlay">
           <div className="modal-box" style={{ maxWidth: 450, textAlign: 'center' }}>
