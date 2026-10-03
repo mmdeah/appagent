@@ -118,6 +118,63 @@ export default function TechnicianView() {
     fetchConfig();
   }, []);
 
+  // ── Borrador automático de la revisión ──────────────────────────────────
+  // Lo que el técnico va llenando se guarda en el propio dispositivo (por
+  // orden) mientras escribe, así si la app se recarga, se cierra o el celular
+  // mata la pestaña, al volver a abrir esa orden —o al reabrir la app— todo
+  // sigue ahí. Se borra solo cuando el reporte se envía con éxito.
+  const draftKey = (id) => `revision_draft_${id}`;
+  const ACTIVE_KEY = 'revision_active_order';
+  const emptyScanner = () => [{ prefix: 'P', code: '', description: '' }];
+
+  const openOrder = (o) => {
+    let draft = null;
+    try { draft = JSON.parse(localStorage.getItem(draftKey(o.id)) || 'null'); } catch { /* borrador dañado: se ignora */ }
+    setReportData(draft?.reportData || {});
+    setScannerCodes(draft?.scannerCodes?.length ? draft.scannerCodes : emptyScanner());
+    setPrecioDiagnostico(draft?.precioDiagnostico || '');
+    setPendingPriority(null);
+    setSelectedOrder(o);
+    try { localStorage.setItem(ACTIVE_KEY, String(o.id)); } catch { /* sin espacio/bloqueado */ }
+  };
+
+  const closeOrder = () => {
+    setSelectedOrder(null);
+    try { localStorage.removeItem(ACTIVE_KEY); } catch { /* nada */ }
+  };
+
+  const clearDraft = (id) => {
+    try {
+      localStorage.removeItem(draftKey(id));
+      localStorage.removeItem(ACTIVE_KEY);
+    } catch { /* nada */ }
+  };
+
+  useEffect(() => {
+    if (!selectedOrder) return;
+    const hasData = Object.keys(reportData).length > 0
+      || scannerCodes.some(c => c.code || c.description)
+      || precioDiagnostico;
+    if (!hasData) return;
+    try {
+      localStorage.setItem(draftKey(selectedOrder.id), JSON.stringify({ reportData, scannerCodes, precioDiagnostico, savedAt: Date.now() }));
+    } catch (e) {
+      console.warn('No se pudo guardar el borrador de la revisión', e);
+    }
+  }, [selectedOrder, reportData, scannerCodes, precioDiagnostico]);
+
+  // Si la app se recargó con una revisión a medias, reabre esa orden sola
+  // apenas cargue la lista de vehículos (una sola vez).
+  const resumedRef = useRef(false);
+  useEffect(() => {
+    if (resumedRef.current || loading || orders.length === 0) return;
+    resumedRef.current = true;
+    let id = null;
+    try { id = localStorage.getItem(ACTIVE_KEY); } catch { /* nada */ }
+    const o = id && orders.find(x => String(x.id) === id);
+    if (o) openOrder(o);
+  }, [loading, orders]);
+
   const handleItemStateChange = (category, item, state, prioridad) => {
     if (state === 'Malo' && !prioridad) {
       setPendingPriority({ category, item });
@@ -329,19 +386,20 @@ export default function TechnicianView() {
         ? existingReports.sort((a, b) => new Date(b.fecha) - new Date(a.fecha))[0]
         : null;
 
-      if (existing) {
-        await fetch(`${API_URL}/reports/${existing.id}`, {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ ...payload, id: existing.id })
-        });
-      } else {
-        await fetch(`${API_URL}/reports`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(payload)
-        });
-      }
+      // Solo se borra el borrador local si el servidor confirmó el guardado.
+      const reportRes = existing
+        ? await fetch(`${API_URL}/reports/${existing.id}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ ...payload, id: existing.id })
+          })
+        : await fetch(`${API_URL}/reports`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+          });
+      if (!reportRes.ok) throw new Error('El servidor rechazó el reporte');
+      clearDraft(selectedOrder.id);
       setStatusMsg({ text: '✓ Reporte subido — revisa WhatsApp', type: 'success' });
       setTimeout(() => {
         setSelectedOrder(null);
@@ -387,7 +445,7 @@ export default function TechnicianView() {
       {selectedOrder ? (
         <div style={{ paddingBottom: '2rem' }}>
           <div className="tech-header">
-            <button className="btn-secondary" onClick={() => setSelectedOrder(null)} style={{ padding: '0.4rem 0.8rem', fontSize: '0.95rem' }}>
+            <button className="btn-secondary" onClick={closeOrder} style={{ padding: '0.4rem 0.8rem', fontSize: '0.95rem' }}>
               <ArrowLeft size={16} /> Volver
             </button>
             <div style={{ textAlign: 'center' }}>
@@ -613,7 +671,7 @@ export default function TechnicianView() {
                   {activeOrders.map(o => (
                     <div key={o.id} className="card" style={{ padding: '1.25rem', borderLeft: '4px solid var(--primary)' }}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '0.75rem' }}>
-                        <div style={{ cursor: 'pointer' }} onClick={() => setSelectedOrder(o)}>
+                        <div style={{ cursor: 'pointer' }} onClick={() => openOrder(o)}>
                           <div style={{ fontSize: '1.45rem', fontWeight: 900, lineHeight: 1 }}>{o.placa}</div>
                           <div style={{ fontSize: '0.95rem', color: 'var(--text-muted)', fontWeight: 600 }}>{o.marca} {o.modelo}</div>
                           {getPicoYPlaca(o.placa) && <div style={{ fontSize: '0.85rem', color: '#f59e0b', fontWeight: 800, marginTop: '0.2rem' }}>⚠️ {getPicoYPlaca(o.placa)}</div>}
@@ -621,7 +679,7 @@ export default function TechnicianView() {
                         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '0.4rem' }}>
                           <div style={{ background: 'var(--primary)', color: 'white', padding: '0.3rem 0.6rem', borderRadius: 6, fontWeight: 900, fontSize: '0.85rem' }}>{o.kilometraje ? `${fmt(o.kilometraje)} KM` : 'S/K'}</div>
                           <div style={{ display: 'flex', gap: '0.4rem' }}>
-                            <button className="btn-secondary" onClick={() => setSelectedOrder(o)} style={{ padding: '0.3rem 0.6rem', fontSize: '0.85rem', fontWeight: 800 }}>Reportar</button>
+                            <button className="btn-secondary" onClick={() => openOrder(o)} style={{ padding: '0.3rem 0.6rem', fontSize: '0.85rem', fontWeight: 800 }}>Reportar</button>
                             <button className="btn-success" onClick={() => setShowChecklist(o.id)} style={{ padding: '0.3rem 0.6rem', fontSize: '0.85rem', fontWeight: 800 }}>Terminar</button>
                           </div>
                         </div>
