@@ -122,6 +122,82 @@ export default function OrderDetailsModal({ order, onClose, fleetMode = false, i
   const [statusMsg, setStatusMsg] = useState({ text: '', type: '' });
   const [showConfirm, setShowConfirm] = useState(false);
   const [lightboxSrc, setLightboxSrc] = useState(null);
+
+  // Fotos de la orden (las del técnico en la revisión, incluida la del
+  // escáner, y las de ingreso): el admin puede borrar o cambiar cada una.
+  // Estado local porque `order` es una prop que se muta sin re-render.
+  const [fotos, setFotos] = useState(order.fotos || []);
+  const [fotoBusy, setFotoBusy] = useState(false);
+  const replaceFotoIdx = useRef(null);
+  const replaceInputRef = useRef(null);
+
+  const persistFotos = async (next) => {
+    setFotoBusy(true);
+    try {
+      const res = await fetch(`${API_URL}/orders/${order.id}`, {
+        method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ fotos: next })
+      });
+      if (!res.ok) throw new Error('El servidor rechazó el cambio');
+      setFotos(next);
+      Object.assign(order, { fotos: next });
+      onUpdate && onUpdate();
+      return true;
+    } catch (e) {
+      console.error(e);
+      showStatus('No se pudo guardar el cambio de fotos. Revisa tu conexión e intenta de nuevo.', 'error');
+      return false;
+    } finally {
+      setFotoBusy(false);
+    }
+  };
+
+  const deleteFoto = async (i) => {
+    if (!window.confirm('¿Borrar esta foto de la orden? No se puede deshacer.')) return;
+    if (await persistFotos(fotos.filter((_, j) => j !== i))) showStatus('Foto eliminada');
+  };
+
+  // Las fotos de cámara pesan varios MB: se reducen antes de guardarlas
+  // (la del escáner con más resolución para que los códigos se lean).
+  const compressFoto = (file, maxDim, quality) => new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = ev => {
+      const img = new Image();
+      img.onload = () => {
+        let { width, height } = img;
+        if (width > maxDim || height > maxDim) {
+          if (width >= height) { height = Math.round(height * maxDim / width); width = maxDim; }
+          else { width = Math.round(width * maxDim / height); height = maxDim; }
+        }
+        const canvas = document.createElement('canvas');
+        canvas.width = width; canvas.height = height;
+        canvas.getContext('2d').drawImage(img, 0, 0, width, height);
+        resolve(canvas.toDataURL('image/jpeg', quality));
+      };
+      img.onerror = reject;
+      img.src = ev.target.result;
+    };
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+
+  const replaceFoto = async (file) => {
+    const i = replaceFotoIdx.current;
+    if (!file || i == null) return;
+    const old = fotos[i];
+    const esEscaner = typeof old === 'object' && old?.tipo === 'escaner';
+    let src;
+    try {
+      src = esEscaner ? await compressFoto(file, 1800, 0.82) : await compressFoto(file, 1280, 0.72);
+    } catch {
+      showStatus('No se pudo leer esa imagen.', 'error');
+      return;
+    }
+    // Se conserva la descripción y el tipo de la foto original; las fotos
+    // antiguas (string suelto) siguen siendo string.
+    const nueva = typeof old === 'string' ? src : { ...old, src };
+    if (await persistFotos(fotos.map((f, j) => j === i ? nueva : f))) showStatus('Foto cambiada');
+  };
   const [metodoPago, setMetodoPago] = useState('Efectivo');
   const [notasEntrega, setNotasEntrega] = useState(order.notasEntrega || '');
   const [isEditingInfo, setIsEditingInfo] = useState(false);
@@ -475,7 +551,7 @@ export default function OrderDetailsModal({ order, onClose, fleetMode = false, i
         // Malo). Antes se filtraban las que no tenían descripción (fotos de
         // recepción u otras subidas sueltas), y esas simplemente no
         // aparecían nunca en el PDF descargado.
-        const todasLasFotos = order.fotos || [];
+        const todasLasFotos = fotos;
         if (todasLasFotos.length === 0) return '';
         // La foto del escáner (códigos de avería) va aparte y a ancho completo
         // para que los códigos se lean bien; el resto, en la cuadrícula chica.
@@ -999,16 +1075,31 @@ export default function OrderDetailsModal({ order, onClose, fleetMode = false, i
               </div>
 
               {/* Fotos de ingreso */}
-              {order.fotos?.length > 0 && (
+              {fotos.length > 0 && (
                 <>
-                  <p className="section-title"><Camera size={12} style={{ display: 'inline', marginRight: 4 }} />Fotos de Ingreso</p>
+                  <p className="section-title"><Camera size={12} style={{ display: 'inline', marginRight: 4 }} />Fotos de la Orden</p>
+                  <input type="file" accept="image/*" ref={replaceInputRef} style={{ display: 'none' }}
+                    onChange={e => { replaceFoto(e.target.files?.[0]); e.target.value = ''; }} />
                   <div className="img-grid" style={{ marginBottom: '1.5rem', gridTemplateColumns: 'repeat(auto-fill, minmax(120px, 1fr))' }}>
-                    {order.fotos.map((f, i) => (
+                    {fotos.map((f, i) => (
                       <div key={i}>
-                        <img src={fotoSrc(f)} className="img-thumb" alt={`ingreso-${i}`}
+                        <img src={fotoSrc(f)} className="img-thumb" alt={`foto-${i}`}
                           onClick={() => setLightboxSrc(fotoSrc(f))}
                           title={fotoDesc(f) || 'Clic para ver en grande'} />
                         {fotoDesc(f) && <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginTop: '0.25rem', textAlign: 'center' }}>{fotoDesc(f)}</div>}
+                        {!fleetMode && (
+                          <div className="hide-on-print" style={{ display: 'flex', gap: '0.3rem', justifyContent: 'center', marginTop: '0.3rem' }}>
+                            <button type="button" disabled={fotoBusy} title="Cambiar esta foto"
+                              onClick={() => { replaceFotoIdx.current = i; replaceInputRef.current?.click(); }}
+                              style={{ background: 'none', border: '1px solid var(--border)', borderRadius: 6, padding: '0.2rem 0.45rem', cursor: 'pointer', color: 'var(--text-muted)', fontSize: '0.72rem', display: 'inline-flex', alignItems: 'center', gap: '0.2rem' }}>
+                              <Camera size={11} /> Cambiar
+                            </button>
+                            <button type="button" disabled={fotoBusy} title="Borrar esta foto" onClick={() => deleteFoto(i)}
+                              style={{ background: 'none', border: '1px solid rgba(239,68,68,0.4)', borderRadius: 6, padding: '0.2rem 0.45rem', cursor: 'pointer', color: '#ef4444', fontSize: '0.72rem', display: 'inline-flex', alignItems: 'center' }}>
+                              <Trash2 size={11} />
+                            </button>
+                          </div>
+                        )}
                       </div>
                     ))}
                   </div>
