@@ -2,10 +2,8 @@ import React, { useState, useEffect, useContext, useRef } from 'react';
 import { API_URL, BACKEND_URL, getPicoYPlaca } from '../api';
 import OrderDetailsModal from './OrderDetailsModal';
 import PhotoUploadModal from './PhotoUploadModal';
-import CitaModal, { SERVICIOS } from './CitaModal';
-import RecordatoriosModal from './RecordatoriosModal';
 import { ThemeContext } from '../App';
-import { PlusCircle, BarChart3, Camera, X, Car, Trash2, Zap, LayoutDashboard, History, Receipt, CheckCircle, AlertTriangle, ClipboardList, Save, Settings, FileText, Plus, Sparkles, CreditCard, Clock, BadgeCheck, Ban, Search, ChevronDown, Calendar, MessageCircle, Pencil } from 'lucide-react';
+import { PlusCircle, BarChart3, Camera, X, Car, Trash2, Zap, LayoutDashboard, History, Receipt, CheckCircle, AlertTriangle, ClipboardList, Save, Settings, FileText, Plus, Sparkles, CreditCard, Clock, BadgeCheck, Ban, Search, ChevronDown, MessageCircle, Pencil } from 'lucide-react';
 import BillingCycleTab from './BillingCycleTab';
 import { getQuoteSlot, getRealQuoteTotal, getRealQuoteIva } from '../quoteUtils';
 
@@ -67,10 +65,6 @@ export default function AdminView() {
   const [draggedOrderId, setDraggedOrderId] = useState(null);
   const [dragOverCol, setDragOverCol] = useState(null);
   const [todos, setTodos] = useState([]);
-  const [citas, setCitas] = useState([]);
-  const [citasMonth, setCitasMonth] = useState(() => { const n = new Date(); return new Date(n.getFullYear(), n.getMonth(), 1); });
-  const [showCitaModal, setShowCitaModal] = useState(null); // null | {mode:'create', fecha} | {mode:'edit', cita}
-  const [showRecordatorios, setShowRecordatorios] = useState(false);
   const [showPriceSearch, setShowPriceSearch] = useState(false);
   const [priceSearchForm, setPriceSearchForm] = useState({ marca: '', modelo: '', anio: '', repuesto: '' });
   const [newTodo, setNewTodo] = useState('');
@@ -290,21 +284,6 @@ export default function AdminView() {
     } catch (e) { console.error(e); }
   };
 
-  const fetchCitas = async () => {
-    try {
-      const res = await fetch(`${API_URL}/citas`);
-      if (res.status === 404) {
-        setCitas([]);
-        return;
-      }
-      const data = await res.json();
-      setCitas(Array.isArray(data) ? data : []);
-    } catch (e) {
-      console.error(e);
-      setCitas([]);
-    }
-  };
-
   const fetchOrders = async () => {
     try {
       const res = await fetch(`${API_URL}/orders?_embed=reports&_embed=quotes`);
@@ -365,7 +344,7 @@ export default function AdminView() {
     }
   };
 
-  useEffect(() => { fetchOrders(); fetchExpenses(); fetchTodos(); fetchConfig(); fetchAldBillings(); fetchCnBillings(); fetchLaAscensionBillings(); fetchFleetUsers(); fetchCitas(); }, []);
+  useEffect(() => { fetchOrders(); fetchExpenses(); fetchTodos(); fetchConfig(); fetchAldBillings(); fetchCnBillings(); fetchLaAscensionBillings(); fetchFleetUsers(); }, []);
   useEffect(() => {
     const handler = (e) => { if (navRef.current && !navRef.current.contains(e.target)) setOpenMenu(null); };
     document.addEventListener('mousedown', handler);
@@ -422,25 +401,6 @@ export default function AdminView() {
       reader.onload = ev => res(ev.target.result);
       reader.readAsDataURL(f);
     }))).then(results => setPhotos(prev => [...prev, ...results]));
-  };
-
-  const handleIngresarDesdeCita = (cita) => {
-    // El campo "vehiculo" de la cita es un texto libre (Ej. "Mazda 3"); se separa
-    // en marca/modelo por la primera palabra como punto de partida, el admin
-    // completa/corrige el resto en el formulario de ingreso.
-    const [marca, ...resto] = (cita.vehiculo || '').split(' ');
-    setForm({
-      ...emptyForm,
-      placa: cita.placa || '',
-      cliente: cita.nombre || '',
-      telefono: cita.telefono || '',
-      marca: marca || '',
-      modelo: resto.join(' '),
-      servicios: SERVICIOS[cita.servicio]?.label || cita.servicio || '',
-      notas: cita.notas || '',
-    });
-    setShowCitaModal(null);
-    setShowNewOrder(true);
   };
 
   const handleCreateOrder = async (e) => {
@@ -971,22 +931,6 @@ export default function AdminView() {
                     <Receipt size={15} />
                     Gastos
                   </button>
-                  <button
-                    onClick={() => { setActiveTab('Citas'); setOpenMenu(null); }}
-                    style={{
-                      display: 'flex', alignItems: 'center', gap: '0.4rem',
-                      padding: '0.45rem 0.9rem',
-                      background: activeTab === 'Citas' ? 'var(--primary)' : 'transparent',
-                      color: activeTab === 'Citas' ? 'white' : 'var(--text-muted)',
-                      border: activeTab === 'Citas' ? 'none' : '1px solid transparent',
-                      borderRadius: 'var(--radius-sm)', cursor: 'pointer',
-                      fontWeight: 700, fontSize: '0.88rem', transition: 'all 0.15s',
-                      whiteSpace: 'nowrap',
-                    }}>
-                    <Calendar size={15} />
-                    Calendario de Citas
-                  </button>
-
                   {activeTab === 'Kanban' && (
                     <div style={{ display: 'flex', gap: '0.5rem', marginLeft: 'auto', flexWrap: 'wrap' }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', background: corteBg, border: `1px solid ${corteColor}`, borderRadius: 999, padding: '0.35rem 0.85rem', fontSize: '0.82rem', whiteSpace: 'nowrap' }}>
@@ -1094,84 +1038,6 @@ export default function AdminView() {
                 ))}
               </div>
               </>);
-            })()}
-
-            {activeTab === 'Citas' && (() => {
-              const year = citasMonth.getFullYear();
-              const month = citasMonth.getMonth();
-              const startOffset = (new Date(year, month, 1).getDay() + 6) % 7; // lunes=0 ... domingo=6
-              const daysInMonth = new Date(year, month + 1, 0).getDate();
-              const hoy = new Date();
-              // Fecha local (no toISOString, que es UTC y en Colombia -horario UTC-5-
-              // salta al día siguiente desde las 7pm), para que "Hoy" y el resaltado
-              // del día coincidan con la fecha real del usuario.
-              const todayStr = `${hoy.getFullYear()}-${String(hoy.getMonth() + 1).padStart(2, '0')}-${String(hoy.getDate()).padStart(2, '0')}`;
-              const MESES_LARGO = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
-
-              const citasPorFecha = {};
-              citas.forEach(c => {
-                if (!citasPorFecha[c.fecha]) citasPorFecha[c.fecha] = [];
-                citasPorFecha[c.fecha].push(c);
-              });
-
-              const celdas = [];
-              for (let i = 0; i < startOffset; i++) celdas.push(null);
-              for (let d = 1; d <= daysInMonth; d++) celdas.push(d);
-
-              return (
-                <div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem', flexWrap: 'wrap', gap: '0.75rem' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-                      <button className="btn-secondary" onClick={() => setCitasMonth(new Date(year, month - 1, 1))}>‹</button>
-                      <span style={{ fontWeight: 700, fontSize: '1.1rem', minWidth: 160, textAlign: 'center' }}>{MESES_LARGO[month]} {year}</span>
-                      <button className="btn-secondary" onClick={() => setCitasMonth(new Date(year, month + 1, 1))}>›</button>
-                      <button className="btn-secondary" onClick={() => setCitasMonth(new Date(new Date().getFullYear(), new Date().getMonth(), 1))}>Hoy</button>
-                    </div>
-                    <div style={{ display: 'flex', gap: '0.75rem' }}>
-                      <button className="btn-secondary" onClick={() => setShowRecordatorios(true)}>
-                        <MessageCircle size={16} /> Recordatorios
-                      </button>
-                      <button className="btn-primary" onClick={() => setShowCitaModal({ mode: 'create', fecha: todayStr })}>
-                        <Plus size={16} /> Nueva Cita
-                      </button>
-                    </div>
-                  </div>
-
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: '0.4rem', marginBottom: '0.5rem' }}>
-                    {['Lun','Mar','Mié','Jue','Vie','Sáb','Dom'].map(d => (
-                      <div key={d} style={{ textAlign: 'center', fontSize: '0.78rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase' }}>{d}</div>
-                    ))}
-                  </div>
-
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: '0.4rem' }}>
-                    {celdas.map((d, i) => {
-                      if (d === null) return <div key={`pad-${i}`} />;
-                      const fecha = `${year}-${String(month + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
-                      const citasDia = (citasPorFecha[fecha] || []).slice().sort((a, b) => (a.hora || '').localeCompare(b.hora || ''));
-                      const isToday = fecha === todayStr;
-                      return (
-                        <div key={fecha}
-                          onClick={() => setShowCitaModal({ mode: 'create', fecha })}
-                          style={{ minHeight: 92, border: `1px solid ${isToday ? 'var(--primary)' : 'var(--border)'}`, borderRadius: 8, padding: '0.4rem', cursor: 'pointer', background: 'var(--bg-card)' }}>
-                          <div style={{ fontSize: '0.8rem', fontWeight: isToday ? 800 : 600, color: isToday ? 'var(--primary)' : 'var(--text)', marginBottom: '0.3rem' }}>{d}</div>
-                          {citasDia.slice(0, 3).map(c => (
-                            <div key={c.id}
-                              onClick={e => { e.stopPropagation(); setShowCitaModal({ mode: 'edit', cita: c }); }}
-                              title={`${c.nombre} — ${SERVICIOS[c.servicio]?.label || c.servicio}`}
-                              style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', fontSize: '0.72rem', marginBottom: '0.2rem', padding: '0.15rem 0.3rem', borderRadius: 4, background: 'var(--bg)', cursor: 'pointer' }}>
-                              <span style={{ width: 7, height: 7, borderRadius: '50%', background: SERVICIOS[c.servicio]?.hex || '#94a3b8', flexShrink: 0 }} />
-                              <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.placa} {c.hora}</span>
-                            </div>
-                          ))}
-                          {citasDia.length > 3 && (
-                            <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', fontWeight: 600 }}>+{citasDia.length - 3} más</div>
-                          )}
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-              );
             })()}
 
             {activeTab === 'Historial' && (() => {
@@ -2824,21 +2690,6 @@ ${PAYMENT_METHODS.map(m => `<tr><td>${m}</td><td style="text-align:right;font-we
 
       {showPhotoUpload && (
         <PhotoUploadModal onClose={() => setShowPhotoUpload(false)} onSuccess={fetchOrders} />
-      )}
-
-      {showCitaModal && (
-        <CitaModal
-          mode={showCitaModal.mode}
-          cita={showCitaModal.cita}
-          initialFecha={showCitaModal.fecha}
-          onClose={() => setShowCitaModal(null)}
-          onSuccess={fetchCitas}
-          onIngresar={handleIngresarDesdeCita}
-        />
-      )}
-
-      {showRecordatorios && (
-        <RecordatoriosModal citas={citas} onClose={() => setShowRecordatorios(false)} onRefresh={fetchCitas} />
       )}
 
       {showPriceSearch && (() => {
