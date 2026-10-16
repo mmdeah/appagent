@@ -767,6 +767,25 @@ export default function OrderDetailsModal({ order, onClose, fleetMode = false, i
   const calcEstimados = (todas) => {
     const norm = (t) => (t || '').toString().toLowerCase().trim().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
     const placa = norm(order.placa), marca = norm(order.marca), modelo = norm(order.modelo);
+
+    // Cruce por palabras (no por texto exacto): "Pastillas Del." coincide con
+    // "Pastillas delanteras", "pastillas de freno delanteras", "Repuesto:
+    // Pastillas Del."... Se normalizan abreviaturas (del/tras/izq/der), se
+    // ignoran artículos y se comparan las raíces de las palabras (singular/
+    // plural, masculino/femenino). Una descripción coincide si contiene TODAS
+    // las palabras importantes del repuesto buscado.
+    const ABREV = { del: 'delantera', delan: 'delantera', tras: 'trasera', izq: 'izquierda', der: 'derecha' };
+    const VACIAS = new Set(['de', 'la', 'el', 'los', 'las', 'y', 'e', 'en', 'para', 'con', 'un', 'una', 'repuesto', 'repuestos']);
+    const raiz = (w) => w.replace(/[aeiouxs]+$/, '');
+    const palabras = (t) => norm(t).replace(/[^a-z0-9]+/g, ' ').split(' ')
+      .filter(w => w && !VACIAS.has(w))
+      .map(w => raiz(ABREV[w] || w))
+      .filter(w => w.length >= 3 || /\d/.test(w));
+    const mismaPalabra = (a, b) => a === b || (Math.min(a.length, b.length) >= 5 && (a.startsWith(b) || b.startsWith(a)));
+    const contieneTodas = (buscadas, texto) => buscadas.length > 0 && buscadas.every(b => texto.some(t => mismaPalabra(b, t)));
+    // Líneas de mano de obra / reparación / insumos no son precios de repuesto.
+    const esOtroConcepto = (d) => /mano de obra|^reparacion|^insumo|diagnostico/.test(d);
+
     const hist = [];
     (todas || []).forEach(o => {
       if (String(o.id) === String(order.id)) return;
@@ -775,7 +794,7 @@ export default function OrderDetailsModal({ order, onClose, fleetMode = false, i
         (q.items || []).forEach(qi => {
           const precio = parseFloat(qi.precio) || 0;
           const d = norm(qi.descripcion);
-          if (precio > 0 && d.startsWith('repuesto')) hist.push({ o, d, precio, fecha: q.fecha || o.fecha });
+          if (precio > 0 && d && !esOtroConcepto(d)) hist.push({ o, d, palabras: palabras(qi.descripcion), precio, fecha: q.fecha || o.fecha });
         });
       });
     });
@@ -784,8 +803,8 @@ export default function OrderDetailsModal({ order, onClose, fleetMode = false, i
     (reportData?.items || []).forEach((it, idx) => {
       if (!it.requiereRepuesto || it.state === 'Necesario' || it.state === 'Realizar') return;
       if (parseFloat(it.valorRepuesto) > 0) return;
-      const n = norm(it.item);
-      const coinciden = hist.filter(h => n && h.d.includes(n));
+      const buscadas = palabras(it.item);
+      const coinciden = hist.filter(h => contieneTodas(buscadas, h.palabras));
       const niveles = [
         ['Este mismo vehículo', 1, placa ? coinciden.filter(h => norm(h.o.placa) === placa) : []],
         ['Mismo modelo', 2, marca ? coinciden.filter(h => norm(h.o.marca) === marca && norm(h.o.modelo) === modelo) : []],
@@ -1241,7 +1260,7 @@ export default function OrderDetailsModal({ order, onClose, fleetMode = false, i
                   {!estimadosLoading && estimados.length > 0 && (
                     <>
                       <p style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginBottom: '0.6rem' }}>
-                        Valor sugerido = mediana de cotizaciones anteriores del mismo repuesto, redondeada a miles. Marca los que quieres aplicar; después puedes ajustar cada precio a mano.
+                        Valor sugerido = mediana de cotizaciones anteriores con las mismas palabras (ej. "pastillas" + "delanteras"), redondeada a miles. Marca los que quieres aplicar; después puedes ajustar cada precio a mano.
                       </p>
                       <div style={{ display: 'flex', flexDirection: 'column', gap: '0.45rem' }}>
                         {estimados.map(r => (
