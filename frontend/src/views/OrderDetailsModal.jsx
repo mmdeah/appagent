@@ -721,6 +721,15 @@ export default function OrderDetailsModal({ order, onClose, fleetMode = false, i
         </div>
       </div>
 
+      ${mainTitle === 'COTIZACIÓN' && reportData?.reprobarDespues ? `
+      <div style="margin: 0 0 18px; padding: 14px 16px; background: #fef08a; border: 2px solid #eab308; border-left: 8px solid #ca8a04; border-radius: 8px; page-break-inside: avoid;">
+        <div style="font-size: 15px; font-weight: 800; color: #713f12; margin-bottom: 6px;">⚠ IMPORTANTE: SE DEBE VOLVER A PROBAR EL VEHÍCULO</div>
+        <div style="font-size: 13px; color: #422006; line-height: 1.5;">
+          Primero se deben <strong>corregir las fallas</strong> indicadas en esta cotización. Después, el vehículo se <strong>volverá a probar con el escáner</strong> para verificar si aparece alguna falla adicional.
+          Si aparece una nueva falla, <strong>te la informaremos y te la cotizaremos aparte</strong> antes de hacer cualquier trabajo adicional.
+        </div>
+      </div>` : ''}
+
       <div class="section-header">Servicios Cotizados</div>
       <table>
         <thead>
@@ -1386,6 +1395,15 @@ export default function OrderDetailsModal({ order, onClose, fleetMode = false, i
                   </button>
                 )}
               </div>
+
+              {reportData?.reprobarDespues && (
+                <div style={{ marginBottom: '1rem', padding: '0.9rem 1.1rem', background: '#fef08a', border: '2px solid #eab308', borderLeft: '8px solid #ca8a04', borderRadius: 10, color: '#422006' }}>
+                  <div style={{ fontWeight: 800, fontSize: '1rem', color: '#713f12', marginBottom: '0.25rem' }}>⚠ IMPORTANTE: SE DEBE VOLVER A PROBAR EL VEHÍCULO</div>
+                  <div style={{ fontSize: '0.88rem', lineHeight: 1.5 }}>
+                    El técnico indicó que primero se corrigen las fallas y luego se vuelve a probar con el escáner por si aparece alguna adicional. Este aviso sale siempre en el PDF de la cotización y no se puede quitar desde aquí.
+                  </div>
+                </div>
+              )}
 
               {/* Slot 1 = la cotización real (visible para cliente/flota, la que se
                   autoriza y cuenta para facturación). Slot 2 = un borrador privado

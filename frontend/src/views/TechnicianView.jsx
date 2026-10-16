@@ -45,6 +45,7 @@ export default function TechnicianView() {
   const [selectedOrder, setSelectedOrder] = useState(null);
   const [reportData, setReportData] = useState({});
   const [showScannerAlert, setShowScannerAlert] = useState(false);
+  const [reprobar, setReprobar] = useState(false); // corregir primero y volver a probar con el escáner
   const [scannerFotos, setScannerFotos] = useState([]); // fotos del escáner con los códigos de avería (una o varias)
   const [statusMsg, setStatusMsg] = useState({ text: '', type: '' });
   const [loading, setLoading] = useState(true);
@@ -130,6 +131,7 @@ export default function TechnicianView() {
     let draft = null;
     try { draft = JSON.parse(localStorage.getItem(draftKey(o.id)) || 'null'); } catch { /* borrador dañado: se ignora */ }
     setReportData(draft?.reportData || {});
+    setReprobar(!!draft?.reprobar);
     setScannerFotos(draft?.scannerFotos || (draft?.scannerFoto ? [draft.scannerFoto] : []));
     setPendingPriority(null);
     setSelectedOrder(o);
@@ -151,14 +153,15 @@ export default function TechnicianView() {
   useEffect(() => {
     if (!selectedOrder) return;
     const hasData = Object.keys(reportData).length > 0
-      || scannerFotos.length > 0;
+      || scannerFotos.length > 0
+      || reprobar;
     if (!hasData) return;
     try {
-      localStorage.setItem(draftKey(selectedOrder.id), JSON.stringify({ reportData, scannerFotos, savedAt: Date.now() }));
+      localStorage.setItem(draftKey(selectedOrder.id), JSON.stringify({ reportData, scannerFotos, reprobar, savedAt: Date.now() }));
     } catch (e) {
       console.warn('No se pudo guardar el borrador de la revisión', e);
     }
-  }, [selectedOrder, reportData, scannerFotos]);
+  }, [selectedOrder, reportData, scannerFotos, reprobar]);
 
   // Si la app se recargó con una revisión a medias, reabre esa orden sola
   // apenas cargue la lista de vehículos (una sola vez).
@@ -377,6 +380,7 @@ export default function TechnicianView() {
       items,
       scannerCodes: [],
       precioDiagnostico: 0,
+      reprobarDespues: reprobar,
       fecha: new Date().toISOString()
     };
     try {
@@ -424,6 +428,7 @@ export default function TechnicianView() {
         setSelectedOrder(null);
         setReportData({});
         setScannerFotos([]);
+        setReprobar(false);
         setStatusMsg({ text: '', type: '' });
         fetchOrders();
       }, 2000);
@@ -624,6 +629,16 @@ export default function TechnicianView() {
                 })}
               </div>
             ))}
+
+            <label className="card" style={{ padding: '1rem', display: 'flex', alignItems: 'flex-start', gap: '0.75rem', cursor: 'pointer', borderLeft: `4px solid ${reprobar ? '#f59e0b' : 'var(--border)'}`, background: reprobar ? 'rgba(245,158,11,0.08)' : undefined }}>
+              <input type="checkbox" checked={reprobar} onChange={e => setReprobar(e.target.checked)} style={{ width: 22, height: 22, marginTop: 2, flexShrink: 0 }} />
+              <span>
+                <span style={{ display: 'block', fontWeight: 800, fontSize: '1.05rem' }}>Corregir primero y volver a probar el vehículo</span>
+                <span style={{ display: 'block', color: 'var(--text-muted)', fontSize: '0.88rem', marginTop: '0.25rem', lineHeight: 1.4 }}>
+                  Marca esto si las fallas deben repararse antes y luego hay que probar de nuevo el vehículo con el escáner, por si aparece alguna falla adicional. Esto saldrá siempre en la cotización del cliente.
+                </span>
+              </span>
+            </label>
 
             <div className="card" style={{ padding: '1rem' }}>
               <h3 className="section-title" style={{ fontSize: '0.8rem' }}>Escáner — códigos de avería</h3>
