@@ -746,9 +746,102 @@ export default function OrderDetailsModal({ order, onClose, fleetMode = false, i
   };
 
   const handleReportPrice = (idx, field, val) => {
+    if (field === 'valorRepuesto' && estimadoAplicado[idx]) setEstimadoAplicado(prev => { const n = { ...prev }; delete n[idx]; return n; });
     const nr = { ...reportData, items: [...reportData.items] };
     nr.items[idx][field] = val;
     setReportData(nr);
+  };
+
+  // ── Estimados de repuestos desde el historial ──────────────────────────
+  // Para cada repuesto del reporte que aún no tiene precio, busca el mismo
+  // repuesto en cotizaciones anteriores y propone un valor (mediana) y un
+  // rango. Va de lo más parecido a lo más general: este mismo vehículo →
+  // mismo modelo → misma marca → otras marcas. Solo es una sugerencia: nada
+  // se llena hasta que el admin marca cuáles aplicar.
+  const [showEstimados, setShowEstimados] = useState(false);
+  const [estimadosLoading, setEstimadosLoading] = useState(false);
+  const [estimados, setEstimados] = useState([]);
+  const [estimadoSel, setEstimadoSel] = useState({});
+  const [estimadoAplicado, setEstimadoAplicado] = useState({}); // idx -> true: casilla llenada con un estimado
+
+  const calcEstimados = (todas) => {
+    const norm = (t) => (t || '').toString().toLowerCase().trim().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+    const placa = norm(order.placa), marca = norm(order.marca), modelo = norm(order.modelo);
+    const hist = [];
+    (todas || []).forEach(o => {
+      if (String(o.id) === String(order.id)) return;
+      (o.quotes || []).forEach(q => {
+        if (q.slot === 2) return; // el borrador privado no es historial real
+        (q.items || []).forEach(qi => {
+          const precio = parseFloat(qi.precio) || 0;
+          const d = norm(qi.descripcion);
+          if (precio > 0 && d.startsWith('repuesto')) hist.push({ o, d, precio, fecha: q.fecha || o.fecha });
+        });
+      });
+    });
+    const mediana = (arr) => { const a = [...arr].sort((x, y) => x - y); const m = Math.floor(a.length / 2); return a.length % 2 ? a[m] : (a[m - 1] + a[m]) / 2; };
+    const rows = [];
+    (reportData?.items || []).forEach((it, idx) => {
+      if (!it.requiereRepuesto || it.state === 'Necesario' || it.state === 'Realizar') return;
+      if (parseFloat(it.valorRepuesto) > 0) return;
+      const n = norm(it.item);
+      const coinciden = hist.filter(h => n && h.d.includes(n));
+      const niveles = [
+        ['Este mismo vehículo', 1, placa ? coinciden.filter(h => norm(h.o.placa) === placa) : []],
+        ['Mismo modelo', 2, marca ? coinciden.filter(h => norm(h.o.marca) === marca && norm(h.o.modelo) === modelo) : []],
+        ['Misma marca', 3, marca ? coinciden.filter(h => norm(h.o.marca) === marca) : []],
+        ['Otras marcas', 4, coinciden],
+      ];
+      const [origen, nivel, datos] = niveles.find(([, , d]) => d.length > 0) || [null, 0, []];
+      if (!datos.length) { rows.push({ idx, item: it.item, sinDatos: true }); return; }
+      const precios = datos.map(d => d.precio);
+      const fechas = datos.map(d => new Date(d.fecha || 0)).sort((a, b) => b - a);
+      rows.push({
+        idx, item: it.item, origen, nivel, n: datos.length,
+        sugerido: Math.round(mediana(precios) / 1000) * 1000,
+        min: Math.min(...precios), max: Math.max(...precios),
+        ultima: fechas[0] && fechas[0].getTime() ? fechas[0] : null,
+      });
+    });
+    return rows;
+  };
+
+  const openEstimados = async () => {
+    setShowEstimados(true);
+    let todas = priceLookupOrders;
+    if (todas === null) {
+      setEstimadosLoading(true);
+      try {
+        const res = await fetch(`${API_URL}/orders?_embed=quotes`);
+        const data = await res.json();
+        todas = Array.isArray(data) ? data : [];
+        setPriceLookupOrders(todas);
+      } catch (e) {
+        console.error(e);
+        todas = [];
+      } finally {
+        setEstimadosLoading(false);
+      }
+    }
+    const rows = calcEstimados(todas);
+    setEstimados(rows);
+    // Marcados de entrada solo los del mismo vehículo o modelo; el resto lo decide el admin.
+    setEstimadoSel(Object.fromEntries(rows.filter(r => !r.sinDatos && r.nivel <= 2).map(r => [r.idx, true])));
+  };
+
+  const aplicarEstimados = () => {
+    const nr = { ...reportData, items: [...reportData.items] };
+    const marcados = {};
+    estimados.forEach(r => {
+      if (r.sinDatos || !estimadoSel[r.idx]) return;
+      nr.items[r.idx] = { ...nr.items[r.idx], valorRepuesto: String(r.sugerido) };
+      marcados[r.idx] = true;
+    });
+    if (!Object.keys(marcados).length) return;
+    setReportData(nr);
+    setEstimadoAplicado(prev => ({ ...prev, ...marcados }));
+    setShowEstimados(false);
+    showStatus(`${Object.keys(marcados).length} estimado(s) aplicado(s) — revísalos y guarda los precios`);
   };
 
   const saveReport = async () => {
@@ -1122,11 +1215,62 @@ export default function OrderDetailsModal({ order, onClose, fleetMode = false, i
             <div>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
                 <p className="section-title" style={{ margin: 0 }}>Reporte Técnico del Técnico</p>
-                {!fleetMode && <button className="btn-primary hide-on-print" style={{ fontSize: '0.82rem', padding: '0.4rem 0.9rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}
-                  onClick={() => setShowAddItem(v => !v)}>
-                  <Plus size={14} /> Añadir ítem
-                </button>}
+                {!fleetMode && <div className="hide-on-print" style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+                  <button className="btn-secondary" style={{ fontSize: '0.82rem', padding: '0.4rem 0.9rem', display: 'flex', alignItems: 'center', gap: '0.4rem', borderColor: PRECIO_COLOR.repuesto, color: PRECIO_COLOR.repuesto }}
+                    onClick={openEstimados} title="Busca en el historial los repuestos que aún no tienen precio">
+                    <Search size={14} /> Sugerir estimados
+                  </button>
+                  <button className="btn-primary" style={{ fontSize: '0.82rem', padding: '0.4rem 0.9rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}
+                    onClick={() => setShowAddItem(v => !v)}>
+                    <Plus size={14} /> Añadir ítem
+                  </button>
+                </div>}
               </div>
+
+              {/* Estimados de repuestos (desde el historial) */}
+              {showEstimados && !fleetMode && (
+                <div className="hide-on-print" style={{ marginBottom: '1rem', padding: '1rem', border: `1px solid ${PRECIO_COLOR.repuesto}`, borderRadius: 12, background: 'rgba(245,158,11,0.05)' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.6rem' }}>
+                    <strong style={{ fontSize: '0.95rem' }}>Estimados de repuestos sin precio</strong>
+                    <button onClick={() => setShowEstimados(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)' }}><X size={16} /></button>
+                  </div>
+                  {estimadosLoading && <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>Buscando en el historial...</p>}
+                  {!estimadosLoading && estimados.length === 0 && (
+                    <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>No hay repuestos pendientes de precio en este reporte.</p>
+                  )}
+                  {!estimadosLoading && estimados.length > 0 && (
+                    <>
+                      <p style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginBottom: '0.6rem' }}>
+                        Valor sugerido = mediana de cotizaciones anteriores del mismo repuesto, redondeada a miles. Marca los que quieres aplicar; después puedes ajustar cada precio a mano.
+                      </p>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.45rem' }}>
+                        {estimados.map(r => (
+                          <label key={r.idx} style={{ display: 'flex', alignItems: 'flex-start', gap: '0.6rem', padding: '0.55rem 0.7rem', background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: 10, cursor: r.sinDatos ? 'default' : 'pointer', opacity: r.sinDatos ? 0.65 : 1 }}>
+                            <input type="checkbox" disabled={r.sinDatos} checked={!!estimadoSel[r.idx]} onChange={e => setEstimadoSel(prev => ({ ...prev, [r.idx]: e.target.checked }))} style={{ width: 18, height: 18, marginTop: 2 }} />
+                            <span style={{ flex: 1, minWidth: 0 }}>
+                              <span style={{ fontWeight: 700 }}>{r.item}</span>
+                              {r.sinDatos ? (
+                                <span style={{ display: 'block', fontSize: '0.8rem', color: 'var(--text-muted)' }}>Sin estimado: no hay este repuesto en el historial.</span>
+                              ) : (
+                                <span style={{ display: 'block', fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+                                  {r.origen} · {r.n} trabajo{r.n !== 1 ? 's' : ''}{r.ultima ? ` · último ${r.ultima.toLocaleDateString('es-CO')}` : ''}
+                                  {r.n > 1 ? ` · rango $${fmt(r.min)} – $${fmt(r.max)}` : ''}
+                                  {r.nivel >= 3 && <strong style={{ color: '#d97706' }}> · referencia general</strong>}
+                                </span>
+                              )}
+                            </span>
+                            {!r.sinDatos && <span style={{ fontWeight: 800, color: PRECIO_COLOR.repuesto, whiteSpace: 'nowrap' }}>${fmt(r.sugerido)}</span>}
+                          </label>
+                        ))}
+                      </div>
+                      <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.75rem' }}>
+                        <button className="btn-primary" style={{ fontSize: '0.85rem' }} disabled={!Object.values(estimadoSel).some(Boolean)} onClick={aplicarEstimados}>Aplicar seleccionados</button>
+                        <button className="btn-secondary" style={{ fontSize: '0.85rem' }} onClick={() => setShowEstimados(false)}>Cerrar</button>
+                      </div>
+                    </>
+                  )}
+                </div>
+              )}
 
               {/* Form to add new item */}
               {showAddItem && (
@@ -1273,6 +1417,7 @@ export default function OrderDetailsModal({ order, onClose, fleetMode = false, i
                                     <input type="number" step="any" min="0.1" placeholder="Cant" value={it.cantidadRepuesto || 1} onChange={e => handleReportPrice(idx, 'cantidadRepuesto', parseFloat(e.target.value.replace(',','.'))||1)} style={{ width: 55, fontSize: '0.8rem', padding: '0.4rem' }} />
                                     <input type="text" className="price-input" placeholder="$ Valor" value={it.valorRepuesto ? fmt(it.valorRepuesto) : ''} onChange={e => handleReportPrice(idx, 'valorRepuesto', e.target.value.replace(/\D/g, ''))} style={{ width: 90, fontSize: '0.8rem', padding: '0.4rem', borderLeft: `3px solid ${PRECIO_COLOR.repuesto}` }} />
                                  </div>}
+                                 {!fleetMode && estimadoAplicado[idx] && <span className="hide-on-print" style={{ fontSize: '0.68rem', fontWeight: 700, color: '#d97706' }}>≈ estimado del historial — revísalo</span>}
                                  <span className={fleetMode ? undefined : 'show-on-print'}>
                                     {it.cantidadRepuesto || 1}x {it.valorRepuesto ? `$${fmt(it.valorRepuesto)}` : 'Pendiente'}
                                  </span>
