@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { API_URL, BACKEND_URL } from '../api';
-import { MessageCircle, Printer, CheckCircle, X, Plus, Trash2, Camera, Edit2, Save, FileText, Upload, Download, Search, MoveRight } from 'lucide-react';
+import { Printer, CheckCircle, X, Plus, Trash2, Camera, Edit2, Save, FileText, Upload, Download, Search, MoveRight } from 'lucide-react';
 import { getQuoteSlot } from '../quoteUtils';
 
 const fmt = (n) => (parseFloat(n) || 0).toLocaleString('es-CO', { minimumFractionDigits: 0 });
@@ -440,40 +440,6 @@ export default function OrderDetailsModal({ order, onClose, fleetMode = false, i
         </div>
       </div>
     `;
-  };
-
-  const printInfo = () => {
-    printWindow(`Orden ${order.placa}`, `
-      <div class="header-title">Orden de Servicio</div>
-      
-      <div class="section-header">Información de la Orden</div>
-      <div style="margin-bottom: 24px">
-        <div class="info-row" style="width: 300px"><span>Número de Orden:</span> <span>ORD-${String(order.id).substring(0,8).toUpperCase()}</span></div>
-        <div class="info-row" style="width: 300px"><span>Fecha de Emisión:</span> <span>${new Date().toLocaleDateString('es-CO', { day: 'numeric', month: 'long', year: 'numeric' })}</span></div>
-        <div class="info-row" style="width: 300px"><span>Estado:</span> <span>${order.estado}</span></div>
-      </div>
-
-      <div class="info-grid">
-        <div class="info-block">
-          <h3>Datos del Cliente</h3>
-          <div class="info-row"><span>Nombre:</span> <span>${order.cliente}</span></div>
-          ${order.documento ? `<div class="info-row"><span>CC / NIT:</span> <span>${order.documento}</span></div>` : ''}
-          <div class="info-row"><span>Teléfono:</span> <span>${order.telefono}</span></div>
-          <div class="info-row"><span>Email:</span> <span>${order.correo || 'N/A'}</span></div>
-        </div>
-        <div class="info-block">
-          <h3>Datos del Vehículo</h3>
-          <div class="info-row"><span>Marca/Modelo:</span> <span>${order.marca} ${order.modelo}</span></div>
-          <div class="info-row"><span>Placa:</span> <span>${order.placa}</span></div>
-          <div class="info-row"><span>Año:</span> <span>${order.anio}</span></div>
-          <div class="info-row"><span>Kilometraje:</span> <span>${order.kilometraje ? fmt(order.kilometraje) + ' KM' : 'N/A'}</span></div>
-        </div>
-      </div>
-
-      ${order.servicios ? `<div class="section-header">Servicios Solicitados</div><p style="padding: 12px; background: #f8fafc; border-radius: 8px;">${order.servicios}</p>` : ''}
-      ${order.notas ? `<div class="section-header">Notas Adicionales</div><p style="padding: 12px; background: #fffbeb; border-radius: 8px; color: #92400e;">${order.notas}</p>` : ''}
-      ${renderChecklistHtml(order.checklistFinal)}
-    `);
   };
 
   const printReport = () => {
@@ -1136,18 +1102,6 @@ export default function OrderDetailsModal({ order, onClose, fleetMode = false, i
               )}
 
               {!fleetMode && <div className="hide-on-print" style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap', marginTop: '1.5rem' }}>
-                <a href={`https://wa.me/${order.telefono}?text=Hola%20${encodeURIComponent(order.cliente || '')},%20te%20escribimos%20del%20Taller%20Automotriz%20sobre%20tu%20veh%C3%ADculo%20${order.placa}`}
-                  target="_blank" rel="noreferrer"
-                  className="btn-success" style={{ textDecoration: 'none' }}>
-                  <MessageCircle size={16} /> WhatsApp
-                </a>
-                <button onClick={printInfo} className="btn-secondary"><Printer size={16} /> Imprimir Orden</button>
-                <button onClick={() => printQuote('COTIZACIÓN')} className="btn-secondary">
-                  <Printer size={16} /> Cotización PDF
-                </button>
-                <button onClick={() => printQuote('CUENTA DE COBRO')} className="btn-success" style={{ background: '#3b82f6', borderColor: '#3b82f6' }}>
-                  <Printer size={16} /> Cuenta de Cobro PDF
-                </button>
                 <button onClick={() => setShowConfirm(true)} className="btn-success" style={{ marginLeft: 'auto' }}>
                   <CheckCircle size={16} /> Entregar Vehículo
                 </button>

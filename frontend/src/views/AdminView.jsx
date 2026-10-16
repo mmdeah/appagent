@@ -1037,16 +1037,8 @@ export default function AdminView() {
                           );
                         })()}
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '0.5rem' }}>
-                          <span style={{ fontSize: '0.82rem', color: 'var(--text-muted)' }}>{o.cliente}</span>
-                          <div style={{ display: 'flex', gap: '0.4rem', alignItems: 'center' }}>
-                            <select
-                              value={o.estado}
-                              onClick={e => e.stopPropagation()}
-                              onChange={e => { e.stopPropagation(); moveOrder(o.id, e.target.value); }}
-                              style={{ fontSize: '0.85rem', padding: '0.2rem 0.4rem', width: 'auto', borderRadius: 6 }}>
-                              {COLUMNS.map(c => <option key={c} value={c}>{c}</option>)}
-                              <option value="Entregado">Entregar ✅</option>
-                            </select>
+                          <span title={o.cliente} style={{ fontSize: '0.82rem', color: 'var(--text-muted)', flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', marginRight: '0.5rem' }}>{o.cliente}</span>
+                          <div style={{ display: 'flex', gap: '0.4rem', alignItems: 'center', flexShrink: 0 }}>
                             <button onClick={e => { e.stopPropagation(); deleteOrder(o.id); }} style={{ background: 'none', border: 'none', color: 'var(--error)', cursor: 'pointer', display: 'flex', padding: '0.2rem' }} title="Eliminar orden">
                               <Trash2 size={14} />
                             </button>
