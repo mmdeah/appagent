@@ -525,7 +525,3 @@ body { overflow-x: hidden; }
     max-width: none !important;
   }
 }
-
-/* Encabezado fijo en la tabla del Reporte Técnico: al bajar por la lista larga
-   siguen visibles los nombres de las columnas de precios. */
-.data-table.sticky-head thead th { position: sticky; top: 0; z-index: 2; }

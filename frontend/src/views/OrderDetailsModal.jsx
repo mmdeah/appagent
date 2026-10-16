@@ -1227,7 +1227,7 @@ export default function OrderDetailsModal({ order, onClose, fleetMode = false, i
                 </div>
               ) : (
                 <>
-                  <table className="data-table sticky-head" style={{ marginBottom: '1.5rem' }}>
+                  <table className="data-table" style={{ marginBottom: '1.5rem' }}>
                     <thead>
                       <tr>
                         <th>Categoría</th>
