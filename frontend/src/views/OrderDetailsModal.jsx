@@ -722,11 +722,10 @@ export default function OrderDetailsModal({ order, onClose, fleetMode = false, i
       </div>
 
       ${mainTitle === 'COTIZACIÓN' && reportData?.reprobarDespues ? `
-      <div style="margin: 0 0 18px; padding: 14px 16px; background: #fef08a; border: 2px solid #eab308; border-left: 8px solid #ca8a04; border-radius: 8px; page-break-inside: avoid;">
-        <div style="font-size: 15px; font-weight: 800; color: #713f12; margin-bottom: 6px;">⚠ IMPORTANTE: SE DEBE VOLVER A PROBAR EL VEHÍCULO</div>
-        <div style="font-size: 13px; color: #422006; line-height: 1.5;">
-          Primero se deben <strong>corregir las fallas</strong> indicadas en esta cotización. Después, el vehículo se <strong>volverá a probar con el escáner</strong> para verificar si aparece alguna falla adicional.
-          Si aparece una nueva falla, <strong>te la informaremos y te la cotizaremos aparte</strong> antes de hacer cualquier trabajo adicional.
+      <div style="margin: 0 0 18px; padding: 12px 16px; background: #fefce8; border: 1px solid #facc15; border-left: 6px solid #eab308; border-radius: 8px; page-break-inside: avoid;">
+        <div style="font-size: 13px; font-weight: 700; color: #854d0e; margin-bottom: 4px;">Observación técnica</div>
+        <div style="font-size: 12.5px; color: #422006; line-height: 1.55;">
+          Esto es lo primero que se debe corregir en el vehículo. Una vez corregido esto, se vuelve a verificar el correcto funcionamiento. Pueden salir adicionales después de esta reparación.
         </div>
       </div>` : ''}
 
@@ -1397,10 +1396,11 @@ export default function OrderDetailsModal({ order, onClose, fleetMode = false, i
               </div>
 
               {reportData?.reprobarDespues && (
-                <div style={{ marginBottom: '1rem', padding: '0.9rem 1.1rem', background: '#fef08a', border: '2px solid #eab308', borderLeft: '8px solid #ca8a04', borderRadius: 10, color: '#422006' }}>
-                  <div style={{ fontWeight: 800, fontSize: '1rem', color: '#713f12', marginBottom: '0.25rem' }}>⚠ IMPORTANTE: SE DEBE VOLVER A PROBAR EL VEHÍCULO</div>
-                  <div style={{ fontSize: '0.88rem', lineHeight: 1.5 }}>
-                    El técnico indicó que primero se corrigen las fallas y luego se vuelve a probar con el escáner por si aparece alguna adicional. Este aviso sale siempre en el PDF de la cotización y no se puede quitar desde aquí.
+                <div style={{ marginBottom: '1rem', padding: '0.8rem 1rem', background: '#fefce8', border: '1px solid #facc15', borderLeft: '6px solid #eab308', borderRadius: 10, color: '#422006' }}>
+                  <div style={{ fontWeight: 700, fontSize: '0.9rem', color: '#854d0e', marginBottom: '0.2rem' }}>Observación técnica</div>
+                  <div style={{ fontSize: '0.85rem', lineHeight: 1.5 }}>
+                    Esto es lo primero que se debe corregir en el vehículo. Una vez corregido esto, se vuelve a verificar el correcto funcionamiento. Pueden salir adicionales después de esta reparación.
+                    <span style={{ display: 'block', marginTop: '0.35rem', fontSize: '0.76rem', color: '#a16207' }}>El técnico lo activó en la revisión; sale siempre en el PDF de la cotización y no se puede quitar desde aquí.</span>
                   </div>
                 </div>
               )}
