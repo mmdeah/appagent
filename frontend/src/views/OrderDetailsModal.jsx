@@ -9,8 +9,8 @@ const fmt = (n) => (parseFloat(n) || 0).toLocaleString('es-CO', { minimumFractio
 // y al bajar se pierde el encabezado, así que cada casilla de precio lleva su
 // propia etiqueta y su color (mano de obra / repuesto / reparación).
 const PRECIO_COLOR = { manoObra: '#60a5fa', repuesto: '#f59e0b', reparacion: '#a78bfa' };
-const PriceCap = ({ texto, color }) => (
-  <div className="hide-on-print" style={{ fontSize: '0.62rem', fontWeight: 800, letterSpacing: '0.05em', textTransform: 'uppercase', color, marginBottom: '0.15rem' }}>{texto}</div>
+const PriceCap = ({ texto }) => (
+  <div className="hide-on-print" style={{ fontSize: '0.68rem', color: 'var(--text-muted)', marginBottom: '0.15rem' }}>{texto}</div>
 );
 
 const PAYMENT_METHODS = ['Efectivo', 'Nequi', 'Bancolombia', 'Banco de Bogota', 'Tarjeta'];
@@ -806,7 +806,7 @@ export default function OrderDetailsModal({ order, onClose, fleetMode = false, i
       const buscadas = palabras(it.item);
       const coinciden = hist.filter(h => contieneTodas(buscadas, h.palabras));
       const niveles = [
-        ['Este mismo vehículo', 1, placa ? coinciden.filter(h => norm(h.o.placa) === placa) : []],
+        ['Mismo vehículo', 1, placa ? coinciden.filter(h => norm(h.o.placa) === placa) : []],
         ['Mismo modelo', 2, marca ? coinciden.filter(h => norm(h.o.marca) === marca && norm(h.o.modelo) === modelo) : []],
         ['Misma marca', 3, marca ? coinciden.filter(h => norm(h.o.marca) === marca) : []],
         ['Otras marcas', 4, coinciden],
@@ -860,7 +860,7 @@ export default function OrderDetailsModal({ order, onClose, fleetMode = false, i
     setReportData(nr);
     setEstimadoAplicado(prev => ({ ...prev, ...marcados }));
     setShowEstimados(false);
-    showStatus(`${Object.keys(marcados).length} estimado(s) aplicado(s) — revísalos y guarda los precios`);
+    showStatus(`${Object.keys(marcados).length} estimado(s) aplicado(s)`);
   };
 
   const saveReport = async () => {
@@ -1235,7 +1235,7 @@ export default function OrderDetailsModal({ order, onClose, fleetMode = false, i
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
                 <p className="section-title" style={{ margin: 0 }}>Reporte Técnico del Técnico</p>
                 {!fleetMode && <div className="hide-on-print" style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
-                  <button className="btn-secondary" style={{ fontSize: '0.82rem', padding: '0.4rem 0.9rem', display: 'flex', alignItems: 'center', gap: '0.4rem', borderColor: PRECIO_COLOR.repuesto, color: PRECIO_COLOR.repuesto }}
+                  <button className="btn-secondary" style={{ fontSize: '0.82rem', padding: '0.4rem 0.9rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}
                     onClick={openEstimados} title="Busca en el historial los repuestos que aún no tienen precio">
                     <Search size={14} /> Sugerir estimados
                   </button>
@@ -1248,43 +1248,34 @@ export default function OrderDetailsModal({ order, onClose, fleetMode = false, i
 
               {/* Estimados de repuestos (desde el historial) */}
               {showEstimados && !fleetMode && (
-                <div className="hide-on-print" style={{ marginBottom: '1rem', padding: '1rem', border: `1px solid ${PRECIO_COLOR.repuesto}`, borderRadius: 12, background: 'rgba(245,158,11,0.05)' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.6rem' }}>
-                    <strong style={{ fontSize: '0.95rem' }}>Estimados de repuestos sin precio</strong>
-                    <button onClick={() => setShowEstimados(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)' }}><X size={16} /></button>
+                <div className="hide-on-print" style={{ marginBottom: '1rem', padding: '0.85rem 1rem', border: '1px solid var(--border)', borderRadius: 10, background: 'var(--bg)' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
+                    <span style={{ fontSize: '0.88rem', fontWeight: 600 }}>Estimados</span>
+                    <button onClick={() => setShowEstimados(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', display: 'flex' }}><X size={15} /></button>
                   </div>
-                  {estimadosLoading && <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>Buscando en el historial...</p>}
+                  {estimadosLoading && <p style={{ color: 'var(--text-muted)', fontSize: '0.82rem' }}>Buscando...</p>}
                   {!estimadosLoading && estimados.length === 0 && (
-                    <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>No hay repuestos pendientes de precio en este reporte.</p>
+                    <p style={{ color: 'var(--text-muted)', fontSize: '0.82rem' }}>No hay repuestos sin precio.</p>
                   )}
                   {!estimadosLoading && estimados.length > 0 && (
                     <>
-                      <p style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginBottom: '0.6rem' }}>
-                        Valor sugerido = mediana de cotizaciones anteriores con las mismas palabras (ej. "pastillas" + "delanteras"), redondeada a miles. Marca los que quieres aplicar; después puedes ajustar cada precio a mano.
-                      </p>
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.45rem' }}>
+                      <div style={{ display: 'flex', flexDirection: 'column' }}>
                         {estimados.map(r => (
-                          <label key={r.idx} style={{ display: 'flex', alignItems: 'flex-start', gap: '0.6rem', padding: '0.55rem 0.7rem', background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: 10, cursor: r.sinDatos ? 'default' : 'pointer', opacity: r.sinDatos ? 0.65 : 1 }}>
-                            <input type="checkbox" disabled={r.sinDatos} checked={!!estimadoSel[r.idx]} onChange={e => setEstimadoSel(prev => ({ ...prev, [r.idx]: e.target.checked }))} style={{ width: 18, height: 18, marginTop: 2 }} />
+                          <label key={r.idx} style={{ display: 'flex', alignItems: 'center', gap: '0.65rem', padding: '0.5rem 0', borderTop: '1px solid var(--border)', cursor: r.sinDatos ? 'default' : 'pointer', opacity: r.sinDatos ? 0.55 : 1 }}>
+                            <input type="checkbox" disabled={r.sinDatos} checked={!!estimadoSel[r.idx]} onChange={e => setEstimadoSel(prev => ({ ...prev, [r.idx]: e.target.checked }))} style={{ width: 16, height: 16 }} />
                             <span style={{ flex: 1, minWidth: 0 }}>
-                              <span style={{ fontWeight: 700 }}>{r.item}</span>
-                              {r.sinDatos ? (
-                                <span style={{ display: 'block', fontSize: '0.8rem', color: 'var(--text-muted)' }}>Sin estimado: no hay este repuesto en el historial.</span>
-                              ) : (
-                                <span style={{ display: 'block', fontSize: '0.8rem', color: 'var(--text-muted)' }}>
-                                  {r.origen} · {r.n} trabajo{r.n !== 1 ? 's' : ''}{r.ultima ? ` · último ${r.ultima.toLocaleDateString('es-CO')}` : ''}
-                                  {r.n > 1 ? ` · rango $${fmt(r.min)} – $${fmt(r.max)}` : ''}
-                                  {r.nivel >= 3 && <strong style={{ color: '#d97706' }}> · referencia general</strong>}
-                                </span>
-                              )}
+                              <span style={{ fontSize: '0.88rem' }}>{r.item}</span>
+                              <span style={{ display: 'block', fontSize: '0.74rem', color: 'var(--text-muted)' }}>
+                                {r.sinDatos ? 'Sin historial' : `${r.origen} · ${r.n} trab.${r.n > 1 ? ` · $${fmt(r.min)} – $${fmt(r.max)}` : ''}${r.ultima ? ` · ${r.ultima.toLocaleDateString('es-CO', { month: 'short', year: 'numeric' }).replace(' de ', ' ')}` : ''}`}
+                              </span>
                             </span>
-                            {!r.sinDatos && <span style={{ fontWeight: 800, color: PRECIO_COLOR.repuesto, whiteSpace: 'nowrap' }}>${fmt(r.sugerido)}</span>}
+                            {!r.sinDatos && <span style={{ fontWeight: 600, fontSize: '0.92rem', whiteSpace: 'nowrap' }}>${fmt(r.sugerido)}</span>}
                           </label>
                         ))}
                       </div>
-                      <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.75rem' }}>
-                        <button className="btn-primary" style={{ fontSize: '0.85rem' }} disabled={!Object.values(estimadoSel).some(Boolean)} onClick={aplicarEstimados}>Aplicar seleccionados</button>
-                        <button className="btn-secondary" style={{ fontSize: '0.85rem' }} onClick={() => setShowEstimados(false)}>Cerrar</button>
+                      <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.6rem', paddingTop: '0.6rem', borderTop: '1px solid var(--border)' }}>
+                        <button className="btn-primary" style={{ fontSize: '0.8rem', padding: '0.35rem 0.9rem' }} disabled={!Object.values(estimadoSel).some(Boolean)} onClick={aplicarEstimados}>Aplicar</button>
+                        <button className="btn-secondary" style={{ fontSize: '0.8rem', padding: '0.35rem 0.9rem' }} onClick={() => setShowEstimados(false)}>Cerrar</button>
                       </div>
                     </>
                   )}
@@ -1396,9 +1387,9 @@ export default function OrderDetailsModal({ order, onClose, fleetMode = false, i
                         <th>Categoría</th>
                         <th>Ítem</th>
                         <th>Estado</th>
-                        <th style={{ color: PRECIO_COLOR.manoObra }}>● M. de Obra ($)</th>
-                        <th style={{ color: PRECIO_COLOR.repuesto }}>● Repuesto</th>
-                        <th style={{ color: PRECIO_COLOR.reparacion }}>● Vr. Reparación ($)</th>
+                        <th><span style={{ color: PRECIO_COLOR.manoObra }}>●</span> M. de Obra ($)</th>
+                        <th><span style={{ color: PRECIO_COLOR.repuesto }}>●</span> Repuesto</th>
+                        <th><span style={{ color: PRECIO_COLOR.reparacion }}>●</span> Vr. Reparación ($)</th>
                         <th className="hide-on-print" style={{ width: 36 }}></th>
                       </tr>
                     </thead>
@@ -1420,23 +1411,23 @@ export default function OrderDetailsModal({ order, onClose, fleetMode = false, i
                             {it.state === 'Bueno' ? <span style={{ color: 'var(--text-muted)' }}>—</span> : (
                               <>
                                 <span className={fleetMode ? undefined : 'show-on-print'}>{it.manoObra ? `$${fmt(it.manoObra)}` : '—'}</span>
-                                {!fleetMode && <PriceCap texto="Mano de obra" color={PRECIO_COLOR.manoObra} />}
+                                {!fleetMode && <PriceCap texto="Mano de obra" />}
                                 {!fleetMode && <input className="hide-on-print price-input" type="text" placeholder="$ 0" value={it.manoObra ? fmt(it.manoObra) : ''}
                                   onChange={e => handleReportPrice(idx, 'manoObra', e.target.value.replace(/\D/g, ''))}
-                                  style={{ width: 100, fontSize: '0.82rem', borderLeft: `3px solid ${PRECIO_COLOR.manoObra}` }} />}
+                                  style={{ width: 100, fontSize: '0.82rem', borderLeft: `2px solid ${PRECIO_COLOR.manoObra}` }} />}
                               </>
                             )}
                           </td>
                           <td style={{ fontSize: '0.82rem' }}>
                             {it.state === 'Necesario' || it.state === 'Realizar' ? null : it.requiereRepuesto ? (
                                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
-                                 <span style={{ fontWeight: 600, color: 'var(--warning)' }}>✓ Requiere</span>
-                                 {!fleetMode && <PriceCap texto="Cant. · Valor repuesto" color={PRECIO_COLOR.repuesto} />}
+                                 <span style={{ color: 'var(--text-muted)' }}>✓ Requiere</span>
+                                 {!fleetMode && <PriceCap texto="Repuesto" />}
                                  {!fleetMode && <div className="hide-on-print" style={{ display: 'flex', gap: '0.4rem' }}>
                                     <input type="number" step="any" min="0.1" placeholder="Cant" value={it.cantidadRepuesto || 1} onChange={e => handleReportPrice(idx, 'cantidadRepuesto', parseFloat(e.target.value.replace(',','.'))||1)} style={{ width: 55, fontSize: '0.8rem', padding: '0.4rem' }} />
-                                    <input type="text" className="price-input" placeholder="$ Valor" value={it.valorRepuesto ? fmt(it.valorRepuesto) : ''} onChange={e => handleReportPrice(idx, 'valorRepuesto', e.target.value.replace(/\D/g, ''))} style={{ width: 90, fontSize: '0.8rem', padding: '0.4rem', borderLeft: `3px solid ${PRECIO_COLOR.repuesto}` }} />
+                                    <input type="text" className="price-input" placeholder="$ Valor" value={it.valorRepuesto ? fmt(it.valorRepuesto) : ''} onChange={e => handleReportPrice(idx, 'valorRepuesto', e.target.value.replace(/\D/g, ''))} style={{ width: 90, fontSize: '0.8rem', padding: '0.4rem', borderLeft: `2px solid ${PRECIO_COLOR.repuesto}` }} />
                                  </div>}
-                                 {!fleetMode && estimadoAplicado[idx] && <span className="hide-on-print" style={{ fontSize: '0.68rem', fontWeight: 700, color: '#d97706' }}>≈ estimado del historial — revísalo</span>}
+                                 {!fleetMode && estimadoAplicado[idx] && <span className="hide-on-print" style={{ fontSize: '0.68rem', color: 'var(--text-muted)' }}>≈ estimado</span>}
                                  <span className={fleetMode ? undefined : 'show-on-print'}>
                                     {it.cantidadRepuesto || 1}x {it.valorRepuesto ? `$${fmt(it.valorRepuesto)}` : 'Pendiente'}
                                  </span>
@@ -1447,11 +1438,11 @@ export default function OrderDetailsModal({ order, onClose, fleetMode = false, i
                             {it.state === 'Necesario' || it.state === 'Realizar' ? null : it.recibeReparacion ? (
                               <>
                                 <span className={fleetMode ? undefined : 'show-on-print'}>{it.valorReparacion ? `$${fmt(it.valorReparacion)}` : 'Pendiente'}</span>
-                                {!fleetMode && <PriceCap texto="Valor reparación" color={PRECIO_COLOR.reparacion} />}
+                                {!fleetMode && <PriceCap texto="Reparación" />}
                                 {!fleetMode && <input className="hide-on-print price-input" type="text" placeholder="Pendiente"
                                   value={it.valorReparacion ? fmt(it.valorReparacion) : ''}
                                   onChange={e => handleReportPrice(idx, 'valorReparacion', e.target.value.replace(/\D/g, ''))}
-                                  style={{ width: 110, fontSize: '0.82rem', borderLeft: `3px solid ${PRECIO_COLOR.reparacion}` }} />}
+                                  style={{ width: 110, fontSize: '0.82rem', borderLeft: `2px solid ${PRECIO_COLOR.reparacion}` }} />}
                               </>
                             ) : <span style={{ color: 'var(--text-muted)' }}>—</span>}
                           </td>
