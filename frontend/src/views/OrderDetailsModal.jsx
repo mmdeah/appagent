@@ -5,6 +5,14 @@ import { getQuoteSlot } from '../quoteUtils';
 
 const fmt = (n) => (parseFloat(n) || 0).toLocaleString('es-CO', { minimumFractionDigits: 0 });
 
+// Colores fijos por concepto en la tabla del Reporte Técnico: la lista es larga
+// y al bajar se pierde el encabezado, así que cada casilla de precio lleva su
+// propia etiqueta y su color (mano de obra / repuesto / reparación).
+const PRECIO_COLOR = { manoObra: '#60a5fa', repuesto: '#f59e0b', reparacion: '#a78bfa' };
+const PriceCap = ({ texto, color }) => (
+  <div className="hide-on-print" style={{ fontSize: '0.62rem', fontWeight: 800, letterSpacing: '0.05em', textTransform: 'uppercase', color, marginBottom: '0.15rem' }}>{texto}</div>
+);
+
 const PAYMENT_METHODS = ['Efectivo', 'Nequi', 'Bancolombia', 'Banco de Bogota', 'Tarjeta'];
 
 // order.fotos mezcla dos formatos: strings antiguos (sin descripción) y objetos
@@ -1219,15 +1227,15 @@ export default function OrderDetailsModal({ order, onClose, fleetMode = false, i
                 </div>
               ) : (
                 <>
-                  <table className="data-table" style={{ marginBottom: '1.5rem' }}>
+                  <table className="data-table sticky-head" style={{ marginBottom: '1.5rem' }}>
                     <thead>
                       <tr>
                         <th>Categoría</th>
                         <th>Ítem</th>
                         <th>Estado</th>
-                        <th>M. de Obra ($)</th>
-                        <th>Repuesto</th>
-                        <th>Vr. Reparación ($)</th>
+                        <th style={{ color: PRECIO_COLOR.manoObra }}>● M. de Obra ($)</th>
+                        <th style={{ color: PRECIO_COLOR.repuesto }}>● Repuesto</th>
+                        <th style={{ color: PRECIO_COLOR.reparacion }}>● Vr. Reparación ($)</th>
                         <th className="hide-on-print" style={{ width: 36 }}></th>
                       </tr>
                     </thead>
@@ -1249,9 +1257,10 @@ export default function OrderDetailsModal({ order, onClose, fleetMode = false, i
                             {it.state === 'Bueno' ? <span style={{ color: 'var(--text-muted)' }}>—</span> : (
                               <>
                                 <span className={fleetMode ? undefined : 'show-on-print'}>{it.manoObra ? `$${fmt(it.manoObra)}` : '—'}</span>
-                                {!fleetMode && <input className="hide-on-print price-input" type="text" placeholder="0" value={it.manoObra ? fmt(it.manoObra) : ''}
+                                {!fleetMode && <PriceCap texto="Mano de obra" color={PRECIO_COLOR.manoObra} />}
+                                {!fleetMode && <input className="hide-on-print price-input" type="text" placeholder="$ 0" value={it.manoObra ? fmt(it.manoObra) : ''}
                                   onChange={e => handleReportPrice(idx, 'manoObra', e.target.value.replace(/\D/g, ''))}
-                                  style={{ width: 100, fontSize: '0.82rem' }} />}
+                                  style={{ width: 100, fontSize: '0.82rem', borderLeft: `3px solid ${PRECIO_COLOR.manoObra}` }} />}
                               </>
                             )}
                           </td>
@@ -1259,9 +1268,10 @@ export default function OrderDetailsModal({ order, onClose, fleetMode = false, i
                             {it.state === 'Necesario' || it.state === 'Realizar' ? null : it.requiereRepuesto ? (
                                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
                                  <span style={{ fontWeight: 600, color: 'var(--warning)' }}>✓ Requiere</span>
+                                 {!fleetMode && <PriceCap texto="Cant. · Valor repuesto" color={PRECIO_COLOR.repuesto} />}
                                  {!fleetMode && <div className="hide-on-print" style={{ display: 'flex', gap: '0.4rem' }}>
                                     <input type="number" step="any" min="0.1" placeholder="Cant" value={it.cantidadRepuesto || 1} onChange={e => handleReportPrice(idx, 'cantidadRepuesto', parseFloat(e.target.value.replace(',','.'))||1)} style={{ width: 55, fontSize: '0.8rem', padding: '0.4rem' }} />
-                                    <input type="text" className="price-input" placeholder="$ Valor" value={it.valorRepuesto ? fmt(it.valorRepuesto) : ''} onChange={e => handleReportPrice(idx, 'valorRepuesto', e.target.value.replace(/\D/g, ''))} style={{ width: 90, fontSize: '0.8rem', padding: '0.4rem' }} />
+                                    <input type="text" className="price-input" placeholder="$ Valor" value={it.valorRepuesto ? fmt(it.valorRepuesto) : ''} onChange={e => handleReportPrice(idx, 'valorRepuesto', e.target.value.replace(/\D/g, ''))} style={{ width: 90, fontSize: '0.8rem', padding: '0.4rem', borderLeft: `3px solid ${PRECIO_COLOR.repuesto}` }} />
                                  </div>}
                                  <span className={fleetMode ? undefined : 'show-on-print'}>
                                     {it.cantidadRepuesto || 1}x {it.valorRepuesto ? `$${fmt(it.valorRepuesto)}` : 'Pendiente'}
@@ -1273,10 +1283,11 @@ export default function OrderDetailsModal({ order, onClose, fleetMode = false, i
                             {it.state === 'Necesario' || it.state === 'Realizar' ? null : it.recibeReparacion ? (
                               <>
                                 <span className={fleetMode ? undefined : 'show-on-print'}>{it.valorReparacion ? `$${fmt(it.valorReparacion)}` : 'Pendiente'}</span>
+                                {!fleetMode && <PriceCap texto="Valor reparación" color={PRECIO_COLOR.reparacion} />}
                                 {!fleetMode && <input className="hide-on-print price-input" type="text" placeholder="Pendiente"
                                   value={it.valorReparacion ? fmt(it.valorReparacion) : ''}
                                   onChange={e => handleReportPrice(idx, 'valorReparacion', e.target.value.replace(/\D/g, ''))}
-                                  style={{ width: 110, fontSize: '0.82rem' }} />}
+                                  style={{ width: 110, fontSize: '0.82rem', borderLeft: `3px solid ${PRECIO_COLOR.reparacion}` }} />}
                               </>
                             ) : <span style={{ color: 'var(--text-muted)' }}>—</span>}
                           </td>
