@@ -687,6 +687,141 @@ Genera el informe en español enfocado únicamente en los ítems seleccionados y
   }
 });
 
+
+// ── Sincronización de citas con la app de agendamiento ───────────────────
+// Trae las citas de HOY (hora de Colombia) de la otra app y las refleja en el
+// Kanban como órdenes en estado "Con Cita" (sin ingresar). Los técnicos las
+// ven de inmediato; el admin solo las mueve de columna cuando llega el carro.
+// El token vive en la variable de entorno CITAS_API_TOKEN y nunca se expone.
+const CITAS_API_URL = (process.env.CITAS_API_URL || 'https://appcitas.up.railway.app').replace(/\/$/, '');
+const CITAS_ACTIVAS = ['AGENDADA', 'CONFIRMADA', 'LLEGO'];
+const CITAS_SYNC_MS = 10 * 60 * 1000;
+const bogotaParts = () => {
+  const f = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Bogota', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', hour12: false });
+  const p = Object.fromEntries(f.formatToParts(new Date()).map(x => [x.type, x.value]));
+  return { fecha: `${p.year}-${p.month}-${p.day}`, hora: parseInt(p.hour, 10) % 24 };
+};
+
+// "Mazda 3 2018" / "tuson i35 2012" -> { marca, modelo, anio } (texto libre).
+const parseVehiculo = (texto) => {
+  const t = (texto || '').trim().replace(/\s+/g, ' ');
+  if (!t) return { marca: '', modelo: '', anio: '' };
+  const partes = t.split(' ');
+  let anio = '';
+  if (partes.length > 1 && /^(19|20)\d{2}$/.test(partes[partes.length - 1])) anio = partes.pop();
+  const marcaRaw = partes.shift() || '';
+  const marca = marcaRaw.charAt(0).toUpperCase() + marcaRaw.slice(1);
+  return { marca, modelo: partes.join(' '), anio };
+};
+
+let lastCitasSync = { at: null, ok: null, creadas: 0, actualizadas: 0, eliminadas: 0, error: null };
+
+async function syncCitas() {
+  const token = process.env.CITAS_API_TOKEN;
+  if (!token) throw new Error('Falta la variable de entorno CITAS_API_TOKEN');
+  const { fecha: hoy } = bogotaParts();
+
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 15000);
+  let data;
+  try {
+    const res = await fetch(`${CITAS_API_URL}/api/citas?fecha=${hoy}`, {
+      headers: { Authorization: `Bearer ${token}` }, signal: controller.signal
+    });
+    if (!res.ok) throw new Error(`La app de citas respondió ${res.status}`);
+    data = await res.json();
+  } finally {
+    clearTimeout(timeout);
+  }
+  const citas = Array.isArray(data?.citas) ? data.citas : [];
+  const db = router.db;
+  let creadas = 0, actualizadas = 0, eliminadas = 0;
+
+  for (const c of citas) {
+    const activa = CITAS_ACTIVAS.includes(c.estado);
+    const existente = db.get('orders').find(o => o.citaId != null && String(o.citaId) === String(c.id)).value();
+    const { marca, modelo, anio } = parseVehiculo(c.vehiculo);
+
+    if (!existente) {
+      if (!activa) continue;
+      db.get('orders').insert({
+        placa: (c.placa || '').toUpperCase(),
+        cliente: c.cliente || '',
+        telefono: c.telefono || '',
+        marca, modelo, anio,
+        servicios: c.servicio_nombre || c.servicio || '',
+        notas: c.notas || '',
+        estado: 'Con Cita',
+        fecha: new Date().toISOString(),
+        fotos: [],
+        citaId: c.id, citaFecha: c.fecha, citaHora: c.hora, citaEstado: c.estado,
+        citaOrigen: c.origen || '', vehiculoTexto: c.vehiculo || '',
+      }).write();
+      creadas++;
+    } else if (existente.estado === 'Con Cita') {
+      // Aún sin ingresar al taller: se mantiene al día con la cita.
+      if (!activa) {
+        db.get('orders').remove(o => o.id === existente.id).write();
+        eliminadas++;
+      } else {
+        // Solo se completan campos vacíos (no se pisa lo que el admin editó).
+        const cambios = {};
+        const llenar = (k, v) => { if (v && !existente[k]) cambios[k] = v; };
+        llenar('placa', (c.placa || '').toUpperCase()); llenar('cliente', c.cliente); llenar('telefono', c.telefono);
+        llenar('marca', marca); llenar('modelo', modelo); llenar('anio', anio); llenar('notas', c.notas);
+        if (existente.citaHora !== c.hora) cambios.citaHora = c.hora;
+        if (existente.citaEstado !== c.estado) cambios.citaEstado = c.estado;
+        if (Object.keys(cambios).length) {
+          db.get('orders').find(o => o.id === existente.id).assign(cambios).write();
+          actualizadas++;
+        }
+      }
+    }
+    // Si la orden ya fue activada (otra columna), no se toca.
+  }
+
+  // Citas de días anteriores que nunca se atendieron (y sin revisión
+  // subida) se limpian solas para no acumularse en la columna.
+  const viejas = db.get('orders').filter(o => o.estado === 'Con Cita' && o.citaFecha && o.citaFecha < hoy).value();
+  for (const o of viejas) {
+    const tieneReporte = db.get('reports').some(r => String(r.orderId) === String(o.id)).value();
+    if (!tieneReporte) { db.get('orders').remove(x => x.id === o.id).write(); eliminadas++; }
+  }
+  return { fecha: hoy, total: citas.length, creadas, actualizadas, eliminadas };
+}
+
+async function runCitasSync() {
+  try {
+    const r = await syncCitas();
+    lastCitasSync = { at: new Date().toISOString(), ok: true, ...r, error: null };
+    if (r.creadas || r.actualizadas || r.eliminadas) console.log('Sync citas:', JSON.stringify(r));
+    return lastCitasSync;
+  } catch (e) {
+    lastCitasSync = { ...lastCitasSync, at: new Date().toISOString(), ok: false, error: e.message };
+    console.error('Sync citas falló:', e.message);
+    return lastCitasSync;
+  }
+}
+
+server.post('/api/sync-citas', async (req, res) => {
+  const r = await runCitasSync();
+  res.status(r.ok ? 200 : 502).json(r);
+});
+server.get('/api/sync-citas/status', (req, res) => res.json(lastCitasSync));
+
+// Consulta automática: desde las 5:00 a. m. hasta las 9:00 p. m. (hora de
+// Colombia) cada 10 minutos, así las citas que entran durante el día
+// también aparecen. No se sincroniza al arrancar el servidor.
+if (process.env.CITAS_API_TOKEN) {
+  setInterval(() => {
+    const { hora } = bogotaParts();
+    if (hora >= 5 && hora < 21) runCitasSync();
+  }, CITAS_SYNC_MS);
+  console.log(`Sync de citas activo (cada ${CITAS_SYNC_MS / 60000} min, 5:00–21:00 Bogotá) -> ${CITAS_API_URL}`);
+} else {
+  console.warn('CITAS_API_TOKEN no configurado: la sincronización de citas está desactivada.');
+}
+
 server.use(router);
 
 const port = process.env.PORT || 3000;

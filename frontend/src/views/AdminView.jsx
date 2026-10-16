@@ -32,7 +32,7 @@ const niceTicks = (min, max, count = 4) => {
   return ticks;
 };
 
-const COLUMNS = ['Recepción', 'Proceso', 'Calidad', 'Ingresos Rápidos'];
+const COLUMNS = ['Con Cita', 'Recepción', 'Proceso', 'Calidad', 'Ingresos Rápidos'];
 const PAYMENT_METHODS = ['Efectivo', 'Nequi', 'Bancolombia', 'Banco de Bogota', 'Tarjeta'];
 const EXPENSE_CATEGORIES = ['Repuestos', 'Insumos', 'Nómina', 'Arriendo', 'Servicios Públicos', 'Herramientas', 'Impuestos', 'Otros'];
 
@@ -284,6 +284,24 @@ export default function AdminView() {
     } catch (e) { console.error(e); }
   };
 
+  const [syncingCitas, setSyncingCitas] = useState(false);
+  const [syncCitasMsg, setSyncCitasMsg] = useState('');
+  const syncCitasNow = async () => {
+    setSyncingCitas(true);
+    try {
+      const res = await fetch(`${BACKEND_URL}/api/sync-citas`, { method: 'POST' });
+      const d = await res.json();
+      if (!res.ok || !d.ok) throw new Error(d.error || 'error');
+      setSyncCitasMsg(d.creadas || d.eliminadas ? `✓ ${d.creadas} nueva${d.creadas !== 1 ? 's' : ''}${d.eliminadas ? ` · ${d.eliminadas} quitada${d.eliminadas !== 1 ? 's' : ''}` : ''}` : `✓ Al día (${d.total} cita${d.total !== 1 ? 's' : ''} hoy)`);
+      await fetchOrders();
+    } catch {
+      setSyncCitasMsg('⚠ No se pudo sincronizar');
+    } finally {
+      setSyncingCitas(false);
+      setTimeout(() => setSyncCitasMsg(''), 6000);
+    }
+  };
+
   const fetchOrders = async () => {
     try {
       const res = await fetch(`${API_URL}/orders?_embed=reports&_embed=quotes`);
@@ -295,7 +313,7 @@ export default function AdminView() {
       // Solo la cotización real (slot 1) cuenta — nunca el borrador privado.
       const incomeTotal = entregadas.reduce((sum, o) => sum + calcOrderTotal(o), 0);
 
-      const active = ordersArr.filter(o => o.estado !== 'Entregado').length;
+      const active = ordersArr.filter(o => o.estado !== 'Entregado' && o.estado !== 'Con Cita').length;
       setStats({ 
         total: Math.round(incomeTotal), 
         avg: entregadas.length > 0 ? incomeTotal / entregadas.length : 0, 
@@ -651,8 +669,8 @@ export default function AdminView() {
     } catch (e) { console.error(e); }
   };
 
-  const colColor = { 'Recepción': '#6366f1', 'Proceso': '#f59e0b', 'Calidad': '#10b981', 'Ingresos Rápidos': '#ec4899' };
-  const colBg   = { 'Recepción': 'rgba(99,102,241,0.08)', 'Proceso': 'rgba(245,158,11,0.08)', 'Calidad': 'rgba(16,185,129,0.08)', 'Ingresos Rápidos': 'rgba(236,72,153,0.08)' };
+  const colColor = { 'Con Cita': '#0ea5e9', 'Recepción': '#6366f1', 'Proceso': '#f59e0b', 'Calidad': '#10b981', 'Ingresos Rápidos': '#ec4899' };
+  const colBg   = { 'Con Cita': 'rgba(14,165,233,0.08)', 'Recepción': 'rgba(99,102,241,0.08)', 'Proceso': 'rgba(245,158,11,0.08)', 'Calidad': 'rgba(16,185,129,0.08)', 'Ingresos Rápidos': 'rgba(236,72,153,0.08)' };
 
   // Usados tanto por la barra de navegación (badge compacto) como por el tab Kanban.
   const { date: corteDate, days: corteDays } = getNextCorteALD();
@@ -933,6 +951,11 @@ export default function AdminView() {
                   </button>
                   {activeTab === 'Kanban' && (
                     <div style={{ display: 'flex', gap: '0.5rem', marginLeft: 'auto', flexWrap: 'wrap' }}>
+                      <button onClick={syncCitasNow} disabled={syncingCitas}
+                        title="Trae ahora las citas de hoy de la app de agendamiento (se actualiza solo cada 10 min)"
+                        style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', background: 'rgba(14,165,233,0.1)', border: '1px solid #0ea5e9', borderRadius: 999, padding: '0.35rem 0.85rem', fontSize: '0.82rem', whiteSpace: 'nowrap', cursor: syncingCitas ? 'wait' : 'pointer', color: 'var(--text)', fontWeight: 600 }}>
+                        <Clock size={14} color="#0ea5e9" /> {syncingCitas ? 'Sincronizando...' : (syncCitasMsg || 'Sincronizar citas de hoy')}
+                      </button>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', background: corteBg, border: `1px solid ${corteColor}`, borderRadius: 999, padding: '0.35rem 0.85rem', fontSize: '0.82rem', whiteSpace: 'nowrap' }}>
                         <Clock size={14} color={corteColor} />
                         <span style={{ color: 'var(--text-muted)' }}>Próximo corte ALD</span>
@@ -976,11 +999,11 @@ export default function AdminView() {
                         draggable
                         onDragStart={e => handleCardDragStart(e, o.id)}
                         onDragEnd={handleCardDragEnd}
-                        style={{ opacity: draggedOrderId === o.id ? 0.4 : 1, cursor: draggedOrderId === o.id ? 'grabbing' : 'pointer' }}>
+                        style={{ opacity: draggedOrderId === o.id ? 0.4 : 1, cursor: draggedOrderId === o.id ? 'grabbing' : 'pointer', ...(o.estado === 'Con Cita' ? { border: '1.5px dashed #0ea5e9' } : {}) }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '0.5rem' }}>
                           <div>
                             <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                              <div style={{ fontWeight: 700, fontSize: '1rem' }}>{o.placa}</div>
+                              <div style={{ fontWeight: 700, fontSize: '1rem', color: o.placa ? undefined : 'var(--text-muted)' }}>{o.placa || 'Sin placa'}</div>
                               {o.quotes?.some(q => q.autorizada) && (
                                 <span title="Trabajo Autorizado" style={{ color: '#10b981', display: 'flex' }}><CheckCircle size={14} /></span>
                               )}
@@ -993,7 +1016,7 @@ export default function AdminView() {
                             )}
                           </div>
                           <span style={{ fontSize: '0.82rem', background: o.reports?.length > 0 ? 'rgba(16,185,129,0.15)' : 'rgba(245,158,11,0.15)', color: o.reports?.length > 0 ? '#34d399' : '#fbbf24', padding: '0.2rem 0.5rem', borderRadius: 999, fontWeight: 600, whiteSpace: 'nowrap' }}>
-                            {o.reports?.length > 0 ? '✓ Revisado' : '⏳ Pdte'}
+                            {o.reports?.length > 0 ? '✓ Revisado' : (o.estado === 'Con Cita' && o.citaHora ? `🗓 Cita ${o.citaHora}` : '⏳ Pdte')}
                           </span>
                         </div>
                         {o.fecha && (
