@@ -206,6 +206,30 @@ export default function OrderDetailsModal({ order, onClose, fleetMode = false, i
     const nueva = typeof old === 'string' ? src : { ...old, src };
     if (await persistFotos(fotos.map((f, j) => j === i ? nueva : f))) showStatus('Foto cambiada');
   };
+
+  // El admin también puede subir fotos al armar un reporte a mano. Desde la
+  // sección "Fotos de la Orden" quedan sueltas; desde un ítem del reporte
+  // llevan el nombre del ítem como descripción (igual que las del técnico).
+  const addInputRef = useRef(null);
+  const addFotoDesc = useRef('');
+  const pickFotos = (descripcion = '') => { addFotoDesc.current = descripcion; addInputRef.current?.click(); };
+  const addFotos = async (files) => {
+    const lista = Array.from(files || []);
+    if (!lista.length) return;
+    setFotoBusy(true);
+    try {
+      const nuevas = [];
+      for (const file of lista) {
+        const src = await compressFoto(file, 1280, 0.72);
+        nuevas.push(addFotoDesc.current ? { src, descripcion: addFotoDesc.current } : src);
+      }
+      if (await persistFotos([...fotos, ...nuevas])) showStatus(nuevas.length === 1 ? 'Foto agregada' : `${nuevas.length} fotos agregadas`);
+    } catch {
+      showStatus('No se pudo leer alguna de las imágenes.', 'error');
+    } finally {
+      setFotoBusy(false);
+    }
+  };
   const [metodoPago, setMetodoPago] = useState('Efectivo');
   const [notasEntrega, setNotasEntrega] = useState(order.notasEntrega || '');
   const [isEditingInfo, setIsEditingInfo] = useState(false);
@@ -1169,9 +1193,15 @@ export default function OrderDetailsModal({ order, onClose, fleetMode = false, i
               </div>
 
               {/* Fotos de ingreso */}
-              {fotos.length > 0 && (
+              {(fotos.length > 0 || !fleetMode) && (
                 <>
-                  <p className="section-title"><Camera size={12} style={{ display: 'inline', marginRight: 4 }} />Fotos de la Orden</p>
+                  <p className="section-title" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                    <span><Camera size={12} style={{ display: 'inline', marginRight: 4 }} />Fotos de la Orden</span>
+                    {!fleetMode && <button type="button" className="btn-secondary hide-on-print" disabled={fotoBusy} onClick={() => pickFotos()}
+                      style={{ fontSize: '0.75rem', padding: '0.25rem 0.7rem', display: 'inline-flex', alignItems: 'center', gap: '0.3rem', textTransform: 'none', letterSpacing: 0 }}>
+                      <Plus size={12} /> Agregar fotos
+                    </button>}
+                  </p>
                   <input type="file" accept="image/*" ref={replaceInputRef} style={{ display: 'none' }}
                     onChange={e => { replaceFoto(e.target.files?.[0]); e.target.value = ''; }} />
                   <div className="img-grid" style={{ marginBottom: '1.5rem', gridTemplateColumns: 'repeat(auto-fill, minmax(120px, 1fr))' }}>
@@ -1230,6 +1260,8 @@ export default function OrderDetailsModal({ order, onClose, fleetMode = false, i
           )}
 
           {/* ── REPORTE TAB ── */}
+          <input type="file" accept="image/*" multiple ref={addInputRef} style={{ display: 'none' }}
+            onChange={e => { addFotos(e.target.files); e.target.value = ''; }} />
           {activeTab === 'reporte' && (
             <div>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
@@ -1390,7 +1422,7 @@ export default function OrderDetailsModal({ order, onClose, fleetMode = false, i
                         <th><span style={{ color: PRECIO_COLOR.manoObra }}>●</span> M. de Obra ($)</th>
                         <th><span style={{ color: PRECIO_COLOR.repuesto }}>●</span> Repuesto</th>
                         <th><span style={{ color: PRECIO_COLOR.reparacion }}>●</span> Vr. Reparación ($)</th>
-                        <th className="hide-on-print" style={{ width: 36 }}></th>
+                        <th className="hide-on-print" style={{ width: 64 }}></th>
                       </tr>
                     </thead>
                     <tbody>
@@ -1446,7 +1478,17 @@ export default function OrderDetailsModal({ order, onClose, fleetMode = false, i
                               </>
                             ) : <span style={{ color: 'var(--text-muted)' }}>—</span>}
                           </td>
-                          <td className="hide-on-print" style={{ textAlign: 'center' }}>
+                          <td className="hide-on-print" style={{ textAlign: 'center', whiteSpace: 'nowrap' }}>
+                            {!fleetMode && it.state && it.state !== 'Bueno' && (() => {
+                              const n = fotos.filter(f => fotoDesc(f) === it.item).length;
+                              return (
+                                <button disabled={fotoBusy} onClick={() => pickFotos(it.item)}
+                                  style={{ background: 'none', border: 'none', color: n ? 'var(--primary)' : 'var(--text-muted)', cursor: 'pointer', padding: '0.2rem', borderRadius: 6, display: 'inline-flex', alignItems: 'center', gap: 2, fontSize: '0.72rem' }}
+                                  title={n ? `${n} foto(s) — agregar otra` : 'Agregar foto de este ítem'}>
+                                  <Camera size={14} />{n > 0 && n}
+                                </button>
+                              );
+                            })()}
                             {!fleetMode && <button onClick={() => handleDeleteReportItem(idx)}
                               style={{ background: 'none', border: 'none', color: 'var(--error)', cursor: 'pointer', padding: '0.2rem', borderRadius: 6, opacity: 0.7 }}
                               title="Eliminar ítem">
