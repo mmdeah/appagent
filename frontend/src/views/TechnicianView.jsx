@@ -44,7 +44,10 @@ export default function TechnicianView() {
   const [orders, setOrders] = useState([]);
   const [selectedOrder, setSelectedOrder] = useState(null);
   const [reportData, setReportData] = useState({});
-  const [showScannerAlert, setShowScannerAlert] = useState(false);
+  const [alerta, setAlerta] = useState(null); // { titulo, texto } — requisito que falta para poder subir
+  const [pernos, setPernos] = useState(null); // ¿tiene pernos de seguridad? 'si' | 'no' | null (sin responder)
+  const [pernosFoto, setPernosFoto] = useState(null); // foto del seguro de los pernos (obligatoria si tiene)
+  const [bornes, setBornes] = useState(null); // estado de los bornes de la batería: 'bien' | 'mal' | null
   const [reprobar, setReprobar] = useState(false); // corregir primero y volver a probar con el escáner
   const [scannerFotos, setScannerFotos] = useState([]); // fotos del escáner con los códigos de avería (una o varias)
   const [statusMsg, setStatusMsg] = useState({ text: '', type: '' });
@@ -133,6 +136,9 @@ export default function TechnicianView() {
     setReportData(draft?.reportData || {});
     setReprobar(!!draft?.reprobar);
     setScannerFotos(draft?.scannerFotos || (draft?.scannerFoto ? [draft.scannerFoto] : []));
+    setPernos(draft?.pernos || null);
+    setPernosFoto(draft?.pernosFoto || null);
+    setBornes(draft?.bornes || null);
     setPendingPriority(null);
     setSelectedOrder(o);
     try { localStorage.setItem(ACTIVE_KEY, String(o.id)); } catch { /* sin espacio/bloqueado */ }
@@ -154,14 +160,15 @@ export default function TechnicianView() {
     if (!selectedOrder) return;
     const hasData = Object.keys(reportData).length > 0
       || scannerFotos.length > 0
+      || pernos || bornes
       || reprobar;
     if (!hasData) return;
     try {
-      localStorage.setItem(draftKey(selectedOrder.id), JSON.stringify({ reportData, scannerFotos, reprobar, savedAt: Date.now() }));
+      localStorage.setItem(draftKey(selectedOrder.id), JSON.stringify({ reportData, scannerFotos, reprobar, pernos, pernosFoto, bornes, savedAt: Date.now() }));
     } catch (e) {
       console.warn('No se pudo guardar el borrador de la revisión', e);
     }
-  }, [selectedOrder, reportData, scannerFotos, reprobar]);
+  }, [selectedOrder, reportData, scannerFotos, reprobar, pernos, pernosFoto, bornes]);
 
   // Si la app se recargó con una revisión a medias, reabre esa orden sola
   // apenas cargue la lista de vehículos (una sola vez).
@@ -270,6 +277,17 @@ export default function TechnicianView() {
     }
   };
 
+  const handlePernosPhoto = async (file) => {
+    if (!file) return;
+    try {
+      setPernosFoto(await compressImage(file));
+    } catch {
+      const reader = new FileReader();
+      reader.onload = ev => setPernosFoto(ev.target.result);
+      reader.readAsDataURL(file);
+    }
+  };
+
   const buildWhatsAppMessage = (items, nScannerFotos) => {
     const o = selectedOrder;
     const fecha = new Date().toLocaleDateString('es-CO');
@@ -324,6 +342,8 @@ export default function TechnicianView() {
       msg += `\n`;
     }
 
+    msg += `*PERNOS DE SEGURIDAD:* ${pernos === 'si' ? 'SI (foto del seguro adjunta en el informe)' : 'NO'}\n`;
+    msg += `*BORNES DE BATERIA:* ${bornes === 'mal' ? 'MAL' : 'BIEN'}\n`;
     if (nScannerFotos > 0) {
       msg += `*ESCANER:* ${nScannerFotos} foto${nScannerFotos > 1 ? 's' : ''} de los codigos de averia adjunta${nScannerFotos > 1 ? 's' : ''} en el informe
 
@@ -346,9 +366,24 @@ export default function TechnicianView() {
     // El reporte no se puede subir sin foto del escáner — ni en esta
     // revisión ni ya guardada en la orden de un envío anterior. Se valida
     // antes de abrir WhatsApp o tocar el servidor.
+    // Tampoco sin responder lo de los pernos de seguridad (con foto del seguro
+    // si los tiene) ni el estado de los bornes de la batería.
+    const yaTienePernosFoto = (selectedOrder?.fotos || []).some(f => f?.tipo === 'pernos');
+    if (!pernos) {
+      setAlerta({ titulo: 'Falta responder los pernos', texto: 'Indica si el vehículo tiene pernos de seguridad (Sí o No) antes de subir la revisión.' });
+      return;
+    }
+    if (pernos === 'si' && !pernosFoto && !yaTienePernosFoto) {
+      setAlerta({ titulo: 'Falta la foto del seguro', texto: 'El vehículo tiene pernos de seguridad: toma la foto del seguro de los pernos para poder subir la revisión.' });
+      return;
+    }
+    if (!bornes) {
+      setAlerta({ titulo: 'Faltan los bornes de la batería', texto: 'Revisa los bornes de la batería y marca si están Bien o Mal antes de subir la revisión.' });
+      return;
+    }
     const yaTieneEscaner = (selectedOrder?.fotos || []).some(f => f?.tipo === 'escaner');
     if (scannerFotos.length === 0 && !yaTieneEscaner) {
-      setShowScannerAlert(true);
+      setAlerta({ titulo: 'Falta la foto del escáner', texto: 'No puedes subir el reporte sin adjuntar al menos una foto del escáner con los códigos de avería. Tómala en la sección "Escáner — códigos de avería" al final del formulario y vuelve a intentar.' });
       return;
     }
     // Cualquier ítem de Insumos/Servicios Especializados solo llega a reportData
@@ -366,6 +401,17 @@ export default function TechnicianView() {
       .filter(it => it.foto)
       .map(it => ({ src: it.foto, descripcion: `${it.item} — ${it.category} (Malo)` }));
     const items = itemsRaw.map(({ foto, ...rest }) => rest);
+    // Los bornes entran como un ítem más del reporte (si están mal, urgente).
+    if (!items.some(i => i.item === 'Bornes de la batería')) {
+      items.push({
+        category: 'Batería / Eléctrico', item: 'Bornes de la batería',
+        state: bornes === 'mal' ? 'Malo' : 'Bueno',
+        ...(bornes === 'mal' ? { prioridad: 'urgente', requiereRepuesto: false, recibeReparacion: true } : {})
+      });
+    }
+    const fotoPernos = pernos === 'si' && pernosFoto
+      ? [{ src: pernosFoto, descripcion: 'Seguro de los pernos de seguridad', tipo: 'pernos' }]
+      : [];
     const fotosEscaner = scannerFotos.map((src, i) => ({
       src, descripcion: `Escáner — códigos de avería${scannerFotos.length > 1 ? ` (${i + 1} de ${scannerFotos.length})` : ''}`, tipo: 'escaner'
     }));
@@ -381,22 +427,23 @@ export default function TechnicianView() {
       scannerCodes: [],
       precioDiagnostico: 0,
       reprobarDespues: reprobar,
+      pernosSeguridad: pernos === 'si',
       fecha: new Date().toISOString()
     };
     try {
-      if (fotosHallazgos.length > 0 || fotosEscaner.length > 0) {
+      if (fotosHallazgos.length > 0 || fotosEscaner.length > 0 || fotoPernos.length > 0) {
         const orderRes = await fetch(`${API_URL}/orders/${selectedOrder.id}`);
         if (!orderRes.ok) throw new Error('No se pudo leer la orden para guardar las fotos');
         const orderActual = await orderRes.json();
         // Las fotos del escáner de este envío reemplazan a las del envío anterior (el formulario trae el juego completo), en vez de acumularse.
-        const fotosActuales = (orderActual.fotos || []).filter(f => !(fotosEscaner.length > 0 && f?.tipo === 'escaner'));
+        const fotosActuales = (orderActual.fotos || []).filter(f => !(fotosEscaner.length > 0 && f?.tipo === 'escaner') && !(fotoPernos.length > 0 && f?.tipo === 'pernos'));
         // Antes esta petición no se revisaba: si el servidor la rechazaba
         // (payload muy grande, conexión mala), el reporte seguía y mostraba
         // "éxito" aunque las fotos nunca quedaran guardadas en la orden.
         const fotosRes = await fetch(`${API_URL}/orders/${selectedOrder.id}`, {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ fotos: [...fotosActuales, ...fotosEscaner, ...fotosHallazgos] })
+          body: JSON.stringify({ fotos: [...fotosActuales, ...fotosEscaner, ...fotoPernos, ...fotosHallazgos] })
         });
         if (!fotosRes.ok) throw new Error('El servidor rechazó el guardado de las fotos');
       }
@@ -428,6 +475,7 @@ export default function TechnicianView() {
         setSelectedOrder(null);
         setReportData({});
         setScannerFotos([]);
+        setPernos(null); setPernosFoto(null); setBornes(null);
         setReprobar(false);
         setStatusMsg({ text: '', type: '' });
         fetchOrders();
@@ -630,6 +678,38 @@ export default function TechnicianView() {
               </div>
             ))}
 
+            <div className="card" style={{ padding: '1rem', borderLeft: `4px solid ${pernos ? 'var(--success)' : 'var(--warning)'}` }}>
+              <h3 className="section-title" style={{ fontSize: '0.8rem' }}>¿El vehículo tiene pernos de seguridad? *</h3>
+              <div style={{ display: 'flex', gap: '0.5rem', marginBottom: pernos === 'si' ? '0.75rem' : 0 }}>
+                <button type="button" className={pernos === 'si' ? 'state-btn good' : 'state-btn'} style={{ padding: '0.5rem 1.4rem', fontSize: '1rem' }} onClick={() => setPernos('si')}>Sí</button>
+                <button type="button" className={pernos === 'no' ? 'state-btn good' : 'state-btn'} style={{ padding: '0.5rem 1.4rem', fontSize: '1rem' }} onClick={() => { setPernos('no'); setPernosFoto(null); }}>No</button>
+              </div>
+              {pernos === 'si' && (
+                pernosFoto ? (
+                  <div style={{ position: 'relative', display: 'inline-block' }}>
+                    <img src={pernosFoto} alt="seguro de los pernos" style={{ width: 120, height: 120, objectFit: 'cover', borderRadius: 10, border: '1px solid var(--border)', display: 'block' }} />
+                    <button type="button" onClick={() => setPernosFoto(null)}
+                      style={{ position: 'absolute', top: -6, right: -6, background: 'var(--error)', border: 'none', borderRadius: '50%', width: 22, height: 22, color: 'white', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                      <X size={13} />
+                    </button>
+                  </div>
+                ) : (
+                  <label style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem', padding: '0.9rem', border: '1.5px dashed var(--warning)', borderRadius: 10, color: 'var(--warning)', fontWeight: 700, cursor: 'pointer' }}>
+                    <Camera size={18} /> Tomar foto del seguro de los pernos
+                    <input type="file" accept="image/*" capture="environment" style={{ display: 'none' }} onChange={e => { handlePernosPhoto(e.target.files?.[0]); e.target.value = ''; }} />
+                  </label>
+                )
+              )}
+            </div>
+
+            <div className="card" style={{ padding: '1rem', borderLeft: `4px solid ${bornes ? (bornes === 'mal' ? 'var(--error)' : 'var(--success)') : 'var(--warning)'}` }}>
+              <h3 className="section-title" style={{ fontSize: '0.8rem' }}>Bornes de la batería *</h3>
+              <div style={{ display: 'flex', gap: '0.5rem' }}>
+                <button type="button" className={bornes === 'bien' ? 'state-btn good' : 'state-btn'} style={{ padding: '0.5rem 1.4rem', fontSize: '1rem' }} onClick={() => setBornes('bien')}>Bien</button>
+                <button type="button" className={bornes === 'mal' ? 'state-btn bad' : 'state-btn'} style={{ padding: '0.5rem 1.4rem', fontSize: '1rem' }} onClick={() => setBornes('mal')}>Mal</button>
+              </div>
+            </div>
+
             <label className="card" style={{ padding: '1rem', display: 'flex', alignItems: 'flex-start', gap: '0.75rem', cursor: 'pointer', borderLeft: `4px solid ${reprobar ? '#f59e0b' : 'var(--border)'}`, background: reprobar ? 'rgba(245,158,11,0.08)' : undefined }}>
               <input type="checkbox" checked={reprobar} onChange={e => setReprobar(e.target.checked)} style={{ width: 22, height: 22, marginTop: 2, flexShrink: 0 }} />
               <span>
@@ -742,17 +822,15 @@ export default function TechnicianView() {
       )}
 
       {showPhotoUpload && <PhotoUploadModal onClose={() => setShowPhotoUpload(false)} onSuccess={() => {}} />}
-      {showScannerAlert && (
+      {alerta && (
         <div className="modal-overlay" style={{ zIndex: 1200 }}>
           <div className="modal-box" style={{ maxWidth: 420, textAlign: 'center' }}>
             <div style={{ width: 64, height: 64, borderRadius: '50%', background: 'rgba(245,158,11,0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 1rem' }}>
               <AlertTriangle size={32} color="var(--warning)" />
             </div>
-            <h2 style={{ fontSize: '1.4rem', fontWeight: 900, marginBottom: '0.6rem' }}>Falta la foto del escáner</h2>
-            <p style={{ color: 'var(--text-muted)', fontSize: '1rem', lineHeight: 1.5, marginBottom: '1.5rem' }}>
-              No puedes subir el reporte sin adjuntar al menos una foto del escáner con los códigos de avería. Tómala en la sección <strong>"Escáner — códigos de avería"</strong> al final del formulario y vuelve a intentar.
-            </p>
-            <button className="btn-primary" style={{ width: '100%', justifyContent: 'center', padding: '0.9rem', fontWeight: 800 }} onClick={() => setShowScannerAlert(false)}>Entendido</button>
+            <h2 style={{ fontSize: '1.4rem', fontWeight: 900, marginBottom: '0.6rem' }}>{alerta.titulo}</h2>
+            <p style={{ color: 'var(--text-muted)', fontSize: '1rem', lineHeight: 1.5, marginBottom: '1.5rem' }}>{alerta.texto}</p>
+            <button className="btn-primary" style={{ width: '100%', justifyContent: 'center', padding: '0.9rem', fontWeight: 800 }} onClick={() => setAlerta(null)}>Entendido</button>
           </div>
         </div>
       )}
