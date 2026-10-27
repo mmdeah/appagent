@@ -1063,6 +1063,17 @@ export default function OrderDetailsModal({ order, onClose, fleetMode = false, i
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '0.25rem' }}>
             <span style={{ fontWeight: 800, fontSize: '1.4rem' }}>{order.placa}</span>
             <span className={`badge ${order.estado === 'Calidad' ? 'badge-green' : order.estado === 'Proceso' ? 'badge-yellow' : 'badge-blue'}`}>{order.estado}</span>
+            {!fleetMode && (
+              <button type="button" className="hide-on-print" title="Copia un enlace directo a esta orden (abre solo esta orden, rápido con internet lento)"
+                onClick={async () => {
+                  const url = `${window.location.origin}/orden/${order.id}?tab=${activeTab}`;
+                  try { await navigator.clipboard.writeText(url); showStatus('Enlace copiado'); }
+                  catch { window.prompt('Copia el enlace:', url); }
+                }}
+                style={{ background: 'none', border: '1px solid var(--border)', borderRadius: 6, padding: '0.2rem 0.55rem', cursor: 'pointer', color: 'var(--text-muted)', fontSize: '0.75rem' }}>
+                Copiar enlace
+              </button>
+            )}
           </div>
           <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>
             {order.marca} {order.modelo} {order.anio} &nbsp;·&nbsp;

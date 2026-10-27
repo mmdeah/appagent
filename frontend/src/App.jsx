@@ -8,6 +8,7 @@ import ContableView from './views/ContableView';
 import FleetView from './views/FleetView';
 import FleetLoginView from './views/FleetLoginView';
 import GastosUploadView from './views/GastosUploadView';
+import OrdenView from './views/OrdenView';
 
 export const ThemeContext = React.createContext({ theme: 'dark', toggleTheme: () => {} });
 
@@ -34,6 +35,7 @@ function App() {
             <Route path="/flota" element={<FleetView />} />
             <Route path="/flota-login" element={<FleetLoginView />} />
             <Route path="/gastos" element={<GastosUploadView />} />
+            <Route path="/orden/:id" element={<OrdenView />} />
           </Routes>
         </div>
       </BrowserRouter>
