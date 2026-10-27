@@ -54,7 +54,7 @@ export default function OrdenView() {
   useEffect(() => { cargar(); }, [id]);
 
   if (order) {
-    return <OrderDetailsModal order={order} initialTab={tab} onClose={() => navigate('/admin')} />;
+    return <OrderDetailsModal order={order} initialTab={tab} onClose={() => navigate('/buscar')} />;
   }
 
   return (
@@ -78,7 +78,7 @@ export default function OrdenView() {
         {estado === 'noexiste' && (
           <>
             <div style={{ fontWeight: 700, marginBottom: '0.4rem' }}>La orden {id} no existe</div>
-            <button className="btn-secondary" onClick={() => navigate('/admin')} style={{ margin: '0 auto' }}>Ir al panel</button>
+            <button className="btn-secondary" onClick={() => navigate('/buscar')} style={{ margin: '0 auto' }}>Buscar otra orden</button>
           </>
         )}
       </div>

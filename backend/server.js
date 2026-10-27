@@ -803,6 +803,27 @@ async function runCitasSync() {
   }
 }
 
+// Búsqueda liviana de órdenes por placa (o cliente): devuelve solo un resumen,
+// SIN fotos ni cotizaciones, para poder encontrar una orden sin cargar el
+// Kanban completo (que arrastra todas las fotos en base64).
+server.get('/api/buscar-ordenes', (req, res) => {
+  const norm = (t) => String(t || '').toLowerCase().replace(/[^a-z0-9ñ]/g, '');
+  const q = norm(req.query.q);
+  if (q.length < 2) return res.json([]);
+  const db = router.db;
+  const reports = db.get('reports').value() || [];
+  const out = (db.get('orders').value() || [])
+    .filter(o => norm(o.placa).includes(q) || norm(o.cliente).includes(q))
+    .sort((x, y) => Number(y.id) - Number(x.id))
+    .slice(0, 15)
+    .map(o => ({
+      id: o.id, placa: o.placa || '', marca: o.marca || '', modelo: o.modelo || '', anio: o.anio || '',
+      cliente: o.cliente || '', estado: o.estado || '', fecha: o.fecha || o.createdAt || null,
+      conReporte: reports.some(r => String(r.orderId) === String(o.id)),
+    }));
+  res.json(out);
+});
+
 server.post('/api/sync-citas', async (req, res) => {
   const r = await runCitasSync();
   res.status(r.ok ? 200 : 502).json(r);
