@@ -20,15 +20,37 @@ export default function OrdenView() {
   const [order, setOrder] = useState(null);
   const [estado, setEstado] = useState('cargando'); // cargando | error | noexiste
   const [intento, setIntento] = useState(0);
+  const [fotos, setFotos] = useState(null); // null = aún cargando
+  const [fotosError, setFotosError] = useState(false);
   const genRef = useRef(0);
+
+  // Las fotos pesan MB: se piden aparte, después de mostrar el reporte.
+  const cargarFotos = async (gen) => {
+    for (let n = 0; n <= 4; n++) {
+      try {
+        const r = await fetch(`${API_URL}/api/orders/${encodeURIComponent(id)}/fotos`);
+        if (!r.ok) throw new Error('no ok');
+        const f = await r.json();
+        if (genRef.current !== gen) return;
+        setFotos(Array.isArray(f) ? f : []);
+        return;
+      } catch {
+        if (genRef.current !== gen) return;
+        await new Promise(ok => setTimeout(ok, (n + 1) * 3000));
+      }
+    }
+    if (genRef.current === gen) setFotosError(true);
+  };
 
   const cargar = () => {
     const gen = ++genRef.current;
     setOrder(null);
+    setFotos(null);
+    setFotosError(false);
     setEstado('cargando');
     setIntento(0);
     const probar = (n) => {
-      fetch(`${API_URL}/orders/${encodeURIComponent(id)}?_embed=reports&_embed=quotes`)
+      fetch(`${API_URL}/api/orders/${encodeURIComponent(id)}/ligero`)
         .then(res => {
           if (res.status === 404) { if (genRef.current === gen) setEstado('noexiste'); return null; }
           if (!res.ok) throw new Error('respuesta no OK');
@@ -37,6 +59,7 @@ export default function OrdenView() {
         .then(data => {
           if (!data || genRef.current !== gen) return;
           setOrder(data);
+          cargarFotos(gen);
         })
         .catch(() => {
           if (genRef.current !== gen) return;
@@ -54,7 +77,17 @@ export default function OrdenView() {
   useEffect(() => { cargar(); }, [id]);
 
   if (order) {
-    return <OrderDetailsModal order={order} initialTab={tab} onClose={() => navigate('/buscar')} />;
+    return (
+      <>
+        {fotosError && (
+          <div className="toast toast-error" style={{ position: 'fixed', top: 12, left: '50%', transform: 'translateX(-50%)', zIndex: 2000 }}>
+            No se pudieron cargar las fotos. <button onClick={() => { setFotosError(false); cargarFotos(genRef.current); }} style={{ marginLeft: 8, textDecoration: 'underline', background: 'none', border: 'none', color: 'inherit', cursor: 'pointer' }}>Reintentar</button>
+          </div>
+        )}
+        <OrderDetailsModal order={order} initialTab={tab} onClose={() => navigate('/buscar')}
+          fotosCargando={fotos === null} fotosExternas={fotos} />
+      </>
+    );
   }
 
   return (

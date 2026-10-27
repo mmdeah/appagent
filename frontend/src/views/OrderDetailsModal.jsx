@@ -20,7 +20,7 @@ const PAYMENT_METHODS = ['Efectivo', 'Nequi', 'Bancolombia', 'Banco de Bogota', 
 const fotoSrc = (f) => (typeof f === 'string' ? f : f?.src);
 const fotoDesc = (f) => (typeof f === 'string' ? '' : (f?.descripcion || ''));
 
-export default function OrderDetailsModal({ order, onClose, fleetMode = false, initialTab = 'info', onUpdate }) {
+export default function OrderDetailsModal({ order, onClose, fleetMode = false, initialTab = 'info', onUpdate, fotosCargando = false, fotosExternas = null }) {
   const [activeTab, setActiveTab] = useState(initialTab);
   // Un pedido puede tener más de un reporte histórico si el técnico subió varios;
   // usamos siempre el más reciente por fecha, no el primero del arreglo.
@@ -139,7 +139,20 @@ export default function OrderDetailsModal({ order, onClose, fleetMode = false, i
   const replaceFotoIdx = useRef(null);
   const replaceInputRef = useRef(null);
 
+  // Cuando el detalle se abre desde /orden/ID las fotos llegan después del
+  // resto (pesan mucho). Mientras tanto `fotos` está vacío a propósito, así que
+  // NO se puede guardar nada de fotos (se borrarían las reales).
+  useEffect(() => {
+    if (!fotosExternas) return;
+    setFotos(fotosExternas);
+    Object.assign(order, { fotos: fotosExternas });
+  }, [fotosExternas]);
+
   const persistFotos = async (next) => {
+    if (fotosCargando) {
+      showStatus('Espera a que terminen de cargar las fotos.', 'error');
+      return false;
+    }
     setFotoBusy(true);
     try {
       const res = await fetch(`${API_URL}/orders/${order.id}`, {
@@ -360,13 +373,15 @@ export default function OrderDetailsModal({ order, onClose, fleetMode = false, i
       const res = await fetch(`${API_URL}/orders/${order.id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(editedOrder)
+        // Sin `fotos`: se guardan por su propio camino y, si la orden se abrió
+        // sin fotos (carga rápida), mandarlas aquí las borraría.
+        body: JSON.stringify((({ fotos: _f, ...resto }) => resto)(editedOrder))
       });
       if (res.ok) {
         showStatus('Información actualizada correctamente');
         setIsEditingInfo(false);
         // Recargar la página o actualizar el estado padre sería ideal, pero por ahora actualizamos el local
-        Object.assign(order, editedOrder);
+        Object.assign(order, (({ fotos: _f, ...resto }) => resto)(editedOrder));
       }
     } catch (err) {
       showStatus('Error al actualizar la información', 'error');
@@ -476,6 +491,7 @@ export default function OrderDetailsModal({ order, onClose, fleetMode = false, i
 
   const printReport = () => {
     if (!reportData || !reportData.items) return;
+    if (fotosCargando && !window.confirm('Las fotos todavía se están cargando: el PDF saldría sin ellas. ¿Imprimir de todos modos?')) return;
     const stateBadge = { Bueno: 'badge-good', Regular: 'badge-warn', Malo: 'badge-bad', Necesario: 'badge-warn', Realizar: 'badge-warn' };
     // Los ítems de Insumos/Servicios Especializados solo llegan aquí si el técnico los marcó,
     // así que si por datos viejos quedaron sin estado, se muestran con el estado que les corresponde
@@ -1207,7 +1223,7 @@ export default function OrderDetailsModal({ order, onClose, fleetMode = false, i
               {(fotos.length > 0 || !fleetMode) && (
                 <>
                   <p className="section-title" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                    <span><Camera size={12} style={{ display: 'inline', marginRight: 4 }} />Fotos de la Orden</span>
+                    <span><Camera size={12} style={{ display: 'inline', marginRight: 4 }} />Fotos de la Orden{fotosCargando ? ' — cargando...' : ''}</span>
                     {!fleetMode && <button type="button" className="btn-secondary hide-on-print" disabled={fotoBusy} onClick={() => pickFotos()}
                       style={{ fontSize: '0.75rem', padding: '0.25rem 0.7rem', display: 'inline-flex', alignItems: 'center', gap: '0.3rem', textTransform: 'none', letterSpacing: 0 }}>
                       <Plus size={12} /> Agregar fotos

@@ -824,6 +824,29 @@ server.get('/api/buscar-ordenes', (req, res) => {
   res.json(out);
 });
 
+// Orden SIN fotos (con sus reportes y cotizaciones) y, aparte, solo las fotos.
+// Las fotos en base64 pueden pesar varios MB por orden; así la pantalla de
+// detalle puede mostrar el reporte y la cotización de inmediato y traer las
+// fotos después, sin bloquear la carga con internet lento.
+server.get('/api/orders/:id/ligero', (req, res) => {
+  const db = router.db;
+  const o = db.get('orders').find(x => String(x.id) === String(req.params.id)).value();
+  if (!o) return res.status(404).json({ error: 'Orden no encontrada' });
+  const { fotos, reports: _r, quotes: _q, ...resto } = o;
+  res.json({
+    ...resto,
+    fotos: [],
+    fotosCount: Array.isArray(fotos) ? fotos.length : 0,
+    reports: (db.get('reports').value() || []).filter(r => String(r.orderId) === String(o.id)),
+    quotes: (db.get('quotes').value() || []).filter(q => String(q.orderId) === String(o.id)),
+  });
+});
+server.get('/api/orders/:id/fotos', (req, res) => {
+  const o = router.db.get('orders').find(x => String(x.id) === String(req.params.id)).value();
+  if (!o) return res.status(404).json({ error: 'Orden no encontrada' });
+  res.json(Array.isArray(o.fotos) ? o.fotos : []);
+});
+
 server.post('/api/sync-citas', async (req, res) => {
   const r = await runCitasSync();
   res.status(r.ok ? 200 : 502).json(r);
