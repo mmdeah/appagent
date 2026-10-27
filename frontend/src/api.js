@@ -22,6 +22,21 @@ if (backendUrl.endsWith('/')) {
 }
 export const BACKEND_URL = backendUrl;
 
+// Lista de órdenes liviana (solo texto, con reportes y cotizaciones, SIN fotos).
+// Si el servidor aún no tiene el endpoint nuevo, cae a la lista completa.
+export const fetchOrdersResumen = async () => {
+  try {
+    const r = await fetch(`${API_URL}/api/orders-resumen`);
+    if (r.ok) {
+      const d = await r.json();
+      if (Array.isArray(d)) return d;
+    }
+  } catch { /* se intenta la lista completa */ }
+  const r2 = await fetch(`${API_URL}/orders?_embed=reports&_embed=quotes`);
+  if (!r2.ok) throw new Error('respuesta no OK');
+  return r2.json();
+};
+
 /**
  * Retorna un mensaje si la placa tiene restricción de Pico y Placa hoy.
  * Lunes (1): 0, 9

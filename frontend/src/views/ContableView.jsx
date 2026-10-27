@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useContext } from 'react';
-import { API_URL } from '../api';
+import { API_URL, fetchOrdersResumen } from '../api';
 import { ThemeContext } from '../App';
-import OrderDetailsModal from './OrderDetailsModal';
+import OrderDetailsLoader from './OrderDetailsLoader';
 import { CreditCard, Building2, Banknote, ChevronRight, Search, X } from 'lucide-react';
 import BillingCycleTab from './BillingCycleTab';
 import { getRealQuoteTotal } from '../quoteUtils';
@@ -26,8 +26,7 @@ export default function ContableView() {
   const [selectedOrder, setSelectedOrder] = useState(null);
 
   const fetchAll = () => {
-    fetch(`${API_URL}/orders?_embed=quotes`)
-      .then(r => r.json()).then(d => setOrders(Array.isArray(d) ? d : [])).catch(() => {});
+    fetchOrdersResumen().then(d => setOrders(Array.isArray(d) ? d : [])).catch(() => {});
     fetch(`${API_URL}/expenses`)
       .then(r => r.json()).then(d => setExpenses(Array.isArray(d) ? d : [])).catch(() => {});
     fetch(`${API_URL}/ald_billings`)
@@ -283,7 +282,7 @@ export default function ContableView() {
       </div>
 
       {selectedOrder && (
-        <OrderDetailsModal
+        <OrderDetailsLoader
           order={selectedOrder}
           onClose={() => setSelectedOrder(null)}
           onUpdate={() => { fetchAll(); setSelectedOrder(null); }}

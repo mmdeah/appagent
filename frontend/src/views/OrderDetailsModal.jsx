@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { API_URL, BACKEND_URL } from '../api';
+import { API_URL, BACKEND_URL, fetchOrdersResumen } from '../api';
 import { Printer, CheckCircle, X, Plus, Trash2, Camera, Edit2, Save, FileText, Upload, Download, Search, MoveRight } from 'lucide-react';
 import { getQuoteSlot } from '../quoteUtils';
 
@@ -294,8 +294,7 @@ export default function OrderDetailsModal({ order, onClose, fleetMode = false, i
     if (priceLookupOrders !== null) return; // ya se cargó una vez, no repetir la consulta
     setLoadingPriceLookup(true);
     try {
-      const res = await fetch(`${API_URL}/orders?_embed=quotes`);
-      const data = await res.json();
+      const data = await fetchOrdersResumen();
       setPriceLookupOrders(Array.isArray(data) ? data : []);
     } catch (e) {
       console.error(e);
@@ -871,8 +870,7 @@ export default function OrderDetailsModal({ order, onClose, fleetMode = false, i
     if (todas === null) {
       setEstimadosLoading(true);
       try {
-        const res = await fetch(`${API_URL}/orders?_embed=quotes`);
-        const data = await res.json();
+        const data = await fetchOrdersResumen();
         todas = Array.isArray(data) ? data : [];
         setPriceLookupOrders(todas);
       } catch (e) {

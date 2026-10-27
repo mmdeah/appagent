@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useContext, useRef } from 'react';
-import { API_URL, BACKEND_URL, getPicoYPlaca } from '../api';
-import OrderDetailsModal from './OrderDetailsModal';
+import { API_URL, BACKEND_URL, getPicoYPlaca, fetchOrdersResumen } from '../api';
+import OrderDetailsLoader from './OrderDetailsLoader';
 import PhotoUploadModal from './PhotoUploadModal';
 import { ThemeContext } from '../App';
 import { PlusCircle, BarChart3, Camera, X, Car, Trash2, Zap, LayoutDashboard, History, Receipt, CheckCircle, AlertTriangle, ClipboardList, Save, Settings, FileText, Plus, Sparkles, CreditCard, Clock, BadgeCheck, Ban, Search, ChevronDown, MessageCircle, Pencil } from 'lucide-react';
@@ -304,8 +304,7 @@ export default function AdminView() {
 
   const fetchOrders = async () => {
     try {
-      const res = await fetch(`${API_URL}/orders?_embed=reports&_embed=quotes`);
-      const data = await res.json();
+      const data = await fetchOrdersResumen();
       const ordersArr = Array.isArray(data) ? data : [];
       setOrders(ordersArr);
       
@@ -2700,7 +2699,7 @@ ${PAYMENT_METHODS.map(m => `<tr><td>${m}</td><td style="text-align:right;font-we
       )}
 
       {selectedOrder && (
-        <OrderDetailsModal order={selectedOrder} onClose={() => { setSelectedOrder(null); fetchOrders(); }} />
+        <OrderDetailsLoader order={selectedOrder} onClose={() => { setSelectedOrder(null); fetchOrders(); }} />
       )}
 
       {showPhotoUpload && (

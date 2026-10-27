@@ -828,6 +828,36 @@ server.get('/api/buscar-ordenes', (req, res) => {
 // Las fotos en base64 pueden pesar varios MB por orden; así la pantalla de
 // detalle puede mostrar el reporte y la cotización de inmediato y traer las
 // fotos después, sin bloquear la carga con internet lento.
+// Lista de órdenes SOLO con texto: igual que /orders?_embed=reports&_embed=quotes
+// pero sin `fotos` (la parte pesada, MB por orden). Agrega fotosCount y
+// fotosTipos (p. ej. ['escaner','pernos']) para saber qué fotos hay sin traerlas.
+server.get('/api/orders-resumen', (req, res) => {
+  const db = router.db;
+  const agrupar = (arr) => {
+    const m = new Map();
+    for (const x of arr || []) {
+      const k = String(x.orderId);
+      if (!m.has(k)) m.set(k, []);
+      m.get(k).push(x);
+    }
+    return m;
+  };
+  const reports = agrupar(db.get('reports').value());
+  const quotes = agrupar(db.get('quotes').value());
+  const out = (db.get('orders').value() || []).map(o => {
+    const { fotos, ...resto } = o;
+    const lista = Array.isArray(fotos) ? fotos : [];
+    return {
+      ...resto,
+      fotosCount: lista.length,
+      fotosTipos: [...new Set(lista.map(f => f && typeof f === 'object' ? f.tipo : null).filter(Boolean))],
+      reports: reports.get(String(o.id)) || [],
+      quotes: quotes.get(String(o.id)) || [],
+    };
+  });
+  res.json(out);
+});
+
 server.get('/api/orders/:id/ligero', (req, res) => {
   const db = router.db;
   const o = db.get('orders').find(x => String(x.id) === String(req.params.id)).value();

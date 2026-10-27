@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useContext, useRef } from 'react';
-import { API_URL, getPicoYPlaca } from '../api';
+import { API_URL, getPicoYPlaca, fetchOrdersResumen } from '../api';
 import { ThemeContext } from '../App';
 import PhotoUploadModal from './PhotoUploadModal';
 import {
@@ -38,6 +38,9 @@ const REVISION_CATEGORIES_DEFAULT = {
 };
 
 const DIAGNOSTICO_AREAS = ["Suspensión", "Frenos", "Motor", "Caja de Cambios", "Clutch / Embrague", "Sistema de Refrigeración", "Inyección", "Sistema Eléctrico"];
+
+// La lista del técnico llega sin fotos (solo texto); fotosTipos dice qué tipos hay.
+const tieneFotoTipo = (o, tipo) => (o?.fotos || []).some(f => f?.tipo === tipo) || (o?.fotosTipos || []).includes(tipo);
 
 export default function TechnicianView() {
   const { theme, toggleTheme } = useContext(ThemeContext);
@@ -95,8 +98,7 @@ export default function TechnicianView() {
     setRetryCount(0);
 
     const tryFetch = (retryNum) => {
-      fetch(`${API_URL}/orders?_embed=quotes`)
-        .then(res => { if (!res.ok) throw new Error('respuesta no OK'); return res.json(); })
+      fetchOrdersResumen()
         .then(data => {
           if (fetchGenRef.current !== gen) return; // una llamada más nueva ya tomó el control
           setOrders(data.filter(o => o.estado !== 'Entregado'));
@@ -368,7 +370,7 @@ export default function TechnicianView() {
     // antes de abrir WhatsApp o tocar el servidor.
     // Tampoco sin responder lo de los pernos de seguridad (con foto del seguro
     // si los tiene) ni el estado de los bornes de la batería.
-    const yaTienePernosFoto = (selectedOrder?.fotos || []).some(f => f?.tipo === 'pernos');
+    const yaTienePernosFoto = tieneFotoTipo(selectedOrder, 'pernos');
     if (!pernos) {
       setAlerta({ titulo: 'Falta responder los pernos', texto: 'Indica si el vehículo tiene pernos de seguridad (Sí o No) antes de subir la revisión.' });
       return;
@@ -381,7 +383,7 @@ export default function TechnicianView() {
       setAlerta({ titulo: 'Faltan los bornes de la batería', texto: 'Revisa los bornes de la batería y marca si están Bien o Mal antes de subir la revisión.' });
       return;
     }
-    const yaTieneEscaner = (selectedOrder?.fotos || []).some(f => f?.tipo === 'escaner');
+    const yaTieneEscaner = tieneFotoTipo(selectedOrder, 'escaner');
     if (scannerFotos.length === 0 && !yaTieneEscaner) {
       setAlerta({ titulo: 'Falta la foto del escáner', texto: 'No puedes subir el reporte sin adjuntar al menos una foto del escáner con los códigos de avería. Tómala en la sección "Escáner — códigos de avería" al final del formulario y vuelve a intentar.' });
       return;
