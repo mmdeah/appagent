@@ -858,6 +858,34 @@ server.get('/api/orders-resumen', (req, res) => {
   res.json(out);
 });
 
+// Órdenes de una flota (ald = ALD/Ayvens, cn = Consult Networks): el servidor
+// filtra por cliente, así el portal no recibe las órdenes de otros clientes, y
+// van sin fotos (con reportes y cotizaciones).
+server.get('/api/flota/orders', (req, res) => {
+  const IS_ALD = (c) => /(ald|ayvens)/i.test(c || '');
+  const IS_CN = (c) => /consult.?networks/i.test(c || '');
+  const empresa = req.query.empresa;
+  const db = router.db;
+  const agrupar = (arr) => {
+    const m = new Map();
+    for (const x of arr || []) {
+      const k = String(x.orderId);
+      if (!m.has(k)) m.set(k, []);
+      m.get(k).push(x);
+    }
+    return m;
+  };
+  const reports = agrupar(db.get('reports').value());
+  const quotes = agrupar(db.get('quotes').value());
+  const out = (db.get('orders').value() || [])
+    .filter(o => empresa === 'ald' ? IS_ALD(o.cliente) : empresa === 'cn' ? IS_CN(o.cliente) : (IS_ALD(o.cliente) || IS_CN(o.cliente)))
+    .map(o => {
+      const { fotos, ...resto } = o;
+      return { ...resto, fotosCount: Array.isArray(fotos) ? fotos.length : 0, reports: reports.get(String(o.id)) || [], quotes: quotes.get(String(o.id)) || [] };
+    });
+  res.json(out);
+});
+
 server.get('/api/orders/:id/ligero', (req, res) => {
   const db = router.db;
   const o = db.get('orders').find(x => String(x.id) === String(req.params.id)).value();

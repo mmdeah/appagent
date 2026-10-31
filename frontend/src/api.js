@@ -22,6 +22,20 @@ if (backendUrl.endsWith('/')) {
 }
 export const BACKEND_URL = backendUrl;
 
+// Órdenes de una flota (ald | cn): filtradas y sin fotos desde el servidor.
+export const fetchFleetOrders = async (empresa) => {
+  try {
+    const r = await fetch(`${API_URL}/api/flota/orders?empresa=${encodeURIComponent(empresa || '')}`);
+    if (r.ok) {
+      const d = await r.json();
+      if (Array.isArray(d)) return { data: d, filtrado: true };
+    }
+  } catch { /* cae a la lista completa */ }
+  const r2 = await fetch(`${API_URL}/orders?_embed=quotes&_embed=reports`);
+  if (!r2.ok) throw new Error('respuesta no OK');
+  return { data: await r2.json(), filtrado: false };
+};
+
 // Lista de órdenes liviana (solo texto, con reportes y cotizaciones, SIN fotos).
 // Si el servidor aún no tiene el endpoint nuevo, cae a la lista completa.
 export const fetchOrdersResumen = async () => {

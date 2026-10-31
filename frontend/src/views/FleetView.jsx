@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useContext } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { API_URL } from '../api';
+import { API_URL, fetchFleetOrders } from '../api';
 import { ThemeContext } from '../App';
-import OrderDetailsModal from './OrderDetailsModal';
+import OrderDetailsLoader from './OrderDetailsLoader';
+import FleetVehiculos from './FleetVehiculos';
 import {
   LogOut, Car, Clock, CheckCircle, Search, X, ChevronRight,
   AlertTriangle, Download, Settings, TrendingUp, TrendingDown,
@@ -33,6 +34,13 @@ const sameMonth = (dateStr, y, m) => {
   return d.getFullYear() === y && d.getMonth() === m;
 };
 
+// El servidor ya filtra por empresa; esto se mantiene por si responde la lista completa.
+const filtrarFlota = (all, u) => (Array.isArray(all) ? all : []).filter(o => {
+  if (u.empresa === 'ald') return IS_ALD(o.cliente);
+  if (u.empresa === 'cn')  return IS_CN(o.cliente);
+  return IS_ALD(o.cliente) || IS_CN(o.cliente);
+});
+
 export default function FleetView() {
   const { toggleTheme } = useContext(ThemeContext);
   const navigate = useNavigate();
@@ -52,6 +60,8 @@ export default function FleetView() {
   // Days threshold config
   const [daysThreshold, setDaysThreshold] = useState(5);
   const [showDaysEdit, setShowDaysEdit] = useState(false);
+  // Intervalos de mantenimiento (cada X km o Y meses) para la pestaña Vehículos.
+  const [mantCfg, setMantCfg] = useState({ km: 5000, meses: 6 });
   const [daysInput, setDaysInput] = useState('5');
 
   useEffect(() => {
@@ -66,6 +76,10 @@ export default function FleetView() {
       setBudget(b);
       setBudgetInput(b.amount ? String(b.amount) : '');
     }
+    try {
+      const m = JSON.parse(localStorage.getItem(`fleetMant_${u.id}`) || 'null');
+      if (m && m.km && m.meses) setMantCfg(m);
+    } catch { /* se usan los valores por defecto */ }
     const savedDays = localStorage.getItem(`fleetDays_${u.id}`);
     if (savedDays) {
       const d = parseInt(savedDays) || 5;
@@ -73,31 +87,18 @@ export default function FleetView() {
       setDaysInput(String(d));
     }
 
-    fetch(`${API_URL}/orders?_embed=quotes&_embed=reports`)
-      .then(r => r.json())
-      .then(data => {
-        const all = Array.isArray(data) ? data : [];
-        setOrders(all.filter(o => {
-          if (u.empresa === 'ald') return IS_ALD(o.cliente);
-          if (u.empresa === 'cn')  return IS_CN(o.cliente);
-          return IS_ALD(o.cliente) || IS_CN(o.cliente);
-        }));
+    fetchFleetOrders(u.empresa)
+      .then(({ data }) => {
+        setOrders(filtrarFlota(data, u));
         setLoading(false);
       })
       .catch(() => setLoading(false));
   }, []);
 
   const refreshOrders = (u = user) => {
-    fetch(`${API_URL}/orders?_embed=quotes&_embed=reports`)
-      .then(r => r.json())
-      .then(data => {
-        const all = Array.isArray(data) ? data : [];
-        setOrders(all.filter(o => {
-          if (u.empresa === 'ald') return IS_ALD(o.cliente);
-          if (u.empresa === 'cn')  return IS_CN(o.cliente);
-          return IS_ALD(o.cliente) || IS_CN(o.cliente);
-        }));
-      });
+    fetchFleetOrders(u.empresa)
+      .then(({ data }) => setOrders(filtrarFlota(data, u)))
+      .catch(() => {});
   };
 
   const handleLogout = () => {
@@ -117,6 +118,11 @@ export default function FleetView() {
     const next = { ...budget, enabled: !budget.enabled };
     setBudget(next);
     localStorage.setItem(`fleetBudget_${user.id}`, JSON.stringify(next));
+  };
+
+  const saveMantCfg = (cfg) => {
+    setMantCfg(cfg);
+    localStorage.setItem(`fleetMant_${user.id}`, JSON.stringify(cfg));
   };
 
   const saveDays = () => {
@@ -207,6 +213,7 @@ export default function FleetView() {
   const TABS = [
     { id: 'resumen',   label: 'Resumen' },
     { id: 'kanban',    label: `Kanban (${activos.length})` },
+    { id: 'vehiculos', label: 'Vehículos' },
     { id: 'historial', label: `Historial (${entregados.length})` },
   ];
 
@@ -496,6 +503,12 @@ export default function FleetView() {
               </div>
             )}
 
+            {/* ── VEHÍCULOS (hoja de vida + próximos mantenimientos) ── */}
+            {activeTab === 'vehiculos' && (
+              <FleetVehiculos orders={orders} calcTotal={calcTotal} cfg={mantCfg} onSaveCfg={saveMantCfg}
+                onOpenOrder={(o) => { setModalInitialTab('info'); setSelectedOrder(o); }} />
+            )}
+
             {/* ── HISTORIAL ── */}
             {activeTab === 'historial' && (
               <div>
@@ -561,7 +574,7 @@ export default function FleetView() {
       </div>
 
       {selectedOrder && (
-        <OrderDetailsModal
+        <OrderDetailsLoader
           order={selectedOrder}
           onClose={() => setSelectedOrder(null)}
           fleetMode={true}
