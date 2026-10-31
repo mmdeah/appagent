@@ -61,6 +61,9 @@ export default function ClientView() {
   const [lightboxSrc, setLightboxSrc] = useState(null);
   const [networkError, setNetworkError] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [acepto, setAcepto] = useState(false); // casilla "estoy de acuerdo" de la confirmación
+  const [confirmando, setConfirmando] = useState(false);
+  const [confirmError, setConfirmError] = useState(false);
 
   const normalizePlate = (v) => (v || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
 
@@ -85,7 +88,29 @@ export default function ClientView() {
     }
   };
 
-  const selectOrder = (o) => { setSelectedOrder(o); setScreen('detail'); };
+  const selectOrder = (o) => { setSelectedOrder(o); setAcepto(false); setConfirmError(false); setScreen('detail'); };
+
+  // El cliente confirma que revisó los datos de la orden y está de acuerdo.
+  // Solo se guarda la confirmación (fecha); el resto de la orden no se toca.
+  const confirmarOrden = async () => {
+    if (!acepto || confirmando || !selectedOrder) return;
+    setConfirmando(true); setConfirmError(false);
+    const confirmacionCliente = { aceptado: true, fecha: new Date().toISOString() };
+    try {
+      const res = await fetch(`${API_URL}/orders/${selectedOrder.id}`, {
+        method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ confirmacionCliente })
+      });
+      if (!res.ok) throw new Error('rechazado');
+      const actualizada = { ...selectedOrder, confirmacionCliente };
+      setSelectedOrder(actualizada);
+      setOrders(prev => prev.map(o => o.id === actualizada.id ? actualizada : o));
+    } catch {
+      setConfirmError(true);
+    } finally {
+      setConfirmando(false);
+    }
+  };
   const backToResults = () => { setSelectedOrder(null); setScreen('results'); };
   const backToSearch = () => { setScreen('search'); setQuery(''); setPlaca(''); setOrders([]); setSelectedOrder(null); setNetworkError(false); };
 
@@ -423,6 +448,44 @@ export default function ClientView() {
                   <span style={{ fontSize: 12.5, color: '#a9ecc9', fontWeight: 600, lineHeight: 1.4 }}>Repuestos y mano de obra con amplia garantía</span>
                 </div>
                 <div style={{ fontSize: 11, color: '#5b6478', textAlign: 'center', marginTop: 12 }}>Valores expresados en pesos colombianos (COP)</div>
+              </div>
+            </div>
+          )}
+
+          <div style={{ padding: '16px 20px 0' }}>
+            <div style={{ ...card, background: 'rgba(245,185,66,.07)', border: '1px solid rgba(245,185,66,.25)' }}>
+              <div style={{ ...sectionLabel, color: '#f7c565' }}>Importante</div>
+              <p style={{ margin: '8px 0 0', fontSize: 14, lineHeight: 1.6, color: '#e3d7bd' }}>
+                Una vez entregado el vehículo, tienes <strong>48 horas</strong> para recogerlo. Si por alguna razón no puedes recogerlo y en el taller no hay espacio, deberás pagar los gastos de parqueadero. Solo en el peor de los casos el vehículo se llevaría a un parqueadero; si no es necesario, no se lleva.
+              </p>
+            </div>
+          </div>
+
+          {order.confirmacionCliente?.aceptado ? (
+            <div style={{ padding: '16px 20px 0' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '14px 16px', borderRadius: 16, background: 'rgba(61,220,151,.09)', border: '1px solid rgba(61,220,151,.25)' }}>
+                <CheckCircle2 size={20} color="#6be3ac" style={{ flexShrink: 0 }} />
+                <div style={{ fontSize: 14, color: '#a9ecc9', lineHeight: 1.45 }}>
+                  <strong>Confirmaste esta orden</strong> el {new Date(order.confirmacionCliente.fecha).toLocaleString('es-CO', { dateStyle: 'long', timeStyle: 'short' })}.
+                </div>
+              </div>
+            </div>
+          ) : order.estado !== 'Entregado' && (
+            <div style={{ padding: '16px 20px 0' }}>
+              <div style={card}>
+                <div style={sectionLabel}>Confirmación</div>
+                <label style={{ display: 'flex', alignItems: 'flex-start', gap: 12, marginTop: 12, cursor: 'pointer' }}>
+                  <input type="checkbox" checked={acepto} onChange={e => setAcepto(e.target.checked)} style={{ width: 22, height: 22, marginTop: 1, flexShrink: 0, accentColor: '#6d70f2' }} />
+                  <span style={{ fontSize: 14.5, lineHeight: 1.5, color: '#dfe3f1' }}>
+                    Revisé los datos de esta orden de servicio, todo está bien y estoy de acuerdo con ella y con la nota de arriba.
+                  </span>
+                </label>
+                <button type="button" onClick={confirmarOrden} disabled={!acepto || confirmando}
+                  style={{ width: '100%', marginTop: 16, minHeight: 50, borderRadius: 14, border: 'none', fontSize: 16, fontWeight: 700, fontFamily: 'inherit', color: '#fff',
+                    background: acepto ? '#6d70f2' : '#2a3350', opacity: acepto ? 1 : 0.6, cursor: acepto && !confirmando ? 'pointer' : 'not-allowed' }}>
+                  {confirmando ? 'Confirmando...' : 'Confirmar orden'}
+                </button>
+                {confirmError && <div style={{ marginTop: 10, fontSize: 13, color: '#ff8b8b', textAlign: 'center' }}>No se pudo guardar la confirmación. Revisa tu conexión e intenta de nuevo.</div>}
               </div>
             </div>
           )}
