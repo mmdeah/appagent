@@ -1006,6 +1006,9 @@ export default function AdminView() {
                               {o.quotes?.some(q => q.autorizada) && (
                                 <span title="Trabajo Autorizado" style={{ color: '#10b981', display: 'flex' }}><CheckCircle size={14} /></span>
                               )}
+                              {o.reports?.some(r => (r.observacionGeneral || '').trim() && !r.observacionAprobada) && (
+                                <span title="El técnico dejó una observación por aprobar" style={{ fontSize: '0.68rem', fontWeight: 700, color: '#d97706', background: 'rgba(245,158,11,0.15)', padding: '0.05rem 0.4rem', borderRadius: 999 }}>obs. por aprobar</span>
+                              )}
                             </div>
                             <div style={{ fontSize: '0.88rem', color: 'var(--text-muted)' }}>{o.marca} {o.modelo}</div>
                             {getPicoYPlaca(o.placa) && (

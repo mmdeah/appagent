@@ -18,6 +18,7 @@ const PAYMENT_METHODS = ['Efectivo', 'Nequi', 'Bancolombia', 'Banco de Bogota', 
 // order.fotos mezcla dos formatos: strings antiguos (sin descripción) y objetos
 // nuevos { src, descripcion } (fotos de hallazgos marcados como Malo en la revisión).
 const fotoSrc = (f) => (typeof f === 'string' ? f : f?.src);
+const escHtml = (t) => String(t ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 const fotoDesc = (f) => (typeof f === 'string' ? '' : (f?.descripcion || ''));
 
 export default function OrderDetailsModal({ order, onClose, fleetMode = false, initialTab = 'info', onUpdate, fotosCargando = false, fotosExternas = null }) {
@@ -147,6 +148,35 @@ export default function OrderDetailsModal({ order, onClose, fleetMode = false, i
     setFotos(fotosExternas);
     Object.assign(order, { fotos: fotosExternas });
   }, [fotosExternas]);
+
+  // Observación general del técnico: la escribe el técnico en la revisión, el
+  // admin la edita y la aprueba; solo aprobada sale al cliente, al reporte
+  // técnico y a la cotización.
+  const [obsTexto, setObsTexto] = useState(latestReport?.observacionGeneral || '');
+  const [obsBusy, setObsBusy] = useState(false);
+  const obsAprobada = !!(reportData?.observacionAprobada && (reportData?.observacionGeneral || '').trim());
+  const obsAprobadaTexto = obsAprobada ? reportData.observacionGeneral.trim() : '';
+  const guardarObservacion = async (aprobada) => {
+    if (!reportData?.id) return;
+    setObsBusy(true);
+    try {
+      const texto = obsTexto.trim();
+      const updated = { ...reportData, observacionGeneral: texto, observacionAprobada: aprobada && !!texto };
+      const res = await fetch(`${API_URL}/reports/${reportData.id}`, {
+        method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(updated)
+      });
+      if (!res.ok) throw new Error('El servidor rechazó el cambio');
+      setReportData(updated);
+      setObsTexto(texto);
+      onUpdate && onUpdate();
+      showStatus(updated.observacionAprobada ? 'Observación aprobada: ya sale al cliente' : 'Observación guardada');
+    } catch (e) {
+      console.error(e);
+      showStatus('No se pudo guardar la observación. Intenta de nuevo.', 'error');
+    } finally {
+      setObsBusy(false);
+    }
+  };
 
   const persistFotos = async (next) => {
     if (fotosCargando) {
@@ -530,6 +560,10 @@ export default function OrderDetailsModal({ order, onClose, fleetMode = false, i
         </div>
       </div>
 
+      ${obsAprobada ? `
+      <div class="section-header">Observación General</div>
+      <p style="padding: 10px 12px; background: #eff6ff; border-left: 3px solid #2563eb; border-radius: 6px; white-space: pre-wrap;">${escHtml(obsAprobadaTexto)}</p>` : ''}
+
       <div class="section-header">Resultados de la Revisión</div>
       <table>
         <thead>
@@ -740,6 +774,12 @@ export default function OrderDetailsModal({ order, onClose, fleetMode = false, i
         <div style="font-size: 12.5px; color: #422006; line-height: 1.55;">
           Esto es lo primero que se debe corregir en el vehículo. Una vez corregido esto, se vuelve a verificar el correcto funcionamiento. Pueden salir adicionales después de esta reparación.
         </div>
+      </div>` : ''}
+
+      ${obsAprobada ? `
+      <div style="margin: 0 0 18px; padding: 12px 16px; background: #eff6ff; border: 1px solid #bfdbfe; border-left: 6px solid #2563eb; border-radius: 8px; page-break-inside: avoid;">
+        <div style="font-size: 13px; font-weight: 700; color: #1e40af; margin-bottom: 4px;">Observación general</div>
+        <div style="font-size: 12.5px; color: #1e293b; line-height: 1.55; white-space: pre-wrap;">${escHtml(obsAprobadaTexto)}</div>
       </div>` : ''}
 
       <div class="section-header">Servicios Cotizados</div>
@@ -1438,6 +1478,31 @@ export default function OrderDetailsModal({ order, onClose, fleetMode = false, i
                 </div>
               ) : (
                 <>
+                  {!fleetMode ? (
+                    <div className="hide-on-print" style={{ marginBottom: '1.25rem', padding: '0.9rem 1rem', border: `1px solid ${obsAprobada ? 'rgba(16,185,129,0.5)' : 'var(--border)'}`, borderRadius: 10, background: 'var(--bg)' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.4rem', gap: '0.5rem', flexWrap: 'wrap' }}>
+                        <span style={{ fontSize: '0.88rem', fontWeight: 600 }}>Observación general</span>
+                        <span style={{ fontSize: '0.74rem', fontWeight: 600, color: obsAprobada ? 'var(--success)' : (obsTexto.trim() ? '#d97706' : 'var(--text-muted)') }}>
+                          {obsAprobada ? '✓ Aprobada · visible para el cliente' : (obsTexto.trim() ? 'Pendiente de aprobación' : 'Sin observación')}
+                        </span>
+                      </div>
+                      <textarea value={obsTexto} onChange={e => setObsTexto(e.target.value)} rows={3}
+                        placeholder="Observación del técnico (puedes editarla). Solo sale al cliente, al reporte y a la cotización cuando la apruebas."
+                        style={{ width: '100%', background: 'var(--surface)', color: 'var(--text)', border: '1px solid var(--border)', borderRadius: 8, padding: '0.5rem', fontFamily: 'inherit', fontSize: '0.88rem', resize: 'vertical' }} />
+                      <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.5rem', flexWrap: 'wrap' }}>
+                        <button className="btn-primary" style={{ fontSize: '0.8rem', padding: '0.35rem 0.9rem' }} disabled={obsBusy || !obsTexto.trim()} onClick={() => guardarObservacion(true)}>
+                          {obsAprobada ? 'Guardar cambios' : 'Aprobar y mostrar'}
+                        </button>
+                        {!obsAprobada && <button className="btn-secondary" style={{ fontSize: '0.8rem', padding: '0.35rem 0.9rem' }} disabled={obsBusy} onClick={() => guardarObservacion(false)}>Guardar sin aprobar</button>}
+                        {obsAprobada && <button className="btn-secondary" style={{ fontSize: '0.8rem', padding: '0.35rem 0.9rem' }} disabled={obsBusy} onClick={() => guardarObservacion(false)}>Ocultar al cliente</button>}
+                      </div>
+                    </div>
+                  ) : obsAprobada && (
+                    <div style={{ marginBottom: '1.25rem', padding: '0.8rem 1rem', background: '#eff6ff', borderLeft: '6px solid #2563eb', borderRadius: 10, color: '#1e293b' }}>
+                      <div style={{ fontWeight: 700, fontSize: '0.9rem', color: '#1e40af', marginBottom: '0.2rem' }}>Observación general</div>
+                      <div style={{ fontSize: '0.85rem', lineHeight: 1.5, whiteSpace: 'pre-wrap' }}>{obsAprobadaTexto}</div>
+                    </div>
+                  )}
                   <table className="data-table" style={{ marginBottom: '1.5rem' }}>
                     <thead>
                       <tr>
@@ -1581,6 +1646,13 @@ export default function OrderDetailsModal({ order, onClose, fleetMode = false, i
                   </button>
                 )}
               </div>
+
+              {obsAprobada && (
+                <div style={{ marginBottom: '1rem', padding: '0.8rem 1rem', background: '#eff6ff', border: '1px solid #bfdbfe', borderLeft: '6px solid #2563eb', borderRadius: 10, color: '#1e293b' }}>
+                  <div style={{ fontWeight: 700, fontSize: '0.9rem', color: '#1e40af', marginBottom: '0.2rem' }}>Observación general</div>
+                  <div style={{ fontSize: '0.85rem', lineHeight: 1.5, whiteSpace: 'pre-wrap' }}>{obsAprobadaTexto}</div>
+                </div>
+              )}
 
               {reportData?.reprobarDespues && (
                 <div style={{ marginBottom: '1rem', padding: '0.8rem 1rem', background: '#fefce8', border: '1px solid #facc15', borderLeft: '6px solid #eab308', borderRadius: 10, color: '#422006' }}>

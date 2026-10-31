@@ -346,6 +346,12 @@ export default function ClientView() {
                   <div style={sectionLabel}>Reporte de Inspección</div>
                   <div style={{ fontSize: 12.5, color: '#6b7488', marginTop: 4 }}>Diagnóstico general de tu vehículo (sin incluir precios)</div>
                 </div>
+                {report.observacionAprobada && (report.observacionGeneral || '').trim() && (
+                  <div style={{ marginTop: 14, padding: '12px 14px', background: 'rgba(109,112,242,.1)', border: '1px solid rgba(109,112,242,.28)', borderRadius: 12 }}>
+                    <div style={{ fontSize: 12, fontWeight: 700, color: '#a5a8ff', textTransform: 'uppercase', letterSpacing: '.05em', marginBottom: 4 }}>Observación del técnico</div>
+                    <div style={{ fontSize: 14, color: '#dfe3f1', lineHeight: 1.55, whiteSpace: 'pre-wrap' }}>{report.observacionGeneral.trim()}</div>
+                  </div>
+                )}
                 {badItems.length > 0 ? (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginTop: 14 }}>
                     {badItems.map((it, i) => (

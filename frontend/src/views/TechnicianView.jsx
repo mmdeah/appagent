@@ -50,6 +50,7 @@ export default function TechnicianView() {
   const [alerta, setAlerta] = useState(null); // { titulo, texto } — requisito que falta para poder subir
   const [pernos, setPernos] = useState(null); // ¿tiene pernos de seguridad? 'si' | 'no' | null (sin responder)
   const [pernosFoto, setPernosFoto] = useState(null); // foto del seguro de los pernos (obligatoria si tiene)
+  const [observacion, setObservacion] = useState(''); // observación general de la revisión (el admin la aprueba antes de que la vea el cliente)
   const [bornes, setBornes] = useState(null); // estado de los bornes de la batería: 'bien' | 'mal' | null
   const [reprobar, setReprobar] = useState(false); // corregir primero y volver a probar con el escáner
   const [scannerFotos, setScannerFotos] = useState([]); // fotos del escáner con los códigos de avería (una o varias)
@@ -141,6 +142,7 @@ export default function TechnicianView() {
     setPernos(draft?.pernos || null);
     setPernosFoto(draft?.pernosFoto || null);
     setBornes(draft?.bornes || null);
+    setObservacion(draft?.observacion || '');
     setPendingPriority(null);
     setSelectedOrder(o);
     try { localStorage.setItem(ACTIVE_KEY, String(o.id)); } catch { /* sin espacio/bloqueado */ }
@@ -162,15 +164,15 @@ export default function TechnicianView() {
     if (!selectedOrder) return;
     const hasData = Object.keys(reportData).length > 0
       || scannerFotos.length > 0
-      || pernos || bornes
+      || pernos || bornes || observacion
       || reprobar;
     if (!hasData) return;
     try {
-      localStorage.setItem(draftKey(selectedOrder.id), JSON.stringify({ reportData, scannerFotos, reprobar, pernos, pernosFoto, bornes, savedAt: Date.now() }));
+      localStorage.setItem(draftKey(selectedOrder.id), JSON.stringify({ reportData, scannerFotos, reprobar, pernos, pernosFoto, bornes, observacion, savedAt: Date.now() }));
     } catch (e) {
       console.warn('No se pudo guardar el borrador de la revisión', e);
     }
-  }, [selectedOrder, reportData, scannerFotos, reprobar, pernos, pernosFoto, bornes]);
+  }, [selectedOrder, reportData, scannerFotos, reprobar, pernos, pernosFoto, bornes, observacion]);
 
   // Si la app se recargó con una revisión a medias, reabre esa orden sola
   // apenas cargue la lista de vehículos (una sola vez).
@@ -459,6 +461,16 @@ export default function TechnicianView() {
         : null;
 
       // Solo se borra el borrador local si el servidor confirmó el guardado.
+      // Observación general: si el técnico no escribió nada nuevo (vacía o igual
+      // a la que ya envió), se conserva lo que el admin editó/aprobó. Si escribe
+      // algo distinto, vuelve a quedar pendiente de aprobación.
+      const obs = observacion.trim();
+      const conservar = existing && (!obs || obs === existing.observacionGeneralOriginal);
+      const obsCampos = conservar
+        ? { observacionGeneral: existing.observacionGeneral, observacionGeneralOriginal: existing.observacionGeneralOriginal, observacionAprobada: existing.observacionAprobada }
+        : (obs ? { observacionGeneral: obs, observacionGeneralOriginal: obs, observacionAprobada: false } : {});
+      Object.assign(payload, obsCampos);
+
       const reportRes = existing
         ? await fetch(`${API_URL}/reports/${existing.id}`, {
             method: 'PUT',
@@ -477,7 +489,7 @@ export default function TechnicianView() {
         setSelectedOrder(null);
         setReportData({});
         setScannerFotos([]);
-        setPernos(null); setPernosFoto(null); setBornes(null);
+        setPernos(null); setPernosFoto(null); setBornes(null); setObservacion('');
         setReprobar(false);
         setStatusMsg({ text: '', type: '' });
         fetchOrders();
@@ -710,6 +722,14 @@ export default function TechnicianView() {
                 <button type="button" className={bornes === 'bien' ? 'state-btn good' : 'state-btn'} style={{ padding: '0.5rem 1.4rem', fontSize: '1rem' }} onClick={() => setBornes('bien')}>Bien</button>
                 <button type="button" className={bornes === 'mal' ? 'state-btn bad' : 'state-btn'} style={{ padding: '0.5rem 1.4rem', fontSize: '1rem' }} onClick={() => setBornes('mal')}>Mal</button>
               </div>
+            </div>
+
+            <div className="card" style={{ padding: '1rem' }}>
+              <h3 className="section-title" style={{ fontSize: '0.8rem' }}>Observación general (opcional)</h3>
+              <textarea value={observacion} onChange={e => setObservacion(e.target.value)} rows={3}
+                placeholder="Algo que el cliente deba saber de la revisión..."
+                style={{ width: '100%', fontSize: '1rem', padding: '0.7rem', borderRadius: 10, border: '1px solid var(--border)', background: 'var(--bg)', color: 'var(--text)', fontFamily: 'inherit', resize: 'vertical' }} />
+              <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginTop: '0.3rem' }}>El administrador la revisa antes de que salga al cliente.</div>
             </div>
 
             <label className="card" style={{ padding: '1rem', display: 'flex', alignItems: 'flex-start', gap: '0.75rem', cursor: 'pointer', borderLeft: `4px solid ${reprobar ? '#f59e0b' : 'var(--border)'}`, background: reprobar ? 'rgba(245,158,11,0.08)' : undefined }}>
