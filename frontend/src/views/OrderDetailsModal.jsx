@@ -1117,12 +1117,6 @@ export default function OrderDetailsModal({ order, onClose, fleetMode = false, i
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '0.25rem' }}>
             <span style={{ fontWeight: 800, fontSize: '1.4rem' }}>{order.placa}</span>
             <span className={`badge ${order.estado === 'Calidad' ? 'badge-green' : order.estado === 'Proceso' ? 'badge-yellow' : 'badge-blue'}`}>{order.estado}</span>
-            {!fleetMode && order.confirmacionCliente?.aceptado && (
-              <span className="hide-on-print" title="El cliente confirmó que revisó la orden y está de acuerdo"
-                style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--success)', background: 'rgba(16,185,129,0.12)', padding: '0.15rem 0.55rem', borderRadius: 999 }}>
-                ✓ Cliente confirmó · {new Date(order.confirmacionCliente.fecha).toLocaleDateString('es-CO')}
-              </span>
-            )}
             {!fleetMode && (
               <button type="button" className="hide-on-print" title="Copia un enlace directo a esta orden (abre solo esta orden, rápido con internet lento)"
                 onClick={async () => {

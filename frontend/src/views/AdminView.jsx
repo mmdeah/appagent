@@ -1006,9 +1006,6 @@ export default function AdminView() {
                               {o.quotes?.some(q => q.autorizada) && (
                                 <span title="Trabajo Autorizado" style={{ color: '#10b981', display: 'flex' }}><CheckCircle size={14} /></span>
                               )}
-                              {o.confirmacionCliente?.aceptado && (
-                                <span title={`El cliente confirmó la orden el ${new Date(o.confirmacionCliente.fecha).toLocaleDateString('es-CO')}`} style={{ fontSize: '0.68rem', fontWeight: 700, color: '#10b981', background: 'rgba(16,185,129,0.14)', padding: '0.05rem 0.4rem', borderRadius: 999 }}>cliente ✓</span>
-                              )}
                               {o.reports?.some(r => (r.observacionGeneral || '').trim() && !r.observacionAprobada) && (
                                 <span title="El técnico dejó una observación por aprobar" style={{ fontSize: '0.68rem', fontWeight: 700, color: '#d97706', background: 'rgba(245,158,11,0.15)', padding: '0.05rem 0.4rem', borderRadius: 999 }}>obs. por aprobar</span>
                               )}
