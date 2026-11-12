@@ -59,7 +59,7 @@ export default function AdminView() {
   // formulario pasa a modo edición de ese gasto (ver handleExpenseSubmit).
   const [editingExpenseId, setEditingExpenseId] = useState(null);
   const gastoFormRef = useRef(null);
-  const [quickOrderForm, setQuickOrderForm] = useState({ placa: '', cliente: '', marca: '', modelo: '', anio: '', servicios: '' });
+  const [quickOrderForm, setQuickOrderForm] = useState({ placa: '', cliente: '', marca: '', modelo: '', anio: '', kilometraje: '', servicios: '' });
   const [formStatus, setFormStatus] = useState({ text: '', type: '' });
   const [orderToDelete, setOrderToDelete] = useState(null);
   const [draggedOrderId, setDraggedOrderId] = useState(null);
@@ -648,9 +648,16 @@ export default function AdminView() {
   const handleQuickOrder = async (e) => {
     e.preventDefault();
     if(!quickOrderForm.placa) return;
+    // El kilometraje es obligatorio en todo ingreso rápido (alimenta el historial y los mantenimientos del vehículo).
+    const kilometraje = String(quickOrderForm.kilometraje || '').replace(/\D/g, '');
+    if (!kilometraje || parseInt(kilometraje, 10) <= 0) {
+      window.alert('Escribe el kilometraje del vehículo para crear el ingreso.');
+      return;
+    }
     try {
       const payload = {
         ...quickOrderForm,
+        kilometraje,
         placa: quickOrderForm.placa.toUpperCase(),
         estado: 'Ingresos Rápidos',
         fecha: new Date().toISOString(),
@@ -662,7 +669,7 @@ export default function AdminView() {
         body: JSON.stringify(payload)
       });
       const newOrder = await res.json();
-      setQuickOrderForm({ placa: '', cliente: '', marca: '', modelo: '', anio: '', servicios: '' });
+      setQuickOrderForm({ placa: '', cliente: '', marca: '', modelo: '', anio: '', kilometraje: '', servicios: '' });
       setSelectedOrder({ ...newOrder, reports: [], quotes: [] });
       fetchOrders();
     } catch (e) { console.error(e); }
@@ -2411,6 +2418,11 @@ ${PAYMENT_METHODS.map(m => `<tr><td>${m}</td><td style="text-align:right;font-we
                         <input required placeholder="Corolla" value={quickOrderForm.modelo} onChange={e => setQuickOrderForm({...quickOrderForm, modelo: e.target.value})} style={{ flex: 2 }} />
                         <input placeholder="Año" type="number" value={quickOrderForm.anio} onChange={e => setQuickOrderForm({...quickOrderForm, anio: e.target.value})} style={{ flex: 1 }} />
                       </div>
+                    </div>
+                    <div>
+                      <label style={{ display: 'block', fontSize: '0.9rem', fontWeight: 600, color: 'var(--text-muted)', marginBottom: '0.4rem' }}>Kilometraje (km) *</label>
+                      <input required inputMode="numeric" placeholder="Ej. 85000" value={quickOrderForm.kilometraje}
+                        onChange={e => setQuickOrderForm({...quickOrderForm, kilometraje: e.target.value.replace(/\D/g, '')})} style={{ width: '100%' }} />
                     </div>
                   </div>
                   <div style={{ marginBottom: '1.5rem' }}>

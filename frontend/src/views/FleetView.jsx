@@ -50,7 +50,7 @@ export default function FleetView() {
   const [loading, setLoading] = useState(true);
   const [selectedOrder, setSelectedOrder] = useState(null);
   const [modalInitialTab, setModalInitialTab] = useState('info');
-  const [activeTab, setActiveTab] = useState('resumen');
+  const [activeTab, setActiveTab] = useState('vehiculos');
   const [search, setSearch] = useState('');
   // Budget config
   const [budget, setBudget] = useState({ enabled: false, amount: 0 });
@@ -211,9 +211,9 @@ export default function FleetView() {
   });
 
   const TABS = [
+    { id: 'vehiculos', label: 'Mis vehículos' },
     { id: 'resumen',   label: 'Resumen' },
     { id: 'kanban',    label: `Kanban (${activos.length})` },
-    { id: 'vehiculos', label: 'Vehículos' },
     { id: 'historial', label: `Historial (${entregados.length})` },
   ];
 
