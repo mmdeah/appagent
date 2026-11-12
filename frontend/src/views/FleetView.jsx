@@ -1,7 +1,7 @@
-import React, { useState, useEffect, useContext } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { API_URL, fetchFleetOrders } from '../api';
-import { ThemeContext } from '../App';
+import { useFleetTheme, fleetThemeStyle } from '../fleetTheme';
 import OrderDetailsLoader from './OrderDetailsLoader';
 import FleetVehiculos from './FleetVehiculos';
 import {
@@ -42,7 +42,7 @@ const filtrarFlota = (all, u) => (Array.isArray(all) ? all : []).filter(o => {
 });
 
 export default function FleetView() {
-  const { toggleTheme } = useContext(ThemeContext);
+  const [tema, toggleTheme] = useFleetTheme();
   const navigate = useNavigate();
 
   const [user, setUser] = useState(null);
@@ -78,8 +78,13 @@ export default function FleetView() {
     }
     try {
       const m = JSON.parse(localStorage.getItem(`fleetMant_${u.id}`) || 'null');
-      if (m && m.km && m.meses) setMantCfg(m);
+      if (m && m.meses) setMantCfg({ km: m.km ?? 5000, meses: m.meses });
     } catch { /* se usan los valores por defecto */ }
+    // La elección también vive en el servidor, así la ve igual desde cualquier equipo.
+    fetch(`${API_URL}/settings/fleet_mant_${u.id}`)
+      .then(r => (r.ok ? r.json() : null))
+      .then(d => { if (d && d.meses) setMantCfg({ km: d.km ?? 5000, meses: d.meses }); })
+      .catch(() => {});
     const savedDays = localStorage.getItem(`fleetDays_${u.id}`);
     if (savedDays) {
       const d = parseInt(savedDays) || 5;
@@ -123,6 +128,10 @@ export default function FleetView() {
   const saveMantCfg = (cfg) => {
     setMantCfg(cfg);
     localStorage.setItem(`fleetMant_${user.id}`, JSON.stringify(cfg));
+    const registro = { id: `fleet_mant_${user.id}`, km: cfg.km, meses: cfg.meses };
+    fetch(`${API_URL}/settings/${registro.id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(registro) })
+      .then(r => (r.ok ? null : fetch(`${API_URL}/settings`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(registro) })))
+      .catch(() => { /* queda guardado en este navegador */ });
   };
 
   const saveDays = () => {
@@ -218,9 +227,9 @@ export default function FleetView() {
   ];
 
   return (
-    <div style={{ minHeight: '100vh', background: 'var(--bg)', color: 'var(--text)' }}>
+    <div data-theme={tema} style={{ minHeight: '100vh', background: 'var(--bg)', color: 'var(--text)', ...fleetThemeStyle(tema) }}>
       {/* Header */}
-      <div style={{ background: 'var(--card-bg)', borderBottom: '1px solid var(--border)', padding: '1rem 1.5rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', position: 'sticky', top: 0, zIndex: 50 }}>
+      <div style={{ background: 'var(--surface)', borderBottom: '1px solid var(--border)', padding: '1rem 1.5rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', position: 'sticky', top: 0, zIndex: 50 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
           <div style={{ width: 36, height: 36, borderRadius: 9, background: companyBg, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
             <Car size={18} color={companyColor} />
@@ -241,7 +250,7 @@ export default function FleetView() {
 
       <div style={{ maxWidth: 1200, margin: '0 auto', padding: '1.5rem' }}>
         {/* Tabs */}
-        <div style={{ display: 'flex', gap: '0.4rem', background: 'var(--card-bg)', padding: '0.3rem', borderRadius: 10, border: '1px solid var(--border)', marginBottom: '1.5rem', width: 'fit-content' }}>
+        <div style={{ display: 'flex', gap: '0.4rem', background: 'var(--surface)', padding: '0.3rem', borderRadius: 10, border: '1px solid var(--border)', marginBottom: '1.5rem', width: 'fit-content' }}>
           {TABS.map(t => (
             <button key={t.id} onClick={() => { setActiveTab(t.id); setSearch(''); }}
               style={{ padding: '0.45rem 1rem', borderRadius: 8, border: 'none', cursor: 'pointer', fontWeight: 700, fontSize: '0.88rem', background: activeTab === t.id ? 'var(--primary)' : 'transparent', color: activeTab === t.id ? 'white' : 'var(--text-muted)', transition: '0.2s' }}>

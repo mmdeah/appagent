@@ -1,11 +1,11 @@
-import React, { useState, useContext } from 'react';
+import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Car, Lock, User } from 'lucide-react';
-import { ThemeContext } from '../App';
+import { useFleetTheme, fleetThemeStyle } from '../fleetTheme';
 import { BACKEND_URL } from '../api';
 
 export default function FleetLoginView() {
-  const { toggleTheme } = useContext(ThemeContext);
+  const [tema, toggleTheme] = useFleetTheme();
   const navigate = useNavigate();
   const [usuario, setUsuario] = useState('');
   const [password, setPassword] = useState('');
@@ -37,7 +37,7 @@ export default function FleetLoginView() {
   };
 
   return (
-    <div className="login-page">
+    <div className="login-page" data-theme={tema} style={fleetThemeStyle(tema)}>
       <div className="login-box">
         <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '0.75rem' }}>
           <button onClick={toggleTheme} className="theme-toggle" title="Cambiar tema" />

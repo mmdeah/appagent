@@ -104,8 +104,10 @@ function analizar(placa, ordenes, calcTotal, cfg, periodo) {
   if (aceite) {
     const dias = (Date.now() - parseF(aceite.fecha)) / DIA;
     kmDesdeAceite = aceite.km > 0 && kmActual > aceite.km ? kmActual - aceite.km : null;
-    const vencido = dias > cfg.meses * 30.4 || (kmDesdeAceite !== null && kmDesdeAceite >= cfg.km);
-    const proximo = dias > cfg.meses * 30.4 * 0.85 || (kmDesdeAceite !== null && kmDesdeAceite >= cfg.km * 0.85);
+    // cfg.km = 0 significa "solo por tiempo": el kilometraje no se tiene en cuenta.
+    const usaKm = cfg.km > 0;
+    const vencido = dias > cfg.meses * 30.4 || (usaKm && kmDesdeAceite !== null && kmDesdeAceite >= cfg.km);
+    const proximo = dias > cfg.meses * 30.4 * 0.85 || (usaKm && kmDesdeAceite !== null && kmDesdeAceite >= cfg.km * 0.85);
     aceiteEstado = vencido ? 'vencido' : proximo ? 'proximo' : 'ok';
   }
   const aceiteEnCurso = !!(activa && ((getQuoteSlot(activa, 1)?.items || []).some(it => esCambioAceite(it.descripcion)) || (activa.servicios || '').split(/[,;\n]+/).some(esCambioAceite)));
@@ -136,7 +138,7 @@ function analizar(placa, ordenes, calcTotal, cfg, periodo) {
     const base = parseF(servicioFecha(ultimo));
     const kmUltimo = kmNum(ultimo.kilometraje) || Math.max(0, ...entregadas.map(o => kmNum(o.kilometraje)));
     const dueFecha = new Date(base); dueFecha.setMonth(dueFecha.getMonth() + cfg.meses);
-    const dueKm = kmUltimo > 0 ? kmUltimo + cfg.km : null;
+    const dueKm = kmUltimo > 0 && cfg.km > 0 ? kmUltimo + cfg.km : null;
 
     // Ritmo de uso: km entre el servicio más antiguo y el más reciente con km.
     const conKm = entregadas.filter(o => kmNum(o.kilometraje) > 0 && servicioFecha(o));
@@ -199,14 +201,69 @@ function BloqueAceite({ v, grande }) {
   );
 }
 
+// Cada cuánto se hace el mantenimiento (cambio de aceite y revisión general):
+// la persona que administra la flota lo decide ella misma. Los meses se eligen
+// con un toque (4, 6, 8, 12) o se escribe cualquier número; el kilometraje es
+// opcional: sin él, el aviso se calcula solo por tiempo.
+const MESES_RAPIDOS = [3, 4, 6, 8, 12];
+function ConfigMantenimiento({ cfg, onSave }) {
+  const [meses, setMeses] = useState(String(cfg.meses));
+  const [km, setKm] = useState(cfg.km > 0 ? String(cfg.km) : '');
+  const [usaKm, setUsaKm] = useState(cfg.km > 0);
+  // Si la configuración llega del servidor después de montar, se refleja aquí.
+  React.useEffect(() => { setMeses(String(cfg.meses)); setKm(cfg.km > 0 ? String(cfg.km) : ''); setUsaKm(cfg.km > 0); }, [cfg.meses, cfg.km]);
+
+  const aplicar = (m, k, u) => {
+    const mm = Math.min(60, Math.max(1, parseInt(m, 10) || cfg.meses));
+    const kk = u ? (parseInt(k, 10) || 5000) : 0;
+    if (mm !== cfg.meses || kk !== cfg.km) onSave({ meses: mm, km: kk });
+  };
+  const elegir = (m) => { setMeses(String(m)); aplicar(m, km, usaKm); };
+
+  return (
+    <div className="card" style={{ padding: '0.9rem 1.1rem', marginBottom: '1rem' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', flexWrap: 'wrap' }}>
+        <span style={{ display: 'flex', alignItems: 'center', gap: 6, fontWeight: 700, fontSize: '0.9rem' }}>
+          <Settings size={15} color="var(--primary)" /> Mantenimiento cada
+        </span>
+        {MESES_RAPIDOS.map(m => (
+          <button key={m} onClick={() => elegir(m)}
+            style={{ padding: '0.3rem 0.8rem', borderRadius: 20, cursor: 'pointer', fontSize: '0.82rem', fontWeight: 700,
+              border: `1.5px solid ${cfg.meses === m ? 'var(--primary)' : 'var(--border)'}`,
+              background: cfg.meses === m ? 'var(--primary)' : 'transparent', color: cfg.meses === m ? '#fff' : 'var(--text)' }}>
+            {m}
+          </button>
+        ))}
+        <span style={{ fontSize: '0.82rem', color: 'var(--text-muted)' }}>o</span>
+        <input type="text" inputMode="numeric" value={meses} onChange={e => setMeses(e.target.value.replace(/\D/g, ''))}
+          onBlur={() => aplicar(meses, km, usaKm)} onKeyDown={e => { if (e.key === 'Enter') e.currentTarget.blur(); }}
+          style={{ width: 52, padding: '0.3rem 0.4rem', textAlign: 'center' }} aria-label="Meses entre mantenimientos" />
+        <span style={{ fontSize: '0.85rem', fontWeight: 600 }}>meses</span>
+
+        <span style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+          <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: '0.82rem', cursor: 'pointer', color: 'var(--text-muted)' }}>
+            <input type="checkbox" checked={usaKm} onChange={e => { setUsaKm(e.target.checked); aplicar(meses, km, e.target.checked); }} />
+            también cada
+          </label>
+          <input type="text" inputMode="numeric" disabled={!usaKm} value={km} placeholder="5000"
+            onChange={e => setKm(e.target.value.replace(/\D/g, ''))} onBlur={() => aplicar(meses, km, usaKm)}
+            onKeyDown={e => { if (e.key === 'Enter') e.currentTarget.blur(); }}
+            style={{ width: 80, padding: '0.3rem 0.4rem', textAlign: 'right', opacity: usaKm ? 1 : 0.5 }} aria-label="Kilómetros entre mantenimientos" />
+          <span style={{ fontSize: '0.82rem', color: 'var(--text-muted)' }}>km</span>
+        </span>
+      </div>
+      <div style={{ fontSize: '0.74rem', color: 'var(--text-muted)', marginTop: 6 }}>
+        Con esto se marca cada vehículo como Al día, Próximo o Vencido. Se guarda automáticamente.
+      </div>
+    </div>
+  );
+}
+
 export default function FleetVehiculos({ orders, calcTotal, cfg, onSaveCfg, onOpenOrder }) {
   const [q, setQ] = useState('');
   const [filtro, setFiltro] = useState('todos'); // todos | vencido | proximo
   const [periodo, setPeriodo] = useState('6');
   const [abierta, setAbierta] = useState(null); // placa con la vista detallada
-  const [showCfg, setShowCfg] = useState(false);
-  const [kmInput, setKmInput] = useState(String(cfg.km));
-  const [mesesInput, setMesesInput] = useState(String(cfg.meses));
 
   const vehiculos = useMemo(() => {
     const grupos = new Map();
@@ -233,8 +290,6 @@ export default function FleetVehiculos({ orders, calcTotal, cfg, onSaveCfg, onOp
     (filtro === 'todos' || v.estado === filtro) &&
     (!t || v.placa.toLowerCase().includes(t) || `${v.ref?.marca || ''} ${v.ref?.modelo || ''}`.toLowerCase().includes(t))
   );
-
-  const guardarCfg = () => onSaveCfg({ km: parseInt(kmInput, 10) || 5000, meses: parseInt(mesesInput, 10) || 6 });
 
   // ───────────── Vista detallada de un vehículo ─────────────
   const detalle = abierta ? vehiculos.find(v => v.placa === abierta) : null;
@@ -363,6 +418,8 @@ export default function FleetVehiculos({ orders, calcTotal, cfg, onSaveCfg, onOp
         ))}
       </div>
 
+      <ConfigMantenimiento cfg={cfg} onSave={onSaveCfg} />
+
       <div style={{ display: 'flex', gap: '0.6rem', marginBottom: '1rem', flexWrap: 'wrap', alignItems: 'center' }}>
         <div style={{ position: 'relative', flex: 1, minWidth: 180 }}>
           <Search size={14} style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)', pointerEvents: 'none' }} />
@@ -375,20 +432,7 @@ export default function FleetVehiculos({ orders, calcTotal, cfg, onSaveCfg, onOp
         {chip('todos', `Todos (${vehiculos.length})`, 'var(--primary)')}
         {chip('vencido', `Vencidos (${conteo.vencido})`, '#ef4444')}
         {chip('proximo', `Próximos (${conteo.proximo})`, '#f59e0b')}
-        <button onClick={() => setShowCfg(s => !s)} title="Intervalos de mantenimiento" className="btn-secondary" style={{ padding: '0.4rem 0.6rem', display: 'flex' }}><Settings size={15} /></button>
       </div>
-
-      {showCfg && (
-        <div className="card" style={{ padding: '0.9rem 1.1rem', marginBottom: '1rem', display: 'flex', gap: '0.75rem', alignItems: 'center', flexWrap: 'wrap' }}>
-          <span style={{ fontWeight: 700, fontSize: '0.88rem' }}>Aceite y mantenimiento cada</span>
-          <input type="text" value={kmInput} onChange={e => setKmInput(e.target.value.replace(/\D/g, ''))} style={{ width: 90, padding: '0.35rem 0.5rem' }} />
-          <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>km o</span>
-          <input type="text" value={mesesInput} onChange={e => setMesesInput(e.target.value.replace(/\D/g, ''))} style={{ width: 55, padding: '0.35rem 0.5rem' }} />
-          <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>meses (lo que llegue primero)</span>
-          <button className="btn-secondary" style={{ padding: '0.35rem 0.9rem', fontSize: '0.8rem' }} onClick={guardarCfg}
-            disabled={String(cfg.km) === kmInput && String(cfg.meses) === mesesInput}>Guardar</button>
-        </div>
-      )}
 
       {visibles.length === 0 ? (
         <div className="card" style={{ padding: '3rem', textAlign: 'center', color: 'var(--text-muted)' }}>
