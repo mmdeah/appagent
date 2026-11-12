@@ -37,6 +37,10 @@ const haceTxt = (d) => {
 // transmisión, diferencial, hidráulico, dirección, etc.
 const NO_MOTOR = /caja|transmision|diferencial|hidraul|direccion|atf|valvulina|freno|refrigerante/;
 const esAceite = (txt) => { const n = normItem(txt); return n.includes('aceite') && !NO_MOTOR.test(n); };
+// "Mantenimiento General" incluye el cambio de aceite, los filtros y una revisión
+// (no es lo mismo que "Mantenimiento de Frenos", que no cuenta).
+const esMantGeneral = (txt) => { const n = normItem(txt); return /mantenimiento general/.test(n) && !n.includes('freno'); };
+const esCambioAceite = (txt) => esAceite(txt) || esMantGeneral(txt);
 
 const ESTADO = {
   vencido: { label: 'Vencido', color: '#ef4444', bg: 'rgba(239,68,68,0.12)', orden: 0 },
@@ -88,10 +92,10 @@ function analizar(placa, ordenes, calcTotal, cfg, periodo) {
   // de las órdenes ENTREGADAS y toma la más reciente.
   let aceite = null;
   for (const o of entregadas) {
-    const enCotizacion = (getQuoteSlot(o, 1)?.items || []).find(it => esAceite(it.descripcion));
-    const enServicios = (o.servicios || '').split(/[,;\n]+/).find(esAceite);
+    const enCotizacion = (getQuoteSlot(o, 1)?.items || []).find(it => esCambioAceite(it.descripcion));
+    const enServicios = (o.servicios || '').split(/[,;\n]+/).find(esCambioAceite);
     const hit = enCotizacion?.descripcion || enServicios;
-    if (hit) { aceite = { fecha: ingresoFecha(o), km: kmNum(o.kilometraje), orden: o, desc: hit.trim() }; break; }
+    if (hit) { aceite = { fecha: ingresoFecha(o), km: kmNum(o.kilometraje), orden: o, desc: hit.trim(), porMantenimiento: esMantGeneral(hit) && !esAceite(hit) }; break; }
   }
   const kmMax = Math.max(0, ...lista.map(o => kmNum(o.kilometraje)));
   const refKm = lista.find(o => kmNum(o.kilometraje) > 0);
@@ -104,7 +108,7 @@ function analizar(placa, ordenes, calcTotal, cfg, periodo) {
     const proximo = dias > cfg.meses * 30.4 * 0.85 || (kmDesdeAceite !== null && kmDesdeAceite >= cfg.km * 0.85);
     aceiteEstado = vencido ? 'vencido' : proximo ? 'proximo' : 'ok';
   }
-  const aceiteEnCurso = !!(activa && ((getQuoteSlot(activa, 1)?.items || []).some(it => esAceite(it.descripcion)) || (activa.servicios || '').split(/[,;\n]+/).some(esAceite)));
+  const aceiteEnCurso = !!(activa && ((getQuoteSlot(activa, 1)?.items || []).some(it => esCambioAceite(it.descripcion)) || (activa.servicios || '').split(/[,;\n]+/).some(esCambioAceite)));
 
   // Fallas (ítems en Malo) que aparecen en 2 o más órdenes distintas.
   const fallas = new Map();
@@ -185,6 +189,7 @@ function BloqueAceite({ v, grande }) {
             {v.aceite.km > 0 ? `a los ${fmt(v.aceite.km)} km` : 'km no registrado'}
             {v.kmDesdeAceite ? ` · ${fmt(v.kmDesdeAceite)} km desde entonces` : ''}
           </div>
+          {v.aceite.porMantenimiento && <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginTop: 2 }}>Incluido en el Mantenimiento General</div>}
         </>
       ) : (
         <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>No hay cambio de aceite en las órdenes entregadas.</div>
@@ -312,7 +317,7 @@ export default function FleetVehiculos({ orders, calcTotal, cfg, onSaveCfg, onOp
                   <div style={{ marginTop: 8 }}>
                     {items.map((it, i) => (
                       <div key={i} style={{ display: 'flex', justifyContent: 'space-between', gap: '1rem', padding: '0.35rem 0', borderTop: '1px solid var(--border)', fontSize: '0.85rem' }}>
-                        <span>{it.descripcion}{esAceite(it.descripcion) && <span style={{ marginLeft: 6, fontSize: '0.66rem', fontWeight: 700, color: '#0ea5e9', background: 'rgba(14,165,233,0.12)', padding: '0.05rem 0.4rem', borderRadius: 999 }}>aceite</span>}</span>
+                        <span>{it.descripcion}{esCambioAceite(it.descripcion) && <span style={{ marginLeft: 6, fontSize: '0.66rem', fontWeight: 700, color: '#0ea5e9', background: 'rgba(14,165,233,0.12)', padding: '0.05rem 0.4rem', borderRadius: 999 }}>{esMantGeneral(it.descripcion) && !esAceite(it.descripcion) ? 'incluye aceite' : 'aceite'}</span>}</span>
                         <span style={{ whiteSpace: 'nowrap', color: 'var(--text-muted)' }}>{(parseFloat(it.cantidad) || 1) > 1 ? `${it.cantidad} × ` : ''}${fmt(it.precio)}</span>
                       </div>
                     ))}
@@ -439,7 +444,7 @@ export default function FleetVehiculos({ orders, calcTotal, cfg, onSaveCfg, onOp
         </div>
       )}
       <div style={{ fontSize: '0.74rem', color: 'var(--text-muted)', marginTop: '0.75rem' }}>
-        El cambio de aceite se busca en la cotización y en los servicios de las órdenes entregadas. Los km de hoy son una estimación según el ritmo del vehículo.
+        El cambio de aceite se busca en la cotización y en los servicios de las órdenes entregadas (cuenta el "Mantenimiento General", que lo incluye). Los km de hoy son una estimación según el ritmo del vehículo.
       </div>
     </div>
   );
