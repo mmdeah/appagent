@@ -362,11 +362,11 @@ export default function AsesorView() {
   const cargar = useCallback(async () => {
     setError(false);
     try {
-      const r = await pedir(`${API_URL}/api/asesor/ordenes`);
+      const r = await pedir(`${API_URL}/api/asesor/ordenes?asesor=${encodeURIComponent(user?.nombre || '')}`);
       if (!r.ok) throw new Error('no ok');
       setOrdenes(await r.json());
     } catch { setError(true); }
-  }, []);
+  }, [user]);
   useEffect(() => { if (user) cargar(); }, [user, cargar]);
 
   if (!user) return null;
@@ -389,7 +389,7 @@ export default function AsesorView() {
       <div style={{ background: 'var(--surface)', borderBottom: '1px solid var(--border)', padding: '1rem 1.5rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '1rem', flexWrap: 'wrap' }}>
         <div>
           <h1 style={{ fontSize: '1.1rem', fontWeight: 800, margin: 0, lineHeight: 1.1 }}>Ayvens · Asesor {user.nombre}</h1>
-          <p style={{ fontSize: '0.78rem', color: 'var(--text-muted)', margin: 0 }}>Órdenes activas y cambios por aprobar</p>
+          <p style={{ fontSize: '0.78rem', color: 'var(--text-muted)', margin: 0 }}>Tus órdenes activas y cambios por aprobar</p>
         </div>
         <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
           <button onClick={toggleTema} className="theme-toggle" title="Cambiar tema" />

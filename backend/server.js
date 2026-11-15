@@ -892,6 +892,11 @@ server.get('/api/orders-resumen', (req, res) => {
 const ASESOR_CAMPOS = ['placa', 'marca', 'modelo', 'anio', 'kilometraje'];
 const esAyvens = (c) => /(ald|ayvens)/i.test(c || '');
 const ordenActivaAyvens = (o) => !!o && o.estado !== 'Entregado' && o.estado !== 'Con Cita' && esAyvens(o.cliente);
+// En Ayvens el asesor va en el nombre del cliente ("Ayvens Asesor Saul",
+// "Ayvens Asesora Paola"...): cada asesor solo ve las órdenes con su nombre
+// (sin importar tildes ni mayúsculas).
+const sinTildes = (t) => String(t || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').trim();
+const esDelAsesor = (o, asesor) => { const a = sinTildes(asesor); return !!a && sinTildes(o.cliente).includes(a); };
 const solCol = () => {
   const db = router.db;
   if (!db.has('asesor_solicitudes').value()) db.set('asesor_solicitudes', []).write();
@@ -914,9 +919,11 @@ const limpiarItem = (it) => ({
 const resumenSolicitud = (s) => { const { snapshot, ...resto } = s; return resto; };
 
 server.get('/api/asesor/ordenes', (req, res) => {
+  const asesor = String(req.query.asesor || '').trim();
+  if (!asesor) return res.status(400).json({ error: 'Falta el nombre del asesor' });
   const db = router.db;
   const sols = solLeer();
-  const out = (db.get('orders').value() || []).filter(ordenActivaAyvens).map(o => {
+  const out = (db.get('orders').value() || []).filter(o => ordenActivaAyvens(o) && esDelAsesor(o, asesor)).map(o => {
     const { fotos, ...resto } = o;
     const q = cotizacionReal(o.id);
     const items = q?.items || [];
@@ -947,7 +954,7 @@ server.post('/api/asesor/solicitudes', (req, res) => {
     const db = router.db;
     const orden = db.get('orders').find(o => String(o.id) === String(orderId)).value();
     if (!orden) return res.status(404).json({ error: 'Orden no encontrada' });
-    if (!ordenActivaAyvens(orden)) return res.status(403).json({ error: 'Solo se pueden proponer cambios en órdenes activas de Ayvens' });
+    if (!ordenActivaAyvens(orden) || !esDelAsesor(orden, asesor)) return res.status(403).json({ error: 'Solo se pueden proponer cambios en tus órdenes activas de Ayvens' });
 
     // Los cambios se calculan aquí contra lo que hay HOY en la orden y la cotización.
     const cambiosVeh = {};
