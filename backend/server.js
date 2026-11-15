@@ -918,6 +918,65 @@ const limpiarItem = (it) => ({
 });
 const resumenSolicitud = (s) => { const { snapshot, ...resto } = s; return resto; };
 
+// Cuando el admin borra un ítem de la cotización (o borra la orden), los cambios del
+// asesor ligados a eso se eliminan de TODAS partes (historial, solicitudes de la
+// orden y panel del admin). `quitadas` = descripciones (sin tildes) de los ítems que
+// ya no están; null = la orden se borró completa.
+function podarSolicitudes(orderId, quitadas) {
+  const todas = solLeer();
+  if (!todas.some(s => String(s.orderId) === String(orderId))) return;
+  const ordenExiste = !!router.db.get('orders').find(o => String(o.id) === String(orderId)).value();
+  const restantes = [];
+  let hubo = false;
+  for (const s of todas) {
+    if (String(s.orderId) !== String(orderId)) { restantes.push(s); continue; }
+    if (!ordenExiste) { hubo = true; continue; } // la orden ya no existe: se va todo lo suyo
+    if (!quitadas || s.estado === 'rechazada') { restantes.push(s); continue; }
+    const originales = s.items || [];
+    const items = originales.filter(c => {
+      const afectado = quitadas.has(sinTildes(c.descripcion)) || quitadas.has(sinTildes(c.despues?.descripcion));
+      // Un ítem NUEVO pendiente no depende de ningún ítem existente.
+      return !afectado || (s.estado === 'pendiente' && c.tipo === 'nuevo');
+    });
+    if (items.length === originales.length) { restantes.push(s); continue; }
+    hubo = true;
+    if (items.length === 0 && !Object.keys(s.vehiculo || {}).length) continue; // quedó vacía: se elimina
+    restantes.push({ ...s, items, totalDelta: items.reduce((t, c) => t + c.delta, 0) });
+  }
+  if (hubo) router.db.set('asesor_solicitudes', restantes).write();
+}
+// Se dispara solo cuando el admin guarda la cotización REAL con menos ítems que antes
+// (un borrado), no cuando solo edita valores, ni con el borrador privado (slot 2).
+server.use('/quotes', (req, res, next) => {
+  try {
+    if (!['PUT', 'PATCH', 'DELETE'].includes(req.method)) return next();
+    const id = req.path.split('/').filter(Boolean)[0];
+    const q = id ? router.db.get('quotes').find(x => String(x.id) === String(id)).value() : null;
+    if (!q || q.slot === 2) return next();
+    const real = cotizacionReal(q.orderId);
+    if (!real || real.id !== q.id) return next();
+    const antes = (q.items || []).map(i => sinTildes(i.descripcion));
+    res.on('finish', () => {
+      try {
+        if (res.statusCode >= 400) return;
+        const ahora = router.db.get('quotes').find(x => String(x.id) === String(id)).value();
+        const vigentes = new Set((ahora?.items || []).map(i => sinTildes(i.descripcion)));
+        const hubo = !ahora || (ahora.items || []).length < antes.length;
+        const quitadas = new Set(antes.filter(d => !vigentes.has(d)));
+        if (hubo && quitadas.size) podarSolicitudes(q.orderId, quitadas);
+      } catch (e) { console.error('Poda de solicitudes falló:', e.message); }
+    });
+  } catch (e) { console.error(e.message); }
+  next();
+});
+server.use('/orders', (req, res, next) => {
+  if (req.method === 'DELETE') {
+    const id = req.path.split('/').filter(Boolean)[0];
+    if (id) res.on('finish', () => { try { if (res.statusCode < 400) podarSolicitudes(id, null); } catch (e) { console.error(e.message); } });
+  }
+  next();
+});
+
 server.get('/api/asesor/ordenes', (req, res) => {
   const asesor = String(req.query.asesor || '').trim();
   if (!asesor) return res.status(400).json({ error: 'Falta el nombre del asesor' });
