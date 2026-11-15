@@ -648,12 +648,9 @@ export default function AdminView() {
   const handleQuickOrder = async (e) => {
     e.preventDefault();
     if(!quickOrderForm.placa) return;
-    // El kilometraje es obligatorio en todo ingreso rápido (alimenta el historial y los mantenimientos del vehículo).
+    // El kilometraje es opcional para el admin; si queda vacío, el técnico debe
+    // ponerlo antes de empezar la revisión.
     const kilometraje = String(quickOrderForm.kilometraje || '').replace(/\D/g, '');
-    if (!kilometraje || parseInt(kilometraje, 10) <= 0) {
-      window.alert('Escribe el kilometraje del vehículo para crear el ingreso.');
-      return;
-    }
     try {
       const payload = {
         ...quickOrderForm,
@@ -674,6 +671,15 @@ export default function AdminView() {
       fetchOrders();
     } catch (e) { console.error(e); }
   };
+
+  // En el Kanban solo se muestran las citas del próximo día más cercano (más las
+  // atrasadas sin resolver); el resto de citas agendadas sigue en el sistema y
+  // aparece cuando le llegue su turno.
+  const hoyLocal = (() => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; })();
+  const proximaCitaFecha = orders
+    .filter(o => o.estado === 'Con Cita' && o.citaFecha && o.citaFecha >= hoyLocal)
+    .map(o => o.citaFecha).sort()[0] || hoyLocal;
+  const ordenesKanban = orders.filter(o => o.estado !== 'Con Cita' || !o.citaFecha || o.citaFecha <= proximaCitaFecha);
 
   const colColor = { 'Con Cita': '#0ea5e9', 'Recepción': '#6366f1', 'Proceso': '#f59e0b', 'Calidad': '#10b981', 'Ingresos Rápidos': '#ec4899' };
   const colBg   = { 'Con Cita': 'rgba(14,165,233,0.08)', 'Recepción': 'rgba(99,102,241,0.08)', 'Proceso': 'rgba(245,158,11,0.08)', 'Calidad': 'rgba(16,185,129,0.08)', 'Ingresos Rápidos': 'rgba(236,72,153,0.08)' };
@@ -996,11 +1002,11 @@ export default function AdminView() {
                         <span style={{ fontWeight: 600, fontSize: '1rem' }}>{col}</span>
                       </div>
                       <span style={{ background: colBg[col], color: colColor[col], borderRadius: 999, padding: '0.15rem 0.6rem', fontSize: '0.85rem', fontWeight: 700 }}>
-                        {orders.filter(o => o.estado === col).length}
+                        {ordenesKanban.filter(o => o.estado === col).length}
                       </span>
                     </div>
 
-                    {orders.filter(o => o.estado === col).map(o => (
+                    {ordenesKanban.filter(o => o.estado === col).map(o => (
                       <div key={o.id} className="kanban-card" onClick={() => setSelectedOrder(o)}
                         draggable
                         onDragStart={e => handleCardDragStart(e, o.id)}
@@ -1055,7 +1061,7 @@ export default function AdminView() {
                         </div>
                       </div>
                     ))}
-                    {orders.filter(o => o.estado === col).length === 0 && (
+                    {ordenesKanban.filter(o => o.estado === col).length === 0 && (
                       <div style={{ textAlign: 'center', padding: '2rem 0', color: 'var(--text-muted)', fontSize: '0.92rem' }}>Sin órdenes</div>
                     )}
                   </div>
@@ -2420,8 +2426,8 @@ ${PAYMENT_METHODS.map(m => `<tr><td>${m}</td><td style="text-align:right;font-we
                       </div>
                     </div>
                     <div>
-                      <label style={{ display: 'block', fontSize: '0.9rem', fontWeight: 600, color: 'var(--text-muted)', marginBottom: '0.4rem' }}>Kilometraje (km) *</label>
-                      <input required inputMode="numeric" placeholder="Ej. 85000" value={quickOrderForm.kilometraje}
+                      <label style={{ display: 'block', fontSize: '0.9rem', fontWeight: 600, color: 'var(--text-muted)', marginBottom: '0.4rem' }}>Kilometraje (km) (opcional)</label>
+                      <input inputMode="numeric" placeholder="Ej. 85000" value={quickOrderForm.kilometraje}
                         onChange={e => setQuickOrderForm({...quickOrderForm, kilometraje: e.target.value.replace(/\D/g, '')})} style={{ width: '100%' }} />
                     </div>
                   </div>
@@ -2664,7 +2670,7 @@ ${PAYMENT_METHODS.map(m => `<tr><td>${m}</td><td style="text-align:right;font-we
                   <p className="section-title">Vehículo</p>
               <div className="form-grid-2" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem', marginBottom: '1.25rem' }}>
                 <input required placeholder="Placa (Ej. AAA123)" value={form.placa} onChange={e => setForm({...form, placa: e.target.value.toUpperCase()})} />
-                <input required placeholder="Kilometraje" type="number" value={form.kilometraje} onChange={e => setForm({...form, kilometraje: e.target.value})} />
+                <input placeholder="Kilometraje (opcional)" type="number" value={form.kilometraje} onChange={e => setForm({...form, kilometraje: e.target.value})} />
                 <input required placeholder="Marca" value={form.marca} onChange={e => setForm({...form, marca: e.target.value})} />
                 <input required placeholder="Modelo" value={form.modelo} onChange={e => setForm({...form, modelo: e.target.value})} />
                 <input required placeholder="Año" type="number" value={form.anio} onChange={e => setForm({...form, anio: e.target.value})} style={{ gridColumn: '1 / -1' }} />

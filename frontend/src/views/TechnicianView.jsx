@@ -39,6 +39,8 @@ const REVISION_CATEGORIES_DEFAULT = {
 
 const DIAGNOSTICO_AREAS = ["Suspensión", "Frenos", "Motor", "Caja de Cambios", "Clutch / Embrague", "Sistema de Refrigeración", "Inyección", "Sistema Eléctrico"];
 
+const kmNum = (k) => parseInt(String(k ?? '').replace(/\D/g, ''), 10) || 0;
+
 // La lista del técnico llega sin fotos (solo texto); fotosTipos dice qué tipos hay.
 const tieneFotoTipo = (o, tipo) => (o?.fotos || []).some(f => f?.tipo === tipo) || (o?.fotosTipos || []).includes(tipo);
 
@@ -50,6 +52,9 @@ export default function TechnicianView() {
   const [alerta, setAlerta] = useState(null); // { titulo, texto } — requisito que falta para poder subir
   const [pernos, setPernos] = useState(null); // ¿tiene pernos de seguridad? 'si' | 'no' | null (sin responder)
   const [pernosFoto, setPernosFoto] = useState(null); // foto del seguro de los pernos (obligatoria si tiene)
+  const [kmInput, setKmInput] = useState(''); // kilometraje que el técnico escribe si la orden aún no lo tiene
+  const [kmSaving, setKmSaving] = useState(false);
+  const [kmError, setKmError] = useState('');
   const [observacion, setObservacion] = useState(''); // observación general de la revisión (el admin la aprueba antes de que la vea el cliente)
   const [bornes, setBornes] = useState(null); // estado de los bornes de la batería: 'bien' | 'mal' | null
   const [reprobar, setReprobar] = useState(false); // corregir primero y volver a probar con el escáner
@@ -144,6 +149,7 @@ export default function TechnicianView() {
     setBornes(draft?.bornes || null);
     setObservacion(draft?.observacion || '');
     setPendingPriority(null);
+    setKmInput(''); setKmError('');
     setSelectedOrder(o);
     try { localStorage.setItem(ACTIVE_KEY, String(o.id)); } catch { /* sin espacio/bloqueado */ }
   };
@@ -366,7 +372,33 @@ export default function TechnicianView() {
     return msg.trim();
   };
 
+  // Si el admin no puso el kilometraje al crear la orden, el técnico debe
+  // ponerlo antes de empezar la revisión (se guarda en la orden).
+  const guardarKm = async () => {
+    const km = kmNum(kmInput);
+    if (km <= 0 || km > 3000000) { setKmError('Escribe un kilometraje válido (solo números).'); return; }
+    setKmSaving(true); setKmError('');
+    try {
+      const res = await fetch(`${API_URL}/orders/${selectedOrder.id}`, {
+        method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ kilometraje: String(km) })
+      });
+      if (!res.ok) throw new Error('rechazado');
+      setSelectedOrder(prev => ({ ...prev, kilometraje: String(km) }));
+      setOrders(prev => prev.map(o => o.id === selectedOrder.id ? { ...o, kilometraje: String(km) } : o));
+      setKmInput('');
+    } catch {
+      setKmError('No se pudo guardar. Revisa la conexión e intenta de nuevo.');
+    } finally {
+      setKmSaving(false);
+    }
+  };
+
   const submitReport = async () => {
+    if (!kmNum(selectedOrder?.kilometraje)) {
+      setAlerta({ titulo: 'Falta el kilometraje', texto: 'Escribe el kilometraje del vehículo para poder subir la revisión.' });
+      return;
+    }
     // El reporte no se puede subir sin foto del escáner — ni en esta
     // revisión ni ya guardada en la orden de un envío anterior. Se valida
     // antes de abrir WhatsApp o tocar el servidor.
@@ -844,6 +876,29 @@ export default function TechnicianView() {
       )}
 
       {showPhotoUpload && <PhotoUploadModal onClose={() => setShowPhotoUpload(false)} onSuccess={() => {}} />}
+      {selectedOrder && !kmNum(selectedOrder.kilometraje) && (
+        <div className="modal-overlay" style={{ zIndex: 1300 }}>
+          <div className="modal-box" style={{ maxWidth: 420, textAlign: 'center' }}>
+            <div style={{ fontWeight: 900, fontSize: '1.5rem', letterSpacing: 1 }}>{selectedOrder.placa}</div>
+            <div style={{ color: 'var(--text-muted)', marginBottom: '1.1rem' }}>{selectedOrder.marca} {selectedOrder.modelo}</div>
+            <h2 style={{ fontSize: '1.25rem', fontWeight: 900, marginBottom: '0.4rem' }}>¿Cuántos kilómetros tiene?</h2>
+            <p style={{ color: 'var(--text-muted)', fontSize: '0.95rem', lineHeight: 1.45, marginBottom: '1rem' }}>
+              Esta orden no tiene el kilometraje. Escríbelo antes de empezar la revisión.
+            </p>
+            <form onSubmit={e => { e.preventDefault(); guardarKm(); }}>
+              <input autoFocus inputMode="numeric" placeholder="Ej. 85000" value={kmInput ? fmt(kmNum(kmInput)) : ''}
+                onChange={e => { setKmInput(e.target.value.replace(/\D/g, '')); setKmError(''); }}
+                style={{ width: '100%', fontSize: '1.6rem', fontWeight: 800, textAlign: 'center', padding: '0.8rem' }} />
+              {kmError && <div style={{ color: 'var(--error)', fontSize: '0.88rem', marginTop: '0.5rem' }}>{kmError}</div>}
+              <button type="submit" className="btn-primary" disabled={kmSaving || !kmNum(kmInput)}
+                style={{ width: '100%', justifyContent: 'center', padding: '0.9rem', fontWeight: 800, marginTop: '1rem' }}>
+                {kmSaving ? 'Guardando...' : 'Guardar y empezar'}
+              </button>
+            </form>
+            <button type="button" className="btn-secondary" onClick={closeOrder} style={{ width: '100%', justifyContent: 'center', marginTop: '0.6rem' }}>Volver</button>
+          </div>
+        </div>
+      )}
       {alerta && (
         <div className="modal-overlay" style={{ zIndex: 1200 }}>
           <div className="modal-box" style={{ maxWidth: 420, textAlign: 'center' }}>
