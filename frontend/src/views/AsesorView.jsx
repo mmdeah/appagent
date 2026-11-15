@@ -240,7 +240,7 @@ function Historial({ user }) {
   const cargar = useCallback(async () => {
     setError(false);
     try {
-      const r = await pedir(`${API_URL}/api/asesor/solicitudes?estado=aprobada`);
+      const r = await pedir(`${API_URL}/api/asesor/solicitudes?estado=aprobada&vigentes=1`);
       if (!r.ok) throw new Error('no ok');
       const sols = (await r.json()).filter(s => !user.nombre || s.asesor === user.nombre);
       const rows = [];

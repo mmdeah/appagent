@@ -940,11 +940,30 @@ server.get('/api/asesor/ordenes', (req, res) => {
 });
 
 server.get('/api/asesor/solicitudes', (req, res) => {
-  const { estado, orderId, asesor } = req.query;
-  const out = solLeer()
+  const { estado, orderId, asesor, vigentes } = req.query;
+  let out = solLeer()
     .filter(s => (!estado || s.estado === estado) && (!orderId || String(s.orderId) === String(orderId)) && (!asesor || s.asesor === asesor))
     .sort((a, b) => new Date(b.creada) - new Date(a.creada))
     .map(resumenSolicitud);
+
+  // vigentes=1 (historial del asesor): solo cuentan los cambios cuyo ítem SIGUE en
+  // la cotización de la orden. Si el admin borra el ítem (o la orden), desaparece
+  // de la lista y deja de sumar en los totales.
+  if (vigentes === '1') {
+    const cache = new Map();
+    const descripcionesVivas = (id) => {
+      if (!cache.has(id)) {
+        const existe = router.db.get('orders').find(x => String(x.id) === String(id)).value();
+        cache.set(id, existe ? new Set((cotizacionReal(id)?.items || []).map(i => sinTildes(i.descripcion))) : null);
+      }
+      return cache.get(id);
+    };
+    out = out.map(s => {
+      const vivas = descripcionesVivas(s.orderId);
+      const items = vivas ? (s.items || []).filter(c => vivas.has(sinTildes(c.descripcion)) || vivas.has(sinTildes(c.despues?.descripcion))) : [];
+      return { ...s, items, totalDelta: items.reduce((t, c) => t + c.delta, 0) };
+    }).filter(s => s.items.length > 0);
+  }
   res.json(out);
 });
 
@@ -1054,7 +1073,11 @@ server.get('/api/asesor/ordenes/:id/cotizacion-aprobada', (req, res) => {
     .sort((a, b) => new Date(b.resuelta) - new Date(a.resuelta))[0];
   if (!ultima) return res.status(404).json({ error: 'Esta orden aún no tiene una versión aprobada' });
   const { fotos, ...datos } = orden;
-  res.json({ orden: datos, items: ultima.snapshot.items, aprobadaEn: ultima.resuelta });
+  // La cotización de la orden solo contiene lo que el admin hizo o aprobó (las
+  // propuestas pendientes nunca la tocan), así que el PDF sale de la versión
+  // vigente: si el admin borra o corrige un ítem después, el PDF lo refleja.
+  const vigente = cotizacionReal(orden.id)?.items;
+  res.json({ orden: datos, items: Array.isArray(vigente) ? vigente : ultima.snapshot.items, aprobadaEn: ultima.resuelta });
 });
 
 // Órdenes de una flota (ald = ALD/Ayvens, cn = Consult Networks): el servidor
