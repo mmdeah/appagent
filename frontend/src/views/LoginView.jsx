@@ -1,6 +1,6 @@
 import React, { useState, useContext } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Shield, Wrench, Car, ArrowLeft, Lock, Building2, Users, Receipt } from 'lucide-react';
+import { Shield, Wrench, Car, ArrowLeft, Lock, Building2, Users, Receipt, ClipboardCheck } from 'lucide-react';
 import { ThemeContext } from '../App';
 import { BACKEND_URL } from '../api';
 
@@ -51,6 +51,15 @@ const roles = [
     path: '/flota'
   },
   {
+    id: 'asesor',
+    label: 'Asesor Ayvens',
+    desc: 'Revisa órdenes y propone cambios al admin',
+    icon: <ClipboardCheck size={22} color="#818cf8" />,
+    iconBg: 'rgba(99,102,241,0.15)',
+    pass: null,
+    path: '/asesor'
+  },
+  {
     id: 'gastos',
     label: 'Gastos',
     desc: 'Sube la foto de un recibo para registrar un gasto',
@@ -75,7 +84,7 @@ export default function LoginView() {
     setError('');
 
     // Fleet portal: authenticate against backend
-    if (selected.id === 'flota') {
+    if (selected.id === 'flota' || selected.id === 'asesor') {
       setLoading(true);
       try {
         const res = await fetch(`${BACKEND_URL}/api/fleet-login`, {
@@ -88,8 +97,13 @@ export default function LoginView() {
           return;
         }
         const user = await res.json();
+        // Cada usuario entra a su propia vista: los asesores van a /asesor, el resto al portal de flotas.
+        if (selected.id === 'asesor' && user.rol !== 'asesor') {
+          setError('Este usuario no es asesor. Usa el perfil "Portal Flotas".');
+          return;
+        }
         localStorage.setItem('fleetUser', JSON.stringify(user));
-        navigate('/flota');
+        navigate(user.rol === 'asesor' ? '/asesor' : '/flota');
       } catch {
         setError('Error de conexión con el servidor.');
       } finally {
@@ -153,7 +167,7 @@ export default function LoginView() {
             </div>
 
             {/* Fleet: show username + password */}
-            {selected.id === 'flota' && (
+            {(selected.id === 'flota' || selected.id === 'asesor') && (
               <div style={{ marginBottom: '1rem' }}>
                 <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '0.4rem' }}>
                   Usuario
@@ -184,7 +198,7 @@ export default function LoginView() {
                 value={password}
                 onChange={e => { setPassword(e.target.value); setError(''); }}
                 style={{ paddingLeft: '2.5rem' }}
-                autoFocus={selected.id !== 'flota'}
+                autoFocus={selected.id !== 'flota' && selected.id !== 'asesor'}
                 required
               />
             </div>

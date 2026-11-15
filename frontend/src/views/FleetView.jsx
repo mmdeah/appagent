@@ -68,6 +68,7 @@ export default function FleetView() {
     const stored = localStorage.getItem('fleetUser');
     if (!stored) { navigate('/flota-login'); return; }
     const u = JSON.parse(stored);
+    if (u.rol === 'asesor') { navigate('/asesor'); return; } // los asesores tienen su propia vista
     setUser(u);
 
     const savedBudget = localStorage.getItem(`fleetBudget_${u.id}`);

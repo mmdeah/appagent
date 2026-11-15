@@ -28,7 +28,7 @@ export default function FleetLoginView() {
       }
       const user = await res.json();
       localStorage.setItem('fleetUser', JSON.stringify(user));
-      navigate('/flota');
+      navigate(user.rol === 'asesor' ? '/asesor' : '/flota');
     } catch {
       setError('Error de conexión con el servidor.');
     } finally {

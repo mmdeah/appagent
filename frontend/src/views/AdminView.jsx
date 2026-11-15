@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useContext, useRef } from 'react';
 import { API_URL, BACKEND_URL, getPicoYPlaca, fetchOrdersResumen, citaDiaTxt } from '../api';
 import OrderDetailsLoader from './OrderDetailsLoader';
+import AsesorSolicitudesAdmin from './AsesorSolicitudesAdmin';
 import PhotoUploadModal from './PhotoUploadModal';
 import { ThemeContext } from '../App';
 import { PlusCircle, BarChart3, Camera, X, Car, Trash2, Zap, LayoutDashboard, History, Receipt, CheckCircle, AlertTriangle, ClipboardList, Save, Settings, FileText, Plus, Sparkles, CreditCard, Clock, BadgeCheck, Ban, Search, ChevronDown, MessageCircle, Pencil } from 'lucide-react';
@@ -86,7 +87,16 @@ export default function AdminView() {
   const [analyzingExpense, setAnalyzingExpense] = useState(false);
   const expenseImageInputRef = React.useRef(null);
   const [fleetUsers, setFleetUsers] = useState([]);
-  const [fleetUserForm, setFleetUserForm] = useState({ nombre: '', empresa: 'ald', usuario: '', password: '' });
+  const [fleetUserForm, setFleetUserForm] = useState({ nombre: '', empresa: 'ald', rol: 'flota', usuario: '', password: '' });
+  // Solicitudes de cambio del asesor de Ayvens pendientes de aprobar (aviso en el menú).
+  const [solPend, setSolPend] = useState(0);
+  const fetchSolPend = () => {
+    fetch(`${API_URL}/api/asesor/solicitudes?estado=pendiente`)
+      .then(r => (r.ok ? r.json() : []))
+      .then(d => setSolPend(Array.isArray(d) ? d.length : 0))
+      .catch(() => {});
+  };
+  useEffect(() => { fetchSolPend(); const t = setInterval(fetchSolPend, 60000); return () => clearInterval(t); }, []);
   const [fleetUserStatus, setFleetUserStatus] = useState('');
   const [ivaPeriod, setIvaPeriod] = useState('mes');
   const [ivaDesde, setIvaDesde] = useState('');
@@ -633,7 +643,7 @@ export default function AdminView() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ ...fleetUserForm, id: Date.now() })
       });
-      setFleetUserForm({ nombre: '', empresa: 'ald', usuario: '', password: '' });
+      setFleetUserForm({ nombre: '', empresa: 'ald', rol: 'flota', usuario: '', password: '' });
       setFleetUserStatus('Usuario creado correctamente.');
       setTimeout(() => setFleetUserStatus(''), 3000);
       fetchFleetUsers();
@@ -872,6 +882,7 @@ export default function AdminView() {
                     { id: 'Kanban',           icon: <LayoutDashboard size={14} />, label: 'Kanban' },
                     { id: 'Historial',        icon: <History size={14} />,         label: 'Historial' },
                     { id: 'Ingresos Rápidos', icon: <Zap size={14} />,             label: 'Ingresos Rápidos' },
+                    { id: 'SolicitudesAsesor', icon: <ClipboardList size={14} />,  label: `Solicitudes Asesor${solPend ? ` (${solPend})` : ''}` },
                   ]
                 },
                 {
@@ -1289,6 +1300,10 @@ export default function AdminView() {
               );
             })()}
 
+            {activeTab === 'SolicitudesAsesor' && (
+              <AsesorSolicitudesAdmin onResuelta={() => { fetchOrders(); fetchSolPend(); }} />
+            )}
+
             {activeTab === 'UsuariosFlota' && (
               <div style={{ maxWidth: 860, display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
                 {/* Add user form */}
@@ -1307,6 +1322,13 @@ export default function AdminView() {
                           <option value="ald">ALD / Ayvens</option>
                           <option value="cn">Consult Networks</option>
                           <option value="both">Ambas</option>
+                        </select>
+                      </div>
+                      <div>
+                        <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 600, color: 'var(--text-muted)', marginBottom: '0.3rem' }}>Rol</label>
+                        <select value={fleetUserForm.rol} onChange={e => setFleetUserForm({...fleetUserForm, rol: e.target.value})} style={{ width: '100%' }}>
+                          <option value="flota">Portal de flota</option>
+                          <option value="asesor">Asesor (Ayvens)</option>
                         </select>
                       </div>
                       <div>
@@ -1342,6 +1364,7 @@ export default function AdminView() {
                                 color: u.empresa === 'ald' ? '#f59e0b' : u.empresa === 'cn' ? 'var(--primary)' : '#10b981' }}>
                                 {u.empresa === 'ald' ? 'ALD / Ayvens' : u.empresa === 'cn' ? 'Consult Networks' : 'Ambas'}
                               </span>
+                              {u.rol === 'asesor' && <span style={{ marginLeft: 6, fontSize: '0.72rem', fontWeight: 700, color: '#6366f1', background: 'rgba(99,102,241,0.12)', padding: '0.15rem 0.5rem', borderRadius: 99 }}>Asesor</span>}
                             </td>
                             <td style={{ fontFamily: 'monospace', fontWeight: 700 }}>{u.usuario}</td>
                             <td style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>{'•'.repeat(Math.min((u.password||'').length, 8))}</td>

@@ -881,6 +881,175 @@ server.get('/api/orders-resumen', (req, res) => {
   res.json(out);
 });
 
+// ───────────────────────── Asesor (Ayvens) ─────────────────────────
+// El asesor ve las órdenes ACTIVAS de Ayvens y propone cambios (datos del
+// vehículo, ítems nuevos o editados de la cotización). Cada propuesta es una
+// solicitud "pendiente" que NO toca la orden hasta que el admin la aprueba; al
+// aprobarla se aplica y se guarda una copia (snapshot) de la cotización, que es
+// la "última versión aprobada" desde la que el asesor descarga el PDF.
+// La colección `asesor_solicitudes` se crea al guardar la primera solicitud
+// (nunca al arrancar el servidor).
+const ASESOR_CAMPOS = ['placa', 'marca', 'modelo', 'anio', 'kilometraje'];
+const esAyvens = (c) => /(ald|ayvens)/i.test(c || '');
+const ordenActivaAyvens = (o) => !!o && o.estado !== 'Entregado' && o.estado !== 'Con Cita' && esAyvens(o.cliente);
+const solCol = () => {
+  const db = router.db;
+  if (!db.has('asesor_solicitudes').value()) db.set('asesor_solicitudes', []).write();
+  return db.get('asesor_solicitudes');
+};
+const solLeer = () => (router.db.has('asesor_solicitudes').value() ? router.db.get('asesor_solicitudes').value() : []);
+const valorLinea = (it) => (Number(it.precio) || 0) * (Number(it.cantidad) || 0) * (it.aplicaIva ? 1.19 : 1);
+// Misma regla que el resto de la app: cotización real = slot 1 (o la más reciente que no sea el borrador slot 2).
+const cotizacionReal = (orderId) => {
+  const qs = (router.db.get('quotes').value() || []).filter(q => String(q.orderId) === String(orderId))
+    .sort((a, b) => new Date(b.fecha || 0) - new Date(a.fecha || 0));
+  return qs.find(q => q.slot === 1) || qs.find(q => q.slot !== 2) || null;
+};
+const limpiarItem = (it) => ({
+  descripcion: String(it.descripcion || '').trim(),
+  cantidad: Number(it.cantidad) > 0 ? Number(it.cantidad) : 1,
+  precio: Math.max(0, Number(it.precio) || 0),
+  aplicaIva: !!it.aplicaIva,
+});
+const resumenSolicitud = (s) => { const { snapshot, ...resto } = s; return resto; };
+
+server.get('/api/asesor/ordenes', (req, res) => {
+  const db = router.db;
+  const sols = solLeer();
+  const out = (db.get('orders').value() || []).filter(ordenActivaAyvens).map(o => {
+    const { fotos, ...resto } = o;
+    const q = cotizacionReal(o.id);
+    const items = q?.items || [];
+    const delOrden = sols.filter(s => String(s.orderId) === String(o.id));
+    return {
+      ...resto, quotes: undefined, reports: undefined,
+      items,
+      total: items.reduce((s, it) => s + valorLinea(it), 0),
+      pendientes: delOrden.filter(s => s.estado === 'pendiente').length,
+      aprobada: delOrden.some(s => s.estado === 'aprobada'),
+    };
+  }).sort((a, b) => new Date(b.fecha || 0) - new Date(a.fecha || 0));
+  res.json(out);
+});
+
+server.get('/api/asesor/solicitudes', (req, res) => {
+  const { estado, orderId, asesor } = req.query;
+  const out = solLeer()
+    .filter(s => (!estado || s.estado === estado) && (!orderId || String(s.orderId) === String(orderId)) && (!asesor || s.asesor === asesor))
+    .sort((a, b) => new Date(b.creada) - new Date(a.creada))
+    .map(resumenSolicitud);
+  res.json(out);
+});
+
+server.post('/api/asesor/solicitudes', (req, res) => {
+  try {
+    const { orderId, asesor, vehiculo = {}, items = [] } = req.body || {};
+    const db = router.db;
+    const orden = db.get('orders').find(o => String(o.id) === String(orderId)).value();
+    if (!orden) return res.status(404).json({ error: 'Orden no encontrada' });
+    if (!ordenActivaAyvens(orden)) return res.status(403).json({ error: 'Solo se pueden proponer cambios en órdenes activas de Ayvens' });
+
+    // Los cambios se calculan aquí contra lo que hay HOY en la orden y la cotización.
+    const cambiosVeh = {};
+    ASESOR_CAMPOS.forEach(k => {
+      if (!(k in vehiculo)) return;
+      let nuevo = String(vehiculo[k] ?? '').trim();
+      if (k === 'placa') nuevo = nuevo.toUpperCase();
+      if (k === 'kilometraje') nuevo = nuevo.replace(/\D/g, '');
+      const antes = String(orden[k] ?? '').trim();
+      if (nuevo !== antes) cambiosVeh[k] = { antes, despues: nuevo };
+    });
+    if (cambiosVeh.placa && !cambiosVeh.placa.despues) return res.status(400).json({ error: 'La placa no puede quedar vacía' });
+
+    const actual = cotizacionReal(orden.id)?.items || [];
+    const cambiosItems = [];
+    for (const raw of Array.isArray(items) ? items : []) {
+      const despues = limpiarItem(raw);
+      if (raw.idx === null || raw.idx === undefined) {
+        if (!despues.descripcion) return res.status(400).json({ error: 'Cada ítem nuevo necesita una descripción' });
+        cambiosItems.push({ tipo: 'nuevo', idx: null, descripcion: despues.descripcion, antes: null, despues, valorAntes: 0, valorDespues: valorLinea(despues), delta: valorLinea(despues) });
+      } else {
+        const base = actual[Number(raw.idx)];
+        if (!base) return res.status(409).json({ error: 'La cotización cambió; recarga la orden e inténtalo de nuevo' });
+        const antes = limpiarItem(base);
+        if (!despues.descripcion) despues.descripcion = antes.descripcion;
+        const igual = antes.descripcion === despues.descripcion && antes.cantidad === despues.cantidad && antes.precio === despues.precio && antes.aplicaIva === despues.aplicaIva;
+        if (igual) continue;
+        const va = valorLinea(antes), vd = valorLinea(despues);
+        cambiosItems.push({ tipo: 'editado', idx: Number(raw.idx), descripcion: antes.descripcion, antes, despues, valorAntes: va, valorDespues: vd, delta: vd - va });
+      }
+    }
+    if (!Object.keys(cambiosVeh).length && !cambiosItems.length) return res.status(400).json({ error: 'No hay cambios para enviar' });
+
+    const sol = solCol().insert({
+      orderId: orden.id, placa: orden.placa || '', asesor: String(asesor || ''),
+      creada: new Date().toISOString(), estado: 'pendiente',
+      vehiculo: cambiosVeh, items: cambiosItems,
+      totalDelta: cambiosItems.reduce((s, c) => s + c.delta, 0),
+    }).write();
+    res.status(201).json(resumenSolicitud(sol));
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+server.post('/api/asesor/solicitudes/:id/aprobar', (req, res) => {
+  try {
+    const db = router.db;
+    const sol = solLeer().find(s => String(s.id) === String(req.params.id));
+    if (!sol) return res.status(404).json({ error: 'Solicitud no encontrada' });
+    if (sol.estado !== 'pendiente') return res.status(409).json({ error: 'Esta solicitud ya fue resuelta' });
+    const orden = db.get('orders').find(o => String(o.id) === String(sol.orderId)).value();
+    if (!orden) return res.status(404).json({ error: 'La orden ya no existe' });
+
+    // 1) Calcular la nueva lista de ítems ANTES de escribir nada (si algo no cuadra, no se aplica nada).
+    let quote = cotizacionReal(orden.id);
+    const nuevos = (quote?.items || []).map(it => ({ ...it }));
+    for (const c of sol.items || []) {
+      if (c.tipo === 'nuevo') { nuevos.push({ ...c.despues }); continue; }
+      let i = (nuevos[c.idx] && nuevos[c.idx].descripcion === c.antes.descripcion) ? c.idx : nuevos.findIndex(it => it.descripcion === c.antes.descripcion);
+      if (i < 0) return res.status(409).json({ error: `La cotización cambió y no se encontró el ítem "${c.antes.descripcion}". Rechaza la solicitud para que el asesor la repita.` });
+      nuevos[i] = { ...nuevos[i], ...c.despues };
+    }
+
+    // 2) Aplicar al vehículo y a la cotización real.
+    const camposVeh = {};
+    Object.entries(sol.vehiculo || {}).forEach(([k, v]) => { camposVeh[k] = v.despues; });
+    if (Object.keys(camposVeh).length) db.get('orders').find(o => o.id === orden.id).assign(camposVeh).write();
+    if ((sol.items || []).length) {
+      if (quote) db.get('quotes').find(q => q.id === quote.id).assign({ items: nuevos }).write();
+      else db.get('quotes').insert({ orderId: orden.id, slot: 1, items: nuevos, fecha: new Date().toISOString(), autorizada: false }).write();
+    }
+
+    // 3) Marcar aprobada y guardar la versión aprobada de la cotización.
+    const itemsAprobados = ((sol.items || []).length ? nuevos : (cotizacionReal(orden.id)?.items || [])).map(it => ({ ...it }));
+    solCol().find(s => s.id === sol.id).assign({
+      estado: 'aprobada', resuelta: new Date().toISOString(),
+      snapshot: { items: itemsAprobados, total: itemsAprobados.reduce((s, it) => s + valorLinea(it), 0) },
+    }).write();
+    res.json(resumenSolicitud(solLeer().find(s => s.id === sol.id)));
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+server.post('/api/asesor/solicitudes/:id/rechazar', (req, res) => {
+  try {
+    const sol = solLeer().find(s => String(s.id) === String(req.params.id));
+    if (!sol) return res.status(404).json({ error: 'Solicitud no encontrada' });
+    if (sol.estado !== 'pendiente') return res.status(409).json({ error: 'Esta solicitud ya fue resuelta' });
+    solCol().find(s => s.id === sol.id).assign({ estado: 'rechazada', resuelta: new Date().toISOString(), notaAdmin: String(req.body?.nota || '') }).write();
+    res.json(resumenSolicitud(solLeer().find(s => s.id === sol.id)));
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// Última versión aprobada de la cotización de una orden (para el PDF del asesor).
+server.get('/api/asesor/ordenes/:id/cotizacion-aprobada', (req, res) => {
+  const orden = router.db.get('orders').find(o => String(o.id) === String(req.params.id)).value();
+  if (!orden || !esAyvens(orden.cliente)) return res.status(404).json({ error: 'Orden no encontrada' });
+  const ultima = solLeer().filter(s => String(s.orderId) === String(orden.id) && s.estado === 'aprobada' && s.snapshot)
+    .sort((a, b) => new Date(b.resuelta) - new Date(a.resuelta))[0];
+  if (!ultima) return res.status(404).json({ error: 'Esta orden aún no tiene una versión aprobada' });
+  const { fotos, ...datos } = orden;
+  res.json({ orden: datos, items: ultima.snapshot.items, aprobadaEn: ultima.resuelta });
+});
+
 // Órdenes de una flota (ald = ALD/Ayvens, cn = Consult Networks): el servidor
 // filtra por cliente, así el portal no recibe las órdenes de otros clientes, y
 // van sin fotos (con reportes y cotizaciones).
