@@ -554,7 +554,13 @@ export default function TechnicianView() {
   // separan por "cotización autorizada": ese paso de autorización se quitó,
   // ahora "Servicios a Realizar" (llenado a mano por el admin) es lo que le
   // dice al técnico qué hacer.
-  const activeOrders = orders;
+  // Igual que en el Kanban del admin: de las citas solo se ven las del próximo
+  // día más cercano (más las atrasadas sin resolver).
+  const hoyLocal = (() => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; })();
+  const proximaCitaFecha = orders
+    .filter(o => o.estado === 'Con Cita' && o.citaFecha && o.citaFecha >= hoyLocal)
+    .map(o => o.citaFecha).sort()[0] || hoyLocal;
+  const activeOrders = orders.filter(o => o.estado !== 'Con Cita' || !o.citaFecha || o.citaFecha <= proximaCitaFecha);
 
   return (
     <div style={{ minHeight: '100vh', background: 'var(--bg)', color: 'var(--text)' }}>
