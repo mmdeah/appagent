@@ -696,6 +696,7 @@ Genera el informe en español enfocado únicamente en los ítems seleccionados y
 const CITAS_API_URL = (process.env.CITAS_API_URL || 'https://appcitas.up.railway.app').replace(/\/$/, '');
 const CITAS_ACTIVAS = ['AGENDADA', 'CONFIRMADA', 'LLEGO'];
 const CITAS_SYNC_MS = 10 * 60 * 1000;
+const CITAS_DIAS_ADELANTE = 14; // cuántos días hacia adelante se traen las citas
 const bogotaParts = () => {
   const f = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Bogota', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', hour12: false });
   const p = Object.fromEntries(f.formatToParts(new Date()).map(x => [x.type, x.value]));
@@ -720,12 +721,17 @@ async function syncCitas() {
   const token = process.env.CITAS_API_TOKEN;
   if (!token) throw new Error('Falta la variable de entorno CITAS_API_TOKEN');
   const { fecha: hoy } = bogotaParts();
+  // Se traen las citas de hoy y de los próximos CITAS_DIAS_ADELANTE días, no solo
+  // las de hoy: así aparecen en el Kanban apenas se agendan.
+  const hasta = new Date(`${hoy}T12:00:00Z`);
+  hasta.setUTCDate(hasta.getUTCDate() + CITAS_DIAS_ADELANTE);
+  const hastaStr = hasta.toISOString().slice(0, 10);
 
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 15000);
   let data;
   try {
-    const res = await fetch(`${CITAS_API_URL}/api/citas?fecha=${hoy}`, {
+    const res = await fetch(`${CITAS_API_URL}/api/citas?desde=${hoy}&hasta=${hastaStr}`, {
       headers: { Authorization: `Bearer ${token}` }, signal: controller.signal
     });
     if (!res.ok) throw new Error(`La app de citas respondió ${res.status}`);
@@ -744,6 +750,11 @@ async function syncCitas() {
 
     if (!existente) {
       if (!activa) continue;
+      // El bot a veces registra dos veces la misma cita (mismo vehículo y día,
+      // con el nombre escrito distinto): no se crea una segunda tarjeta.
+      const placaCita = (c.placa || '').toUpperCase();
+      const duplicada = placaCita && db.get('orders').some(o => o.estado === 'Con Cita' && o.citaId != null && (o.placa || '').toUpperCase() === placaCita && o.citaFecha === c.fecha).value();
+      if (duplicada) continue;
       db.get('orders').insert({
         placa: (c.placa || '').toUpperCase(),
         cliente: c.cliente || '',
@@ -780,6 +791,18 @@ async function syncCitas() {
     // Si la orden ya fue activada (otra columna), no se toca.
   }
 
+  // Citas que ya no vienen de la app de citas (borradas o movidas fuera del
+  // rango) y siguen "Con Cita" sin ingresar: se quitan para no dejar fantasmas.
+  const idsVigentes = new Set(citas.map(c => String(c.id)));
+  const huerfanas = db.get('orders').filter(o =>
+    o.estado === 'Con Cita' && o.citaId != null && !idsVigentes.has(String(o.citaId)) &&
+    o.citaFecha && o.citaFecha >= hoy && o.citaFecha <= hastaStr
+  ).value();
+  for (const o of huerfanas) {
+    const tieneReporte = db.get('reports').some(r => String(r.orderId) === String(o.id)).value();
+    if (!tieneReporte) { db.get('orders').remove(x => x.id === o.id).write(); eliminadas++; }
+  }
+
   // Citas de días anteriores que nunca se atendieron (y sin revisión
   // subida) se limpian solas para no acumularse en la columna.
   const viejas = db.get('orders').filter(o => o.estado === 'Con Cita' && o.citaFecha && o.citaFecha < hoy).value();
@@ -787,7 +810,7 @@ async function syncCitas() {
     const tieneReporte = db.get('reports').some(r => String(r.orderId) === String(o.id)).value();
     if (!tieneReporte) { db.get('orders').remove(x => x.id === o.id).write(); eliminadas++; }
   }
-  return { fecha: hoy, total: citas.length, creadas, actualizadas, eliminadas };
+  return { fecha: hoy, hasta: hastaStr, total: citas.length, creadas, actualizadas, eliminadas };
 }
 
 async function runCitasSync() {

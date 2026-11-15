@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useContext, useRef } from 'react';
-import { API_URL, BACKEND_URL, getPicoYPlaca, fetchOrdersResumen } from '../api';
+import { API_URL, BACKEND_URL, getPicoYPlaca, fetchOrdersResumen, citaDiaTxt } from '../api';
 import OrderDetailsLoader from './OrderDetailsLoader';
 import PhotoUploadModal from './PhotoUploadModal';
 import { ThemeContext } from '../App';
@@ -1025,7 +1025,7 @@ export default function AdminView() {
                             )}
                           </div>
                           <span style={{ fontSize: '0.82rem', background: o.reports?.length > 0 ? 'rgba(16,185,129,0.15)' : 'rgba(245,158,11,0.15)', color: o.reports?.length > 0 ? '#34d399' : '#fbbf24', padding: '0.2rem 0.5rem', borderRadius: 999, fontWeight: 600, whiteSpace: 'nowrap' }}>
-                            {o.reports?.length > 0 ? '✓ Revisado' : (o.estado === 'Con Cita' && o.citaHora ? `🗓 Cita ${o.citaHora}` : '⏳ Pdte')}
+                            {o.reports?.length > 0 ? '✓ Revisado' : (o.estado === 'Con Cita' && o.citaHora ? `🗓 ${citaDiaTxt(o.citaFecha)} ${o.citaHora}` : '⏳ Pdte')}
                           </span>
                         </div>
                         {o.fecha && (

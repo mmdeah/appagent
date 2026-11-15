@@ -22,6 +22,17 @@ if (backendUrl.endsWith('/')) {
 }
 export const BACKEND_URL = backendUrl;
 
+// "2026-11-17" -> "hoy" | "mañana" | "mar, 17 nov" (día de una cita agendada).
+export const citaDiaTxt = (f) => {
+  if (!f) return '';
+  const d = new Date(`${f}T12:00:00`);
+  const hoy = new Date();
+  const manana = new Date(hoy); manana.setDate(hoy.getDate() + 1);
+  if (d.toDateString() === hoy.toDateString()) return 'hoy';
+  if (d.toDateString() === manana.toDateString()) return 'mañana';
+  return d.toLocaleDateString('es-CO', { weekday: 'short', day: 'numeric', month: 'short' });
+};
+
 // Órdenes de una flota (ald | cn): filtradas y sin fotos desde el servidor.
 export const fetchFleetOrders = async (empresa) => {
   try {

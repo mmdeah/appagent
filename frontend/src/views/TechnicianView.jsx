@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useContext, useRef } from 'react';
-import { API_URL, getPicoYPlaca, fetchOrdersResumen } from '../api';
+import { API_URL, getPicoYPlaca, fetchOrdersResumen, citaDiaTxt } from '../api';
 import { ThemeContext } from '../App';
 import PhotoUploadModal from './PhotoUploadModal';
 import {
@@ -821,7 +821,7 @@ export default function TechnicianView() {
                         <div style={{ cursor: 'pointer' }} onClick={() => openOrder(o)}>
                           <div style={{ fontSize: '1.45rem', fontWeight: 900, lineHeight: 1, color: o.placa ? undefined : 'var(--text-muted)' }}>{o.placa || 'SIN PLACA'}</div>
                           <div style={{ fontSize: '0.95rem', color: 'var(--text-muted)', fontWeight: 600 }}>{o.marca} {o.modelo}</div>
-                          {o.estado === 'Con Cita' && <div style={{ display: 'inline-block', marginTop: '0.3rem', fontSize: '0.78rem', fontWeight: 800, color: '#0ea5e9', background: 'rgba(14,165,233,0.12)', padding: '0.1rem 0.5rem', borderRadius: 999 }}>🗓 Cita{o.citaHora ? ` ${o.citaHora}` : ''} · aún sin ingresar</div>}
+                          {o.estado === 'Con Cita' && <div style={{ display: 'inline-block', marginTop: '0.3rem', fontSize: '0.78rem', fontWeight: 800, color: '#0ea5e9', background: 'rgba(14,165,233,0.12)', padding: '0.1rem 0.5rem', borderRadius: 999 }}>🗓 Cita {citaDiaTxt(o.citaFecha)}{o.citaHora ? ` ${o.citaHora}` : ''} · aún sin ingresar</div>}
                           {getPicoYPlaca(o.placa) && <div style={{ fontSize: '0.85rem', color: '#f59e0b', fontWeight: 800, marginTop: '0.2rem' }}>⚠️ {getPicoYPlaca(o.placa)}</div>}
                         </div>
                         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '0.4rem' }}>
