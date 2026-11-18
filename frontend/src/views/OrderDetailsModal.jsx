@@ -276,10 +276,6 @@ export default function OrderDetailsModal({ order, onClose, fleetMode = false, i
   const [metodoPago, setMetodoPago] = useState('Efectivo');
   const [notasEntrega, setNotasEntrega] = useState(order.notasEntrega || '');
   const [isEditingInfo, setIsEditingInfo] = useState(false);
-  // Índices (dentro de quoteItems del slot activo) de los ítems marcados
-  // para enviar su texto a "Servicios a Realizar" — se reinicia al cambiar
-  // de slot para no arrastrar selección de una tabla distinta.
-  const [selectedQuoteIdx, setSelectedQuoteIdx] = useState([]);
   // Si está activado, el PDF del Reporte Técnico ("Imprimir Reporte") solo
   // incluye los ítems marcados como "Malo"; desactivado (por defecto) salen
   // todos los ítems revisados, igual que antes.
@@ -414,32 +410,6 @@ export default function OrderDetailsModal({ order, onClose, fleetMode = false, i
       }
     } catch (err) {
       showStatus('Error al actualizar la información', 'error');
-    }
-  };
-
-  // Toma el texto (solo la descripción, sin precios) de los ítems de la
-  // cotización que el admin seleccionó y lo agrega al campo "Servicios a
-  // Realizar" de la orden, para que el técnico sepa qué hacer sin necesidad
-  // de entrar a ver la cotización.
-  const sendSelectedToServicios = async () => {
-    const textos = selectedQuoteIdx.map(i => quoteItems[i]?.descripcion?.trim()).filter(Boolean);
-    if (textos.length === 0) return;
-    const nuevoTexto = textos.join(', ');
-    const servicios = order.servicios ? `${order.servicios}, ${nuevoTexto}` : nuevoTexto;
-    try {
-      const res = await fetch(`${API_URL}/orders/${order.id}`, {
-        method: 'PATCH', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ servicios })
-      });
-      if (!res.ok) throw new Error('El servidor rechazó la actualización');
-      Object.assign(order, { servicios });
-      setEditedOrder(prev => ({ ...prev, servicios }));
-      setSelectedQuoteIdx([]);
-      showStatus('Enviado a "Servicios a Realizar"');
-      onUpdate && onUpdate();
-    } catch (e) {
-      console.error(e);
-      showStatus('Error al enviar a Servicios a Realizar. Intenta de nuevo.', 'error');
     }
   };
 
@@ -1672,14 +1642,14 @@ export default function OrderDetailsModal({ order, onClose, fleetMode = false, i
                 <button
                   className={`tab-btn ${activeSlot === 1 ? 'active' : ''}`}
                   style={{ flex: 'none', padding: '0.5rem 1rem' }}
-                  onClick={() => { setActiveSlot(1); setSelectedQuoteIdx([]); }}>
+                  onClick={() => setActiveSlot(1)}>
                   Cotización
                 </button>
                 {quotes[2] && (
                   <button
                     className={`tab-btn ${activeSlot === 2 ? 'active' : ''}`}
                     style={{ flex: 'none', padding: '0.5rem 1rem' }}
-                    onClick={() => { setActiveSlot(2); setSelectedQuoteIdx([]); }}>
+                    onClick={() => setActiveSlot(2)}>
                     Borrador (solo yo)
                   </button>
                 )}
@@ -1688,7 +1658,6 @@ export default function OrderDetailsModal({ order, onClose, fleetMode = false, i
                     onClick={() => {
                       setQuotes(prev => ({ ...prev, 2: { id: null, items: [{ descripcion: '', cantidad: 1, precio: 0, aplicaIva: false, prioridad: 'urgente' }] } }));
                       setActiveSlot(2);
-                      setSelectedQuoteIdx([]);
                     }}>
                     <Plus size={14} /> Agregar borrador
                   </button>
@@ -1735,7 +1704,6 @@ export default function OrderDetailsModal({ order, onClose, fleetMode = false, i
               <table className="data-table">
                 <thead>
                   <tr>
-                    {!fleetMode && <th className="hide-on-print" style={{ width: 30 }}></th>}
                     <th style={{ width: '35%' }}>Descripción</th>
                     <th style={{ textAlign: 'center' }}>Prioridad</th>
                     <th style={{ textAlign: 'center' }}>Cant.</th>
@@ -1751,11 +1719,6 @@ export default function OrderDetailsModal({ order, onClose, fleetMode = false, i
                     const total = it.aplicaIva ? lt * 1.19 : lt;
                     return (
                       <tr key={idx}>
-                        {!fleetMode && <td className="hide-on-print" style={{ textAlign: 'center' }}>
-                          <input type="checkbox" checked={selectedQuoteIdx.includes(idx)}
-                            onChange={e => setSelectedQuoteIdx(prev => e.target.checked ? [...prev, idx] : prev.filter(i => i !== idx))}
-                            title="Seleccionar para enviar a Servicios a Realizar" />
-                        </td>}
                         <td>
                           {!fleetMode && <input className="hide-on-print" type="text" placeholder="Descripción" value={it.descripcion}
                             onChange={e => { const q=[...quoteItems]; q[idx].descripcion=e.target.value; setQuoteItems(q); }}
@@ -1863,10 +1826,6 @@ export default function OrderDetailsModal({ order, onClose, fleetMode = false, i
               {!fleetMode && <div className="hide-on-print" style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap', alignItems: 'center', marginTop: '0.75rem', marginBottom: '1.5rem' }}>
                 <button className="btn-secondary" style={{ fontSize: '0.82rem' }} onClick={() => setQuoteItems([...quoteItems, { descripcion: '', cantidad: 1, precio: 0, aplicaIva: false, prioridad: 'urgente' }])}>
                   <Plus size={14} /> Añadir ítem
-                </button>
-                <button className="btn-secondary" style={{ fontSize: '0.82rem' }} disabled={selectedQuoteIdx.length === 0} onClick={sendSelectedToServicios}
-                  title="Copia solo el texto (sin precios) de los ítems marcados al campo Servicios a Realizar de la orden">
-                  <MoveRight size={14} /> Enviar a "Servicios a Realizar" {selectedQuoteIdx.length > 0 ? `(${selectedQuoteIdx.length})` : ''}
                 </button>
               </div>}
 
