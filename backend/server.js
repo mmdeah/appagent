@@ -408,13 +408,16 @@ server.post('/api/analyze-expense-image', async (req, res) => {
     const { imageBase64, mimeType } = req.body;
     if (!imageBase64) return res.status(400).json({ error: 'Se requiere imageBase64' });
 
-    const openRouterKey = process.env.OPENROUTER_EXPENSE_KEY || process.env.OPENROUTER_API_KEY;
-    if (!openRouterKey) return res.status(500).json({ error: 'Falta OPENROUTER_EXPENSE_KEY' });
+    // Prueba cada llave configurada: si una quedó vieja (401), usa la siguiente.
+    const llaves = [['OPENROUTER_EXPENSE_KEY', process.env.OPENROUTER_EXPENSE_KEY], ['OPENROUTER_API_KEY', process.env.OPENROUTER_API_KEY]]
+      .filter(([, v]) => v && v.trim())
+      .filter(([, v], i, arr) => arr.findIndex(([, w]) => w === v) === i);
+    if (!llaves.length) return res.status(500).json({ error: 'Falta OPENROUTER_EXPENSE_KEY' });
 
-    const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+    const llamar = (openRouterKey) => fetch('https://openrouter.ai/api/v1/chat/completions', {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${openRouterKey}`,
+        'Authorization': `Bearer ${openRouterKey.trim()}`,
         'Content-Type': 'application/json',
         'HTTP-Referer': 'https://appagent.up.railway.app',
         'X-Title': 'AppAgent'
@@ -450,9 +453,17 @@ No incluyas texto adicional, solo el JSON.`
       })
     });
 
+    let response, fallos = [];
+    for (const [nombre, valor] of llaves) {
+      response = await llamar(valor);
+      if (response.ok) break;
+      const detalle = await response.text();
+      fallos.push(`${nombre}: ${response.status} ${detalle.slice(0, 200)}`);
+      console.error('[analyze-expense-image] fallo con', nombre, response.status, detalle.slice(0, 200));
+      if (response.status !== 401 && response.status !== 402 && response.status !== 403) break;
+    }
     if (!response.ok) {
-      const err = await response.text();
-      return res.status(502).json({ error: 'Error de OpenRouter', details: err });
+      return res.status(502).json({ error: 'Error de OpenRouter', details: fallos.join(' | ') });
     }
 
     const result = await response.json();
