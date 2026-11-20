@@ -72,7 +72,8 @@ export default function ClientView() {
     try {
       const res = await fetch(`${API_URL}/orders?placa=${p}&_embed=reports&_embed=quotes`);
       const data = await res.json();
-      setOrders(Array.isArray(data) ? data : []);
+      // Una cita agendada aún no es un ingreso: el cliente solo ve órdenes ya ingresadas al taller
+      setOrders(Array.isArray(data) ? data.filter(o => o.estado !== 'Con Cita') : []);
       setPlaca(p);
       setScreen('results');
     } catch {
