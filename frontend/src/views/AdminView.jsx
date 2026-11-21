@@ -2166,6 +2166,14 @@ ${PAYMENT_METHODS.map(m => `<tr><td>${m}</td><td style="text-align:right;font-we
               const totalIva  = ordenesConIva.reduce((s, x) => s + x.iva, 0);
               const totalFact = ordenesConIva.reduce((s, x) => s + x.total, 0);
 
+              // ── IVA de compras: gastos del rango con factura con IVA ──
+              const comprasConIva = expenses
+                .filter(g => g.facturaIva === 'Sí' && inIvaRange(g.fecha))
+                .sort((a, b) => new Date(b.fecha) - new Date(a.fecha));
+              const ivaCompras = comprasConIva.reduce((s, g) => s + (parseFloat(g.ivaValor) || 0), 0);
+              const comprasSinValor = comprasConIva.filter(g => !(parseFloat(g.ivaValor) > 0)).length;
+              const ivaNeto = totalIva - ivaCompras;
+
               const generarReporteIva = () => {
                 const fmtDate = d => d ? d.toLocaleDateString('es-CO') : '—';
                 const periodo = `${fmtDate(ivDesde)} — ${fmtDate(ivHasta)}`;
@@ -2212,11 +2220,21 @@ ${PAYMENT_METHODS.map(m => `<tr><td>${m}</td><td style="text-align:right;font-we
   <div class="kpi"><div class="l">IVA generado (19%)</div><div class="v">$${fmt(totalIva)}</div></div>
   <div class="kpi"><div class="l">Total facturado</div><div class="v">$${fmt(totalFact)}</div></div>
 </div>
+<div class="kpi-grid">
+  <div class="kpi"><div class="l">IVA comprado (gastos)</div><div class="v">$${fmt(ivaCompras)}</div></div>
+  <div class="kpi"><div class="l">IVA generado − comprado</div><div class="v">${ivaNeto < 0 ? '-' : ''}$${fmt(Math.abs(ivaNeto))}</div></div>
+</div>
 
 <h2>Detalle por orden de servicio</h2>
 <table>
   <thead><tr><th>Ítem</th><th style="text-align:center">Cant.</th><th style="text-align:right">Vr. Unitario</th><th style="text-align:right">IVA</th><th style="text-align:right">Total</th></tr></thead>
   <tbody>${filasOrdenes || '<tr><td class="muted" colspan="5">Sin órdenes con IVA en este período.</td></tr>'}</tbody>
+</table>
+
+<h2>IVA de compras (gastos con factura con IVA)</h2>
+<table>
+  <thead><tr><th>Fecha</th><th>Concepto</th><th>Vendedor</th><th style="text-align:right">Monto</th><th style="text-align:right">IVA</th></tr></thead>
+  <tbody>${comprasConIva.map(g => `<tr><td>${g.fecha ? new Date(g.fecha).toLocaleDateString('es-CO') : ''}</td><td>${g.concepto || ''}</td><td>${g.vendedor || ''}</td><td style="text-align:right">$${fmt(g.monto)}</td><td style="text-align:right">${parseFloat(g.ivaValor) > 0 ? '$' + fmt(g.ivaValor) : 'Sin valor'}</td></tr>`).join('') || '<tr><td class="muted" colspan="5">Sin gastos con IVA en este período.</td></tr>'}</tbody>
 </table>
 </body></html>`;
                 const w = window.open('', '_blank');
@@ -2265,6 +2283,8 @@ ${PAYMENT_METHODS.map(m => `<tr><td>${m}</td><td style="text-align:right;font-we
                       { label: 'Base gravable', value: `$${fmt(totalBase)}`, color: 'var(--text)', span: 3 },
                       { label: 'IVA generado (19%)', value: `$${fmt(totalIva)}`, color: '#818cf8', span: 3, sub: 'Para declaración DIAN' },
                       { label: 'Total facturado con IVA', value: `$${fmt(totalFact)}`, color: '#10b981', span: 3 },
+                      { label: 'IVA comprado (gastos)', value: `$${fmt(ivaCompras)}`, color: '#3b82f6', span: 4, sub: comprasSinValor ? `${comprasConIva.length} facturas · ${comprasSinValor} sin valor de IVA registrado` : `${comprasConIva.length} facturas de compra con IVA` },
+                      { label: 'IVA generado − comprado', value: `${ivaNeto < 0 ? '-' : ''}$${fmt(Math.abs(ivaNeto))}`, color: ivaNeto < 0 ? '#10b981' : '#f59e0b', span: 4, sub: ivaNeto < 0 ? 'Saldo a favor (referencia, no es asesoría contable)' : 'Aproximado a pagar (referencia, no es asesoría contable)' },
                     ].map(s => (
                       <div key={s.label} className="card" style={{ gridColumn: `span ${s.span}`, padding: '1.1rem 1.25rem', minWidth: 0 }}>
                         <div style={{ fontSize: '0.72rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing:'0.05em', marginBottom: '0.4rem' }}>{s.label}</div>
@@ -2272,6 +2292,34 @@ ${PAYMENT_METHODS.map(m => `<tr><td>${m}</td><td style="text-align:right;font-we
                         {s.sub && <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)', marginTop: '0.3rem' }}>{s.sub}</div>}
                       </div>
                     ))}
+                  </div>
+
+                  {/* Compras con IVA (gastos) */}
+                  <div className="card" style={{ padding: '1.5rem' }}>
+                    <h3 style={{ fontSize: '0.95rem', fontWeight: 700, marginBottom: '0.3rem' }}>
+                      IVA de compras <span style={{ fontWeight: 500, color: 'var(--text-muted)', fontSize: '0.8rem' }}>({comprasConIva.length} facturas en el período)</span>
+                    </h3>
+                    <p style={{ color: 'var(--text-muted)', fontSize: '0.8rem', marginBottom: '1rem' }}>Gastos marcados "con IVA". El valor sale de lo que leyó la IA en la foto o de lo que escribiste en el gasto.</p>
+                    {comprasConIva.length === 0 ? (
+                      <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem', textAlign: 'center', padding: '1rem 0' }}>Sin gastos con IVA en este período.</p>
+                    ) : (
+                      <table className="data-table">
+                        <thead><tr><th>Fecha</th><th>Concepto</th><th>Vendedor</th><th style={{ textAlign: 'right' }}>Monto</th><th style={{ textAlign: 'right' }}>IVA</th></tr></thead>
+                        <tbody>
+                          {comprasConIva.map(g => (
+                            <tr key={g.id}>
+                              <td style={{ whiteSpace: 'nowrap', color: 'var(--text-muted)', fontSize: '0.85rem' }}>{g.fecha ? new Date(g.fecha).toLocaleDateString('es-CO') : '—'}</td>
+                              <td style={{ fontWeight: 600 }}>{g.concepto}</td>
+                              <td style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>{g.vendedor || '—'}</td>
+                              <td style={{ textAlign: 'right', whiteSpace: 'nowrap' }}>${fmt(g.monto)}</td>
+                              <td style={{ textAlign: 'right', whiteSpace: 'nowrap', fontWeight: 800, color: parseFloat(g.ivaValor) > 0 ? '#3b82f6' : 'var(--error)' }}>
+                                {parseFloat(g.ivaValor) > 0 ? `$${fmt(g.ivaValor)}` : 'Sin valor'}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    )}
                   </div>
 
                   {/* Orders table */}
