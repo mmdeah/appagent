@@ -13,7 +13,7 @@ const PAYMENT_METHODS = ['Efectivo', 'Nequi', 'Bancolombia', 'Banco de Bogota', 
 
 const emptyForm = () => ({
   fecha: new Date().toISOString().split('T')[0],
-  concepto: '', monto: '', metodoPago: 'Efectivo', categoria: 'Repuestos', vendedor: '', facturaIva: 'No', ordenId: '',
+  concepto: '', monto: '', metodoPago: 'Efectivo', categoria: 'Repuestos', vendedor: '', facturaIva: 'No', ivaValor: '', ordenId: '',
 });
 
 const fmtMiles = (digitsOnly) => digitsOnly ? parseInt(digitsOnly, 10).toLocaleString('es-CO') : '';
@@ -97,6 +97,7 @@ export default function GastosUploadView() {
         ...(data.categoria && EXPENSE_CATEGORIES.includes(data.categoria) ? { categoria: data.categoria } : {}),
         ...(data.vendedor ? { vendedor: data.vendedor } : {}),
         ...(typeof data.facturaConIva === 'boolean' ? { facturaIva: data.facturaConIva ? 'Sí' : 'No' } : {}),
+        ...(Number(data.ivaValor) > 0 ? { ivaValor: String(Math.round(Number(data.ivaValor))), facturaIva: 'Sí' } : {}),
       }));
     } catch (e) {
       setAnalyzeError(true);
@@ -127,6 +128,7 @@ export default function GastosUploadView() {
           ...form,
           concepto,
           monto: parseInt(form.monto) || 0,
+          ivaValor: form.facturaIva === 'Sí' ? (parseInt(form.ivaValor) || 0) : 0,
           ordenId: ordenSeleccionada ? ordenSeleccionada.id : null,
           placa: ordenSeleccionada ? ordenSeleccionada.placa : '',
         }),
@@ -269,6 +271,14 @@ export default function GastosUploadView() {
                       ❌ No
                     </button>
                   </div>
+                  {form.facturaIva === 'Sí' && (
+                    <div style={{ marginTop: '0.75rem' }}>
+                      <label style={{ ...label, fontSize: '0.95rem' }}>¿Cuánto fue el IVA? (en pesos)</label>
+                      <input type="text" inputMode="numeric" placeholder="Ej: 7.125 (déjalo vacío si no lo ves)"
+                        value={fmtMiles(form.ivaValor)} onChange={e => setForm({ ...form, ivaValor: e.target.value.replace(/\D/g, '') })}
+                        style={{ fontSize: '1.2rem', fontWeight: 700 }} />
+                    </div>
+                  )}
                 </div>
 
                 <div>

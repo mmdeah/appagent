@@ -442,7 +442,8 @@ server.post('/api/analyze-expense-image', async (req, res) => {
   "metodoPago": "Efectivo" o "Nequi" o "Bancolombia" o "Banco de Bogota" o "Tarjeta" (infiere si puedes, sino "Efectivo"),
   "categoria": "Repuestos" o "Insumos" o "Nómina" o "Arriendo" o "Servicios Públicos" o "Herramientas" o "Impuestos" o "Otros" (clasifica según el contenido del recibo),
   "vendedor": "nombre del negocio, tienda o persona que vendió/emitió el recibo, tal como aparece en el encabezado o firma. null si no se ve.",
-  "facturaConIva": true o false — true SOLO si el recibo muestra explícitamente el IVA discriminado (ej. una línea "IVA" o "IVA (19%)" con su valor); false si no aparece IVA discriminado o no es claro
+  "facturaConIva": true o false — true SOLO si el recibo muestra explícitamente el IVA discriminado (ej. una línea "IVA" o "IVA (19%)" con su valor); false si no aparece IVA discriminado o no es claro,
+  "ivaValor": número entero sin símbolos ni puntos ni comas con el valor TOTAL en pesos del IVA discriminado en el recibo (suma si hay varias líneas de IVA; ej: 7125). null si no aparece el valor del IVA. No lo calcules ni lo estimes: solo lo que el recibo muestra
 }
 No incluyas texto adicional, solo el JSON.`
               }
